@@ -1,0 +1,77 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Memeriksa Riwayat Transaksi (UC-08)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih tab "Riwayat Transaksi" pada Dompet Token;
+
+|Polaris Audio|
+:Kueri catatan mutasi buku besar dari basis data;
+:Menampilkan tabel riwayat transaksi dan bilah filter;
+
+|Audio Engineer|
+repeat
+  :Menentukan parameter filter (Top-up, Sesi, Refund);
+  :Menekan tombol terapkan filter;
+
+  |Polaris Audio|
+  :Validasi ketersediaan data transaksi pada periode filter;
+  backward:Tampilkan notifikasi tidak ada data transaksi;
+repeat while () is ([Data Tidak Ditemukan]) not ([Data Ditemukan])
+
+:Perbarui tabel mutasi token sesuai kriteria filter;
+
+|Audio Engineer|
+:Memilih baris transaksi untuk melihat rincian lengkap;
+
+|Polaris Audio|
+:Menampilkan jendela detail transaksi (ID, trek, stempel waktu);
+
+:Periksa opsi tindakan pada detail transaksi;
+if () then ([Unduh Bukti Pembayaran])
+  :Generate dan terbitkan dokumen kuitansi resmi (PDF);
+  |Audio Engineer|
+  :Menyimpan berkas tanda terima digital ke perangkat;
+else ([Tutup Panel Detail])
+  |Polaris Audio|
+  :Tutup jendela detail dan kembalikan ke tabel utama;
+  |Audio Engineer|
+  :Kembali ke daftar riwayat transaksi;
+endif
+
+|Audio Engineer|
+:Melihat ringkasan pembukuan mutasi token yang telah diverifikasi;
+stop
+
+@enduml

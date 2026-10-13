@@ -1,0 +1,77 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Memverifikasi Integritas & Sinkronisasi Sesi (UC-11)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka antarmuka verifikasi sesi mixing;
+
+|Polaris Audio|
+:Memulai proses verifikasi otomatis integritas berkas;
+:Memeriksa keselarasan durasi dan titik awal (zero-aligned);
+:Memindai keberadaan sinyal suara (deteksi keheningan digital);
+
+:Validasi keseragaman sample rate dan bit depth antar-trek;
+if () then ([Perbedaan Sample Rate Campuran])
+  :Tampilkan opsi rekomendasi "Sesuaikan Sample Rate";
+  |Audio Engineer|
+  :Menyetujui opsi penyesuaian sample rate otomatis;
+  |Polaris Audio|
+  :Jalankan proses resampling internal ke sample rate standar;
+else ([Sample Rate Seragam])
+endif
+
+:Pemeriksaan integritas durasi dan keheningan audio;
+if () then ([Terdeteksi Anomali (Offset / Trek Hening)])
+  :Tampilkan penanda peringatan oranye pada trek bermasalah;
+  |Audio Engineer|
+  :Tinjau anomali dan tentukan aksi (hapus trek atau abaikan);
+  |Polaris Audio|
+  :Perbarui daftar trek aktif dan sesuaikan kalkulasi token;
+else ([Semua Trek Sinkron & Utuh])
+  :Tampilkan penanda centang hijau pada seluruh baris trek;
+endif
+
+:Tampilkan ringkasan hasil verifikasi dan total trek valid;
+
+|Audio Engineer|
+:Meninjau ringkasan dan menekan tombol "Lanjut ke Klasifikasi";
+
+|Polaris Audio|
+:Kunci konfigurasi sesi dan siapkan data untuk klasifikasi AI (UC-12);
+
+|Audio Engineer|
+:Melihat antarmuka klasifikasi instrumen dan pasangan trek;
+stop
+
+@enduml

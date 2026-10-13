@@ -1,0 +1,114 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+}
+
+title Sequence Diagram: Register Akun Baru (UC-01)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Register\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "AuthController\n(API Gateway)" as Auth
+entity "UserService\n(Account Core)" as UserSvc
+entity "WalletService\n(Token Core)" as WalletSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+User -> UI : Buka halaman registrasi
+activate User
+activate UI
+UI --> User : Tampilkan formulir pendaftaran akun baru
+deactivate UI
+
+User -> UI : Masukkan Nama, Email, & Password
+activate UI
+User -> UI : Tekan tombol "Daftar Akun"
+UI -> UI : Validasi format email & kekuatan password
+
+alt Format Tidak Valid / Password Lemah
+  UI --> User : Tampilkan notifikasi error (Password min. 8 karakter & alfanumerik)
+else Format & Password Valid
+  UI -> Auth : POST /api/v1/auth/register (name, email, password)
+  activate Auth
+  
+  Auth -> UserSvc : registerUser(name, email, password)
+  activate UserSvc
+  
+  UserSvc -> DB : SELECT id FROM users WHERE email = ?
+  activate DB
+  DB --> UserSvc : Hasil kueri data email
+  deactivate DB
+  
+  alt Email Sudah Terdaftar
+    UserSvc --> Auth : Error: EmailAlreadyExistsException
+    Auth --> UI : 409 Conflict ("Alamat email sudah terdaftar")
+    UI --> User : Tampilkan notifikasi: "Email sudah terdaftar. Silakan login"
+  else Email Belum Terdaftar (Email Baru)
+    UserSvc -> UserSvc : Hash password (argon2 / bcrypt)
+    UserSvc -> DB : INSERT INTO users (name, email, password_hash, role)
+    activate DB
+    DB --> UserSvc : User terbuat (user_id)
+    deactivate DB
+    
+    UserSvc -> WalletSvc : initializeWallet(user_id)
+    activate WalletSvc
+    
+    WalletSvc -> DB : INSERT INTO wallets (user_id, balance=5)
+    activate DB
+    DB --> WalletSvc : Wallet terbuat
+    
+    WalletSvc -> DB : INSERT INTO token_transactions (user_id, amount=5, type='WELCOME_GRANT')
+    DB --> WalletSvc : Ledger transaksi tercatat
+    deactivate DB
+    
+    WalletSvc --> UserSvc : Dompet terinisialisasi (saldo awal: 5)
+    deactivate WalletSvc
+    
+    UserSvc -> UserSvc : Generate JWT access token & session
+    UserSvc --> Auth : RegistrationSuccess(user, wallet, jwt_token)
+    deactivate UserSvc
+    
+    Auth --> UI : 201 Created (JWT, profile, initial tokens)
+    deactivate Auth
+    
+    UI -> UI : Simpan JWT ke local storage / secure cookie
+    UI --> User : Arahkan ke Dasbor Utama (tampilkan nama & saldo 5 token)
+  end
+end
+deactivate UI
+deactivate User
+
+@enduml

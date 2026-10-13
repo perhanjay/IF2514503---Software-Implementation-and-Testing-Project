@@ -1,0 +1,247 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mendengarkan Perbandingan Audio Mentah vs Audio Perbaikan (UC-16)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Pemutar Multitrack A/B\n(Web UI Player)" as UI
+control "WebAudioEngine\n(Dual-Buffer AudioContext)" as AudioEngine
+control "PhaseMeterRenderer\n(Canvas Visualizer)" as Visualizer
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "PlaybackController\n(API Gateway)" as PlayCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "PlaybackSessionService\n(Stem Manifest Service)" as PlaySvc
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage / CDN\n(S3 / Signed Dual-Stems)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Inisialisasi & Pemuatan Dual-Stem Buffer (Raw vs Fixed) ==
+
+User -> UI : Buka antarmuka Pemutar Multitrack A/B (dari UC-14/UC-15)
+activate User
+activate UI
+
+UI -> PlayCtrl : GET /api/v1/sessions/{id}/playback-manifest (Bearer JWT)
+activate PlayCtrl
+
+PlayCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> PlayCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+PlayCtrl -> PlaySvc : getDualPlaybackManifest(session_id)
+activate PlaySvc
+
+PlaySvc -> DB : SELECT id, name, raw_stem_url, repaired_stem_url, phase_data FROM session_tracks WHERE session_id = ?
+activate DB
+DB --> PlaySvc : Metadata trek & presigned URL audio mentah vs perbaikan
+deactivate DB
+
+PlaySvc --> PlayCtrl : PlaybackManifestPayload (tracks[], session_id, duration)
+deactivate PlaySvc
+
+PlayCtrl --> UI : 200 OK (manifest, dual_stem_urls)
+deactivate PlayCtrl
+
+UI -> AudioEngine : initAudioContext(sample_rate=48kHz, channels=2)
+activate AudioEngine
+
+AudioEngine -> Storage : Fetch stem audio (Dual-Stream parallel: raw & repaired chunks)
+activate Storage
+Storage --> AudioEngine : Binary Audio Buffers (WAV / PCM Float32Array)
+deactivate Storage
+
+AudioEngine -> AudioEngine : Decode audio buffers & sinkronisasi timecode (start_time = 0.0s)
+AudioEngine --> UI : AudioBuffersReady (Dual-buffer synced)
+deactivate AudioEngine
+
+UI --> User : Render pemutar multitrack penuh (garis waktu, tombol A/B, Mono Check, Meter Fasa)
+deactivate UI
+
+== Fase 2: Pemutaran Multitrack Sinkron & Monitoring Real-Time ==
+
+User -> UI : Tekan tombol "Play" (Spasi)
+activate UI
+
+UI -> AudioEngine : playAllTracks(startTime=currentTime, mode='FIXED')
+activate AudioEngine
+
+AudioEngine -> AudioEngine : Mulai pemutaran seluruh trek serentak via WebAudio nodes
+AudioEngine -> Visualizer : Kirim audio frame data ke AnalyserNode
+activate Visualizer
+
+Visualizer -> Visualizer : Hitung real-time phase correlation (-1.0 s/d +1.0) & VU metering
+Visualizer --> UI : Render grafik korelasi fasa & meter level dinamis (60 FPS)
+deactivate Visualizer
+
+UI --> User : Tampilan visualizer bergerak sinkron & audio perbaikan mengalun di monitor
+deactivate UI
+deactivate AudioEngine
+
+== Fase 3: Pengujian Komparasi A/B & Pemeriksaan Mono (Typical Course) ==
+
+User -> UI : Tekan tombol "Komparasi A/B" (Raw vs Repaired)
+activate UI
+
+UI -> AudioEngine : switchAudioSource(target='RAW', crossfadeMs=5)
+activate AudioEngine
+
+AudioEngine -> AudioEngine : Alihkan output ke Raw Audio Buffers pada timecode identik tanpa latensi/klik
+AudioEngine -> Visualizer : Alihkan sinyal input AnalyserNode ke trek mentah
+activate Visualizer
+
+Visualizer --> UI : Perbarui grafik korelasi fasa (tampilkan fasa terbalik / indikasi merah)
+deactivate Visualizer
+
+UI --> User : Terdengar audio mentah sebelum perbaikan & meter fasa berkedip merah (-1.0)
+deactivate AudioEngine
+deactivate UI
+
+User -> UI : Tekan tombol "Komparasi A/B" kembali ke audio hasil perbaikan
+activate UI
+
+UI -> AudioEngine : switchAudioSource(target='FIXED', crossfadeMs=5)
+activate AudioEngine
+
+AudioEngine -> AudioEngine : Alihkan output ke Repaired Audio Buffers tanpa jeda waktu
+AudioEngine -> Visualizer : Alihkan sinyal input AnalyserNode ke trek perbaikan
+activate Visualizer
+
+Visualizer --> UI : Perbarui grafik korelasi fasa (tampilkan fasa koheren / indikasi hijau)
+deactivate Visualizer
+
+UI --> User : Terdengar audio bersih koheren & meter fasa kembali hijau (+0.8 s/d +1.0)
+deactivate AudioEngine
+deactivate UI
+
+User -> UI : Tekan tombol "Mono Check"
+activate UI
+
+UI -> AudioEngine : toggleMonoSumming(enabled=true)
+activate AudioEngine
+
+AudioEngine -> AudioEngine : Gabungkan channel Left & Right ke mono summing bus (L+R / 2)
+AudioEngine -> Visualizer : Kirim sinyal mono sum ke AnalyserNode
+activate Visualizer
+
+Visualizer --> UI : Perbarui visualizer mono correlation & kekuatan sinyal tengah (Mid/Side)
+deactivate Visualizer
+
+AudioEngine --> UI : MonoModeActive
+deactivate AudioEngine
+
+UI --> User : Audio beralih ke mono tanpa phase cancellation (vokal & drum tetap terdengar solid)
+deactivate UI
+
+== Fase 4: Fitur Penyetelan Lanjutan (Alternative Workflow) ==
+
+alt [Alternative Workflow 1: Solo atau Mute Trek Tertentu]
+  User -> UI : Tekan tombol Solo (S) pada Snare / Mute (M) pada Overhead
+  activate UI
+  UI -> AudioEngine : setTrackGain(track_id='snare', solo=true, mute=false)
+  activate AudioEngine
+  AudioEngine -> AudioEngine : Redam gain trek non-solo menjadi 0, isolasi output trek terpilih
+  AudioEngine --> UI : TrackStateUpdated
+  deactivate AudioEngine
+  UI --> User : Audisi instrumen spesifik secara mendalam tanpa distraksi instrumen lain
+  deactivate UI
+
+else [Alternative Workflow 2: Melakukan Perulangan (Loop Region)]
+  User -> UI : Seleksi rentang loop region pada garis waktu lagu (misal: Bar 16 - 24)
+  activate UI
+  UI -> AudioEngine : setLoopRange(startTime=32.0s, endTime=48.0s, loop=true)
+  activate AudioEngine
+  AudioEngine -> AudioEngine : Konfigurasi AudioBufferSourceNode loop endpoints
+  AudioEngine --> UI : LoopRegionActivated
+  deactivate AudioEngine
+  UI --> User : Audio berputar berulang otomatis pada segmen yang dipilih untuk evaluasi detail
+  deactivate UI
+end
+
+== Fase 5: Penanganan Beban Kinerja / Glitch Audio (Exceptional Workflow) ==
+
+opt [Exceptional Workflow: Beban CPU/Memori Pengguna Tinggi (Audio Glitch / Drop-out Warning)]
+  activate AudioEngine
+  AudioEngine -> AudioEngine : Deteksi lonjakan latensi AudioContext / buffer underrun
+  AudioEngine -> UI : emitPerformanceWarning(dropFrameDetected=true)
+  deactivate AudioEngine
+  activate UI
+  UI -> Visualizer : throttleRendering(targetFps=15, simplifyGraph=true)
+  activate Visualizer
+  Visualizer --> UI : VisualizerThrottled
+  deactivate Visualizer
+  UI --> User : Turunkan animasi visualizer sementara & tampilkan toast: "Mengoptimalkan performa pemutaran"
+  deactivate UI
+end
+
+== Fase 6: Validasi Selesai & Navigasi ke Unduhan ==
+
+User -> UI : Tekan tombol "Selesai & Lanjut ke Unduhan"
+activate UI
+
+UI -> PlayCtrl : POST /api/v1/sessions/{id}/verify-audit (Bearer JWT)
+activate PlayCtrl
+
+PlayCtrl -> PlaySvc : markSessionVerified(session_id)
+activate PlaySvc
+
+PlaySvc -> DB : UPDATE sessions SET status = 'AUDIT_VERIFIED', verified_at = NOW() WHERE id = session_id
+activate DB
+DB --> PlaySvc : StatusUpdated
+deactivate DB
+
+PlaySvc --> PlayCtrl : SessionVerificationSuccess
+deactivate PlaySvc
+
+PlayCtrl --> UI : 200 OK (redirect_url='/sessions/{id}/export')
+deactivate PlayCtrl
+
+UI --> User : Alihkan ke halaman pengunduhan paket stem (UC-17) & laporan audit PDF (UC-18)
+deactivate UI
+
+deactivate User
+
+@enduml

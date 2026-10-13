@@ -1,0 +1,113 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+}
+
+title Sequence Diagram: Memeriksa Saldo Token (UC-06)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Dompet Token / Dasbor\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "WalletController\n(API Gateway)" as WalletCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "WalletService\n(Token Management)" as WalletSvc
+entity "PromoClaimService\n(Daily Grant Core)" as PromoSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+User -> UI : Klik ikon / menu "Dompet Token" pada bilah navigasi
+activate User
+activate UI
+
+UI -> WalletCtrl : GET /api/v1/wallet/details (Bearer JWT)
+activate WalletCtrl
+
+WalletCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> WalletCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+WalletCtrl -> WalletSvc : getWalletBalance(user_id)
+activate WalletSvc
+
+WalletSvc -> DB : SELECT balance, updated_at FROM wallets WHERE user_id = ?
+activate DB
+DB --> WalletSvc : Data dompet (saldo token aktif)
+deactivate DB
+
+WalletSvc --> WalletCtrl : WalletData (balance, usage_rules)
+deactivate WalletSvc
+
+WalletCtrl -> PromoSvc : checkDailyClaimAvailability(user_id)
+activate PromoSvc
+
+PromoSvc -> DB : SELECT last_claimed_at FROM daily_claims WHERE user_id = ?
+activate DB
+DB --> PromoSvc : Stempel waktu klaim terakhir
+deactivate DB
+
+PromoSvc --> WalletCtrl : ClaimStatus (can_claim: boolean)
+deactivate PromoSvc
+
+WalletCtrl --> UI : 200 OK (balance, can_claim, usage_rules)
+deactivate WalletCtrl
+
+UI --> User : Render kartu saldo token, aturan biaya, & status tombol klaim
+deactivate UI
+
+alt Saldo Token Habis (balance == 0)
+  UI -> UI : Tampilkan penanda merah & tombol peringatan "Saldo Habis"
+  User -> UI : Tekan tombol "Top-up Token"
+  activate UI
+  UI --> User : Arahkan ke halaman Pembelian Paket Token (UC-07)
+  deactivate UI
+else Jatah Klaim Harian Tersedia (can_claim == true)
+  UI -> UI : Tampilkan tombol aktif "Klaim Token Gratis Harian"
+  User -> UI : Tekan tombol "Klaim Token Gratis"
+  activate UI
+  UI --> User : Arahkan ke alur Klaim Jatah Token Gratis (UC-09)
+  deactivate UI
+else Saldo Cukup & Klaim Cooldown
+  UI -> UI : Tampilkan status saldo normal & tombol klaim nonaktif
+  User -> UI : Tutup panel dompet atau lanjut ke proyek mixing
+  activate UI
+  UI --> User : Kembali ke tampilan dasbor sesi mixing aktif
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

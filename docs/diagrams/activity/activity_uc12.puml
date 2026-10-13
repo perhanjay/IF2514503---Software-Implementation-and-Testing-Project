@@ -1,0 +1,74 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengoreksi Label & Pasangan Track Secara Manual (UC-12)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka antarmuka klasifikasi trek dan konfigurasi pairing;
+
+|Polaris Audio|
+:Menampilkan daftar trek dengan prediksi instrumen AI dan grup mikrofon;
+
+|Audio Engineer|
+:Memeriksa kesesuaian label instrumen dan kelompok pasangan trek;
+
+|Polaris Audio|
+:Evaluasi kebutuhan koreksi manual oleh pengguna;
+if () then ([Perlu Koreksi Manual])
+  |Audio Engineer|
+  :Memilih opsi ubah label instrumen atau atur pairing (pair/unpair);
+  |Polaris Audio|
+  :Validasi kompatibilitas instrumen untuk analisis fasa multi-mikrofon;
+  if () then ([Relasi Pasangan Tidak Lazim])
+    :Tampilkan dialog konfirmasi peringatan kompatibilitas pairing;
+    |Audio Engineer|
+    :Meninjau konfirmasi dan menetapkan pilihan pairing;
+    |Polaris Audio|
+  else ([Label / Relasi Pasangan Lazim])
+  endif
+  :Perbarui metadata label instrumen dan hubungan pasangan trek;
+else ([Prediksi AI Sudah Akurat])
+endif
+
+|Audio Engineer|
+:Meninjau konfigurasi akhir dan tekan "Simpan & Lanjutkan ke Diagnostik";
+
+|Polaris Audio|
+:Simpan pembaruan metadata sesi mixing ke basis data;
+:Inisialisasi mesin analisis fasa dan diagnostik DSP (UC-13);
+
+|Audio Engineer|
+:Melihat Dasbor Diagnostik Sesi dan Skor Kesehatan Mixing;
+stop
+
+@enduml

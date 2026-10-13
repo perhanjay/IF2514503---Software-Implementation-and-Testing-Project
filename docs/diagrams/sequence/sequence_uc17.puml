@@ -1,0 +1,218 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mengunduh Stems Audio Hasil Perbaikan (UC-17)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Unduh Stems\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "ExportController\n(API Gateway)" as ExportCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "ExportPackageService\n(Stem Archiver Core)" as ExportSvc
+control "ZipArchiverWorker\n(Packaging Worker)" as ArchiverWorker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Storage)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pemuatan Halaman & Pengecekan Kesiapan Arsip ==
+
+User -> UI : Buka Halaman Unduh Stems (dari Dasbor Ringkasan Sesi)
+activate User
+activate UI
+
+UI -> ExportCtrl : GET /api/v1/sessions/{id}/export/stems-info (Bearer JWT)
+activate ExportCtrl
+
+ExportCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> ExportCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+ExportCtrl -> ExportSvc : getStemsInfo(session_id)
+activate ExportSvc
+
+ExportSvc -> DB : SELECT id, name, is_repaired, repaired_url, raw_url, retention_expires_at, zip_archive_url FROM session_tracks WHERE session_id = ?
+activate DB
+DB --> ExportSvc : SessionTracks & RetentionMetadata
+deactivate DB
+
+ExportSvc --> ExportCtrl : ExportInfoPayload (track_count, total_size, retention_hours, zip_status)
+deactivate ExportSvc
+
+ExportCtrl --> UI : 200 OK (stems_list, zip_ready_flag, retention_info)
+deactivate ExportCtrl
+
+UI --> User : Tampilkan tombol "Unduh Seluruh Stems (.ZIP)", daftar trek individual, dan sisa retensi (48 Jam)
+deactivate UI
+
+== Fase 2: Pengemasan & Pengunduhan Arsip Penuh ZIP (Typical Course) ==
+
+User -> UI : Tekan tombol "Unduh Seluruh Stems (.ZIP)"
+activate UI
+
+UI -> ExportCtrl : POST /api/v1/sessions/{id}/export/zip (Bearer JWT)
+activate ExportCtrl
+
+ExportCtrl -> ExportSvc : requestFullZipArchive(session_id, user_id)
+activate ExportSvc
+
+ExportSvc -> DB : SELECT zip_archive_url FROM sessions WHERE id = session_id
+activate DB
+DB --> ExportSvc : zip_archive_url == NULL (Arsip belum dibuat)
+deactivate DB
+
+ExportSvc -> ArchiverWorker : dispatch(CreateZipArchiveJob(session_id))
+activate ArchiverWorker
+ArchiverWorker --> ExportSvc : JobEnqueued (ws_channel)
+deactivate ArchiverWorker
+
+ExportSvc --> ExportCtrl : PackagingInitiated (job_id, ws_channel)
+deactivate ExportSvc
+
+ExportCtrl --> UI : 202 Accepted (packaging in progress)
+deactivate ExportCtrl
+
+UI --> User : Tampilkan bilah kemajuan: "Sedang mengemas ZIP lossless (WAV 24-bit/48kHz)..."
+
+activate ArchiverWorker
+ArchiverWorker -> Storage : Baca seluruh berkas perbaikan (FIXED_*.wav) & trek bersih
+activate Storage
+Storage --> ArchiverWorker : Audio Streams
+deactivate Storage
+
+ArchiverWorker -> ArchiverWorker : Kompilasi arsip ZIP (lossless WAV, penamaan rapi FIXED_[NamaTrek].wav)
+ArchiverWorker -> Storage : Tulis berkas arsip ZIP (Session_[Title]_Stems_24bit.zip)
+activate Storage
+Storage --> ArchiverWorker : UploadSuccess (zip_storage_key)
+deactivate Storage
+
+ArchiverWorker -> DB : UPDATE sessions SET zip_archive_url = ?, zip_created_at = NOW() WHERE id = ?
+activate DB
+DB --> ArchiverWorker : RecordUpdated
+deactivate DB
+
+ArchiverWorker --> ExportSvc : PackagingCompleted (zip_storage_key)
+activate ExportSvc
+deactivate ArchiverWorker
+
+ExportSvc -> Storage : generatePresignedDownloadUrl(zip_storage_key, expiresIn=1h)
+activate Storage
+Storage --> ExportSvc : PresignedDownloadUrl
+deactivate Storage
+
+ExportSvc -> UI : WebSocket push: EVENT_ZIP_READY (download_url)
+deactivate ExportSvc
+
+UI -> Storage : Trigger direct browser download (GET presigned ZIP URL)
+activate Storage
+Storage --> UI : Stream binary ZIP archive (Content-Disposition: attachment)
+deactivate Storage
+
+UI --> User : Berkas ZIP tersimpan otomatis di komputer lokal & konfirmasi unduhan selesai
+deactivate UI
+
+== Fase 3: Pengunduhan Trek Satuan (Alternative Workflow) ==
+
+alt [Alternative Workflow: Mengunduh Trek Secara Satuan (Individual Track Download)]
+  User -> UI : Tekan ikon unduh pada baris trek tertentu (misal: "FIXED_Snare_Bottom.wav")
+  activate UI
+  UI -> ExportCtrl : GET /api/v1/sessions/{id}/tracks/{track_id}/download-url (Bearer JWT)
+  activate ExportCtrl
+  ExportCtrl -> ExportSvc : getTrackDownloadUrl(session_id, track_id)
+  activate ExportSvc
+  ExportSvc -> Storage : generatePresignedDownloadUrl(track_storage_key, filename="FIXED_Snare_Bottom.wav")
+  activate Storage
+  Storage --> ExportSvc : PresignedTrackUrl
+  deactivate Storage
+  ExportSvc --> ExportCtrl : TrackDownloadPayload
+  deactivate ExportSvc
+  ExportCtrl --> UI : 200 OK (presigned_track_url)
+  deactivate ExportCtrl
+  UI -> Storage : Trigger direct download audio WAV
+  activate Storage
+  Storage --> UI : Stream binary WAV file
+  deactivate Storage
+  UI --> User : Berkas audio individual tersimpan tanpa perlu mengunduh seluruh arsip ZIP
+  deactivate UI
+end
+
+== Fase 4: Penanganan Unduhan Terputus (Exceptional Workflow) ==
+
+opt [Exceptional Workflow: Unduhan Terputus di Tengah Jalan (Network Interrupted / Resume)]
+  activate UI
+  UI -> UI : Deteksi koneksi jaringan terputus saat unduhan berlangsung
+  UI --> User : Tampilkan peringatan: "Unduhan terputus. Klik 'Unduh Ulang' (Gratis selama masa retensi)"
+  deactivate UI
+
+  User -> UI : Tekan tombol "Unduh Ulang"
+  activate UI
+  UI -> ExportCtrl : GET /api/v1/sessions/{id}/export/retry-download (Bearer JWT)
+  activate ExportCtrl
+  ExportCtrl -> ExportSvc : verifyRetentionAndGetDownloadUrl(session_id)
+  activate ExportSvc
+  ExportSvc -> DB : SELECT zip_archive_url, retention_expires_at FROM sessions WHERE id = session_id
+  activate DB
+  DB --> ExportSvc : ArchiveReady & retention_expires_at > NOW() (Valid)
+  deactivate DB
+  ExportSvc -> Storage : generatePresignedDownloadUrl(zip_storage_key)
+  activate Storage
+  Storage --> ExportSvc : FreshPresignedUrl
+  deactivate Storage
+  ExportSvc --> ExportCtrl : ValidDownloadUrl (Tanpa potongan token tambahan)
+  deactivate ExportSvc
+  ExportCtrl --> UI : 200 OK (fresh_download_url)
+  deactivate ExportCtrl
+  UI -> Storage : Trigger restart/resume download
+  activate Storage
+  Storage --> UI : Stream binary ZIP archive
+  deactivate Storage
+  UI --> User : Pengunduhan dilanjutkan hingga tuntas tanpa pemotongan saldo token
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

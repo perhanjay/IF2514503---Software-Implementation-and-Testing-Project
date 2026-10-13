@@ -1,0 +1,64 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Menyesuaikan Perbaikan Kecil (UC-15)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka panel "Kustomisasi Perbaikan" pada Dasbor Diagnostik;
+
+|Polaris Audio|
+:Menampilkan daftar trek dengan sakelar modul perbaikan DSP\n(Phase Flip, Micro-delay, Stereo Fix, DC Offset, Rumble, & Gain);
+
+|Audio Engineer|
+repeat
+  :Menyesuaikan sakelar modul perbaikan per trek\natau tekan "Reset ke Rekomendasi Sistem";
+  |Polaris Audio|
+  :Perbarui status pilihan dan kalkulasi estimasi kebutuhan token;
+  |Audio Engineer|
+  :Menekan tombol "Terapkan Perbaikan Terpilih";
+  |Polaris Audio|
+  :Validasi ketersediaan modul perbaikan yang aktif;
+  backward:Tampilkan pesan peringatan minimal satu modul harus aktif;
+repeat while () is ([Tidak Ada Modul Dipilih]) not ([Minimal Satu Modul Aktif])
+
+:Eksekusi komputasi DSP hanya pada modul perbaikan terpilih;
+:Tampilkan bilah kemajuan (progress bar) rendering kustom;
+:Potong saldo token proporsional dan catat mutasi buku besar;
+:Tampilkan notifikasi sukses dan siapkan audio perbaikan;
+
+|Audio Engineer|
+:Diarahkan ke Pemutar Audio A/B untuk validasi hasil (UC-16);
+:Melihat antarmuka Pemutar Multitrack A/B dan kontrol komparasi;
+stop
+
+@enduml

@@ -1,0 +1,123 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+}
+
+title Sequence Diagram: Mengubah Profil (UC-04)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Profil\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "ProfileController\n(API Gateway)" as ProfileCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "ProfileService\n(Account Logic)" as ProfileSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+User -> UI : Buka menu avatar & pilih "Pengaturan Profil"
+activate User
+activate UI
+
+UI -> ProfileCtrl : GET /api/v1/profile (Bearer JWT)
+activate ProfileCtrl
+
+ProfileCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> ProfileCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+ProfileCtrl -> ProfileSvc : getUserProfile(user_id)
+activate ProfileSvc
+
+ProfileSvc -> DB : SELECT full_name, email, display_name FROM users WHERE id = ?
+activate DB
+DB --> ProfileSvc : Data profil terkini
+deactivate DB
+
+ProfileSvc --> ProfileCtrl : ProfileData
+deactivate ProfileSvc
+
+ProfileCtrl --> UI : 200 OK (ProfileData)
+deactivate ProfileCtrl
+
+UI --> User : Render formulir profil dengan data saat ini
+deactivate UI
+
+User -> UI : Sunting data pada formulir profil
+activate UI
+
+alt Pembatalan Penyuntingan (Batal)
+  User -> UI : Tekan tombol "Batal"
+  UI -> UI : Kembalikan nilai form ke data profil awal
+  UI --> User : Tampilkan data awal tanpa menyimpan perubahan
+else Simpan Perubahan Profil
+  User -> UI : Tekan tombol "Simpan Perubahan"
+  UI -> UI : Validasi kelengkapan isian kolom
+
+  alt Kolom Nama Lengkap Dikosongkan
+    UI --> User : Tampilkan peringatan: "Nama lengkap wajib diisi"
+  else Data Valid & Lengkap
+    UI -> ProfileCtrl : PUT /api/v1/profile (Bearer JWT, updatedData)
+    activate ProfileCtrl
+
+    ProfileCtrl -> AuthGuard : validateSession(token)
+    activate AuthGuard
+    AuthGuard --> ProfileCtrl : SessionValid (user_id)
+    deactivate AuthGuard
+
+    ProfileCtrl -> ProfileSvc : updateProfile(user_id, updatedData)
+    activate ProfileSvc
+
+    ProfileSvc -> DB : UPDATE users SET full_name = ?, display_name = ?, updated_at = NOW() WHERE id = ?
+    activate DB
+    DB --> ProfileSvc : Record updated
+    deactivate DB
+
+    ProfileSvc --> ProfileCtrl : UpdateSuccess (updatedUser)
+    deactivate ProfileSvc
+
+    ProfileCtrl --> UI : 200 OK (updatedUser)
+    deactivate ProfileCtrl
+
+    UI -> UI : Perbarui state lokal & nama tampilan pada navbar
+    UI --> User : Tampilkan notifikasi: "Profil berhasil diperbarui"
+  end
+end
+
+deactivate UI
+deactivate User
+
+@enduml

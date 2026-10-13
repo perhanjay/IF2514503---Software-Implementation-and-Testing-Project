@@ -1,0 +1,194 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Menyesuaikan Perbaikan Kecil (UC-15)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Panel Kustomisasi Perbaikan\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "CustomFixController\n(API Gateway)" as FixCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "CustomFixService\n(Granular Pipeline Core)" as FixSvc
+entity "WalletService\n(Token Ledger Core)" as WalletSvc
+control "DspRepairWorker\n(Audio DSP Engine)" as DspWorker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Storage)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pemuatan Konfigurasi Modul Rekomendasi ==
+
+User -> UI : Buka tab "Kustomisasi Perbaikan" pada Dasbor Diagnostik
+activate User
+activate UI
+
+UI -> FixCtrl : GET /api/v1/sessions/{id}/custom-fix/config (Bearer JWT)
+activate FixCtrl
+
+FixCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> FixCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+FixCtrl -> FixSvc : getRecommendedFixConfig(session_id)
+activate FixSvc
+
+FixSvc -> DB : SELECT id, name, instrument, recommended_fixes FROM session_tracks WHERE session_id = ?
+activate DB
+DB --> FixSvc : Metadata trek & rekomendasi modul DSP standar
+deactivate DB
+
+FixSvc --> FixCtrl : ConfigPayload
+deactivate FixSvc
+
+FixCtrl --> UI : 200 OK (tracks_config, active_toggles)
+deactivate FixCtrl
+
+UI --> User : Render matriks sakelar centang per trek (Phase, Delay, Stereo, DC, Rumble, Gain)
+deactivate UI
+
+== Fase 2: Penyetelan Sakelar Modul DSP secara Granular ==
+
+alt Opsi A: Reset ke Rekomendasi Sistem (Alternative Workflow)
+  User -> UI : Tekan tombol "Reset ke Rekomendasi Sistem"
+  activate UI
+  UI -> UI : Pulihkan seluruh centang sakelar sesuai rekomendasi awal sistem
+  UI --> User : Perbarui tampilan sakelar default & hitung ulang kebutuhan token
+  deactivate UI
+
+else Opsi B: Mengubah Sakelar Perbaikan Selektif per Trek
+  User -> UI : Matikan sakelar Auto Gain pada vokal & biarkan Polarity Flip aktif pada snare
+  activate UI
+  UI -> UI : Kalkulasi estimasi biaya token proporsional (misal: 3 trek bermodul aktif = 3 token)
+  UI --> User : Perbarui indikator visual & tampilkan estimasi 3 token
+  deactivate UI
+end
+
+== Fase 3: Validasi Eksekusi & Pemrosesan DSP Kustom ==
+
+User -> UI : Tekan tombol "Terapkan Perbaikan Terpilih"
+activate UI
+
+alt Tidak Ada Modul Perbaikan yang Dipilih (Exceptional Workflow)
+  UI -> UI : Validasi lokal: total sakelar aktif == 0
+  UI --> User : Tampilkan peringatan: "Tidak ada modul yang dipilih. Aktifkan minimal satu modul"
+
+else Minimal Satu Modul Perbaikan Aktif
+  UI -> FixCtrl : POST /api/v1/sessions/{id}/custom-fix/apply (custom_track_configs)
+  activate FixCtrl
+
+  FixCtrl -> FixSvc : executeCustomFixPipeline(session_id, user_id, custom_track_configs)
+  activate FixSvc
+
+  FixSvc -> WalletSvc : deductTokens(user_id, session_id, token_amount=3)
+  activate WalletSvc
+
+  WalletSvc -> DB : UPDATE wallets SET balance = balance - 3 WHERE user_id = ?
+  activate DB
+  DB --> WalletSvc : BalanceUpdated
+  
+  WalletSvc -> DB : INSERT INTO token_ledgers (user_id, session_id, type='DEBIT_FIX', amount=-3, description='[Perbaikan Kustom] 3 Trek')
+  DB --> WalletSvc : LedgerRecorded
+  deactivate DB
+
+  WalletSvc --> FixSvc : PaymentConfirmed
+  deactivate WalletSvc
+
+  FixSvc -> DB : UPDATE sessions SET status = 'PROCESSING_CUSTOM_FIX' WHERE id = session_id
+  activate DB
+  DB --> FixSvc : SessionStatusUpdated
+  deactivate DB
+
+  FixSvc -> DspWorker : dispatch(ExecuteSelectiveDspJob(custom_track_configs))
+  activate DspWorker
+  DspWorker --> FixSvc : JobQueuedInRedis (ws_channel)
+  deactivate DspWorker
+
+  FixSvc --> FixCtrl : CustomFixStarted (job_id, ws_channel)
+  deactivate FixSvc
+
+  FixCtrl --> UI : 202 Accepted (job_id, ws_channel)
+  deactivate FixCtrl
+
+  UI --> User : Tampilkan bilah kemajuan (*progress bar*) rendering kustom real-time
+
+  activate DspWorker
+  DspWorker -> Storage : Baca audio mentah dari trek dengan modul aktif
+  activate Storage
+  Storage --> DspWorker : AudioStream
+  deactivate Storage
+
+  DspWorker -> DspWorker : Eksekusi HANYA modul perbaikan yang dicentang (lewati modul nonaktif)
+  DspWorker -> Storage : Tulis berkas audio perbaikan kustom
+  activate Storage
+  Storage --> DspWorker : CustomAudioWritten
+  deactivate Storage
+
+  DspWorker -> DB : UPDATE session_tracks SET is_repaired = true, applied_modules = ? WHERE id = ?
+  activate DB
+  DB --> DspWorker : TracksUpdated
+  deactivate DB
+
+  DspWorker --> FixSvc : SelectivePipelineCompleted
+  activate FixSvc
+  deactivate DspWorker
+
+  FixSvc -> DB : UPDATE sessions SET status = 'CUSTOM_REPAIRED_COMPLETED' WHERE id = session_id
+  activate DB
+  DB --> FixSvc : SessionCompleted
+  deactivate DB
+
+  FixSvc -> UI : WebSocket push: EVENT_CUSTOM_FIX_SUCCESS
+  activate UI
+  deactivate FixSvc
+
+  UI --> User : Notifikasi sukses perbaikan kustom & buka Pemutar Audio A/B (UC-16)
+  deactivate UI
+end
+
+deactivate UI
+deactivate User
+
+@enduml

@@ -1,0 +1,77 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mendengarkan Perbandingan Audio Mentah vs Audio Perbaikan (UC-16)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka antarmuka Pemutar Multitrack A/B pasca-perbaikan;
+
+|Polaris Audio|
+:Muat berkas audio mentah & audio hasil perbaikan\nbeserta visualizer korelasi fasa;
+
+|Audio Engineer|
+:Menekan tombol "Play" untuk memutar seluruh trek;
+
+|Polaris Audio|
+:Putar seluruh trek secara tersinkronisasi;
+:Validasi beban performa CPU dan memori peramban;
+if () then ([Beban CPU Tinggi / Risiko Glitch])
+  :Turunkan animasi visualizer sementara\n(prioritaskan kestabilan pemutaran audio);
+else ([Beban Performa Normal])
+  :Render visualisasi grafik fasa dan level sinyal real-time;
+endif
+
+|Audio Engineer|
+repeat
+  :Uji pemutaran audio (A/B Toggle, Mono Check,\nSolo/Mute instrumen, atau Loop Region);
+  |Polaris Audio|
+  :Alihkan output instan tanpa jeda (gapless)\ndan perbarui grafik korelasi fasa;
+  |Audio Engineer|
+  :Evaluasi koherensi fasa dan keseimbangan audio;
+  |Polaris Audio|
+  :Validasi kepuasan hasil audisi oleh pengguna;
+  backward:Lanjutkan pengujian sonik pada bagian trek lain;
+repeat while () is ([Perlu Audisi Lanjutan]) not ([Kualitas Audio Tervalidasi])
+
+|Audio Engineer|
+:Menekan tombol "Selesai & Lanjut ke Unduhan";
+
+|Polaris Audio|
+:Kunci status verifikasi sesi mixing;
+:Arahkan pengguna ke halaman pengunduhan (UC-17 & UC-18);
+
+|Audio Engineer|
+:Melihat halaman unduhan paket stem dan laporan audit;
+stop
+
+@enduml

@@ -1,0 +1,76 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Melakukan Pembelian Paket Token (UC-07)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih tombol "Top-up / Beli Token";
+
+|Polaris Audio|
+:Menampilkan katalog paket kuota token;
+
+|Audio Engineer|
+repeat
+  :Memilih paket token dan saluran pembayaran;
+  :Menekan tombol "Lanjutkan ke Pembayaran";
+
+  |Polaris Audio|
+  :Menerbitkan tagihan transaksi dan kode bayar;
+  :Menampilkan kode QRIS / nomor Virtual Account;
+
+  |Audio Engineer|
+  :Menyelesaikan transfer pembayaran;
+
+  |Polaris Audio|
+  :Verifikasi notifikasi pembayaran via Webhook;
+  backward:Tampilkan notifikasi pembayaran kedaluwarsa/gagal;
+repeat while () is ([Pembayaran Gagal / Kedaluwarsa]) not ([Pembayaran Berhasil])
+
+:Periksa kelayakan pengkreditan saldo;
+if () then ([Kendala Sinkronisasi Ledger])
+  :Tampilkan pesan kendala sinkronisasi data;
+  |Audio Engineer|
+  :Akses menu riwayat transaksi untuk verifikasi (UC-08);
+else ([Verifikasi Selesai])
+  |Polaris Audio|
+  :Kreditkan kuota token ke dompet virtual;
+  :Catat mutasi transaksi ke buku besar sistem;
+  :Kirimkan tanda terima digital ke alamat email;
+  :Tampilkan pesan sukses dan angka saldo terbaru;
+endif
+
+|Audio Engineer|
+:Melihat saldo token terbaru dan tanda terima transaksi;
+stop
+
+@enduml

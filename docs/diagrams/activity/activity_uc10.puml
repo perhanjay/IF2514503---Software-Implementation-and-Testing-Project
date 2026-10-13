@@ -1,0 +1,74 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengunggah Sesi Mixing (UC-10)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih tombol "Unggah Sesi Baru" pada Dasbor;
+
+|Polaris Audio|
+:Menampilkan area unggah berkas dan info saldo token;
+
+|Audio Engineer|
+repeat
+  :Memilih atau menarik berkas multitrack (WAV/FLAC/ZIP);
+
+  |Polaris Audio|
+  :Menjalankan transmisi berkas ke penyimpanan awan;
+  :Validasi integritas format dan kelayakan berkas audio;
+  backward:Tampilkan notifikasi berkas rusak atau tidak didukung;
+repeat while () is ([Format Tidak Valid / Rusak]) not ([Format Valid & Utuh])
+
+:Render visualisasi bentuk gelombang (waveform overview);
+:Menampilkan daftar trek dan estimasi kebutuhan token;
+
+|Audio Engineer|
+:Meninjau daftar trek dan tekan tombol konfirmasi;
+
+|Polaris Audio|
+:Periksa konfirmasi kelanjutan sesi mixing;
+if () then ([Batalkan Unggahan])
+  :Hapus berkas sementara dari penyimpanan awan;
+  |Audio Engineer|
+  :Batalkan sesi dan kembali ke Dasbor Utama;
+else ([Lanjutkan ke Analisis])
+  |Polaris Audio|
+  :Simpan metadata sesi mixing ke basis data;
+  :Arahkan ke tahap verifikasi integritas sesi (UC-11);
+endif
+
+|Audio Engineer|
+:Melihat antarmuka sistem sesuai navigasi sesi yang dipilih;
+stop
+
+@enduml

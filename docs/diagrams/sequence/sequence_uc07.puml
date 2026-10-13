@@ -1,0 +1,237 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Melakukan Pembelian Paket Token (UC-07)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Pembelian / Dompet\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "PaymentController\n(Checkout & Webhook API)" as PayCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "OrderService\n(Transaction Core)" as OrderSvc
+entity "WalletService\n(Token Ledger Core)" as WalletSvc
+end box
+
+box "External Services"
+control "Payment Gateway\n(Midtrans / Xendit API)" as PG
+control "Notification Service\n(Email Receipt)" as NotifSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pemilihan Paket Token & Pembuatan Tagihan (Checkout) ==
+
+User -> UI : Klik tombol "Top-up / Beli Token" pada halaman dompet
+activate User
+activate UI
+
+UI -> PayCtrl : GET /api/v1/tokens/packages (Bearer JWT)
+activate PayCtrl
+
+PayCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> PayCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+PayCtrl -> OrderSvc : getAvailablePackages()
+activate OrderSvc
+
+OrderSvc -> DB : SELECT * FROM token_packages WHERE is_active = true
+activate DB
+DB --> OrderSvc : Data bundle token (20, 50, 100 Token) & harga
+deactivate DB
+
+OrderSvc --> PayCtrl : TokenPackagesData
+deactivate OrderSvc
+
+PayCtrl --> UI : 200 OK (packages_list)
+deactivate PayCtrl
+
+UI --> User : Tampilkan katalog paket kuota token & metode pembayaran
+deactivate UI
+
+User -> UI : Pilih paket (misal: 50 Token) & metode pembayaran
+activate UI
+User -> UI : Tekan tombol "Lanjutkan ke Pembayaran"
+
+UI -> PayCtrl : POST /api/v1/payments/checkout (package_id, payment_method)
+activate PayCtrl
+
+PayCtrl -> OrderSvc : createOrder(user_id, package_id, payment_method)
+activate OrderSvc
+
+OrderSvc -> DB : INSERT INTO orders (user_id, package_id, amount, status='PENDING')
+activate DB
+DB --> OrderSvc : OrderCreated (order_id)
+deactivate DB
+
+OrderSvc -> PG : createChargeTransaction(order_id, amount, payment_method)
+activate PG
+PG --> OrderSvc : ChargeResponse (payment_code / qr_url / 3ds_url, expires_at)
+deactivate PG
+
+OrderSvc -> DB : UPDATE orders SET gateway_ref = ?, expires_at = ? WHERE id = order_id
+activate DB
+DB --> OrderSvc : OrderUpdated
+deactivate DB
+
+OrderSvc --> PayCtrl : CheckoutResult (order_id, payment_details, expires_at)
+deactivate OrderSvc
+
+PayCtrl --> UI : 201 Created (checkout_payload)
+deactivate PayCtrl
+
+== Fase 2: Eksekusi Pembayaran oleh Pengguna ==
+
+alt Saluran Pembayaran: QRIS / Virtual Account (VA)
+  UI --> User : Tampilkan kode QRIS / nomor VA & countdown batas waktu
+  User -> PG : Pindai QRIS / transfer via Mobile Banking atau E-Wallet
+  activate PG
+  PG --> User : Konfirmasi transfer terkirim di aplikasi perbankan
+  deactivate PG
+else Saluran Pembayaran: Kartu Kredit / Debit (3D-Secure)
+  UI --> User : Tampilkan formulir aman kartu & buka otentikasi OTP
+  User -> PG : Masukkan data kartu & verifikasi kode OTP 3D-Secure
+  activate PG
+  PG --> User : Notifikasi otorisasi kartu berhasil
+  deactivate PG
+end
+deactivate UI
+
+== Fase 3: Pemrosesan Webhook & Pengkreditan Saldo Token ==
+
+PG -> PayCtrl : POST /api/v1/payments/webhook (order_id, transaction_status, signature)
+activate PG
+activate PayCtrl
+
+PayCtrl -> PayCtrl : verifySignatureKey(payload, signature)
+PayCtrl -> OrderSvc : processPaymentWebhook(order_id, transaction_status)
+activate OrderSvc
+
+OrderSvc -> DB : SELECT * FROM orders WHERE id = order_id FOR UPDATE
+activate DB
+DB --> OrderSvc : OrderData (status)
+deactivate DB
+
+alt Status: Settlement / Capture (Pembayaran Berhasil)
+  OrderSvc -> DB : UPDATE orders SET status = 'PAID', paid_at = NOW() WHERE id = order_id
+  activate DB
+  DB --> OrderSvc : OrderUpdated (status='PAID')
+  deactivate DB
+
+  OrderSvc -> WalletSvc : creditTokenPurchase(user_id, 50, order_id)
+  activate WalletSvc
+
+  WalletSvc -> DB : UPDATE wallets SET balance = balance + 50 WHERE user_id = ?
+  activate DB
+  DB --> WalletSvc : WalletBalanceUpdated
+  
+  WalletSvc -> DB : INSERT INTO token_ledgers (user_id, order_id, type='CREDIT_TOPUP', amount=50)
+  DB --> WalletSvc : LedgerRecordInserted
+  deactivate DB
+
+  WalletSvc --> OrderSvc : CreditSuccess (new_balance)
+  deactivate WalletSvc
+
+  OrderSvc -> NotifSvc : sendPaymentReceiptEmail(user_id, order_id, receipt_pdf)
+  activate NotifSvc
+  NotifSvc --> User : Kirim email tanda terima resmi (Receipt/Invoice PDF)
+  deactivate NotifSvc
+
+  OrderSvc --> PayCtrl : WebhookHandled (Success)
+  deactivate OrderSvc
+
+  PayCtrl --> PG : 200 OK (Webhook Acknowledged)
+  deactivate PG
+  deactivate PayCtrl
+
+  UI -> PayCtrl : GET /api/v1/payments/orders/{order_id}/status (Polling / SSE)
+  activate PayCtrl
+  PayCtrl --> UI : 200 OK (status: "PAID", balance: new_balance)
+  deactivate PayCtrl
+
+  UI --> User : Tampilkan notifikasi "Pembayaran Berhasil! 50 Token ditambahkan" & perbarui saldo
+
+else Status: Expire (Batas Waktu Pembayaran Habis)
+  OrderSvc -> DB : UPDATE orders SET status = 'EXPIRED' WHERE id = order_id
+  activate DB
+  DB --> OrderSvc : OrderUpdated (status='EXPIRED')
+  deactivate DB
+
+  OrderSvc --> PayCtrl : WebhookHandled (Expired)
+  deactivate OrderSvc
+
+  PayCtrl --> PG : 200 OK (Webhook Acknowledged)
+  deactivate PG
+  deactivate PayCtrl
+
+  UI -> PayCtrl : GET /api/v1/payments/orders/{order_id}/status (Polling / SSE)
+  activate PayCtrl
+  PayCtrl --> UI : 200 OK (status: "EXPIRED")
+  deactivate PayCtrl
+
+  UI --> User : Tampilkan peringatan: "Waktu pembayaran telah habis. Silakan ulangi pesanan baru"
+
+else Status: Deny / Cancel / Failure (Transaksi Ditolak Bank)
+  OrderSvc -> DB : UPDATE orders SET status = 'FAILED' WHERE id = order_id
+  activate DB
+  DB --> OrderSvc : OrderUpdated (status='FAILED')
+  deactivate DB
+
+  OrderSvc --> PayCtrl : WebhookHandled (Failed)
+  deactivate OrderSvc
+
+  PayCtrl --> PG : 200 OK (Webhook Acknowledged)
+  deactivate PG
+  deactivate PayCtrl
+
+  UI -> PayCtrl : GET /api/v1/payments/orders/{order_id}/status (Polling / SSE)
+  activate PayCtrl
+  PayCtrl --> UI : 200 OK (status: "FAILED")
+  deactivate PayCtrl
+
+  UI --> User : Tampilkan notifikasi: "Transaksi gagal atau ditolak bank. Silakan coba metode lain"
+end
+
+deactivate User
+
+@enduml

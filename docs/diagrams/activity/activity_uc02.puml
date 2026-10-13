@@ -1,0 +1,68 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Login ke Sistem (UC-02)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka halaman login;
+
+|Polaris Audio|
+:Menampilkan formulir login akun;
+
+|Audio Engineer|
+repeat
+  :Memasukkan alamat email dan kata sandi;
+  :Menekan tombol "Masuk";
+
+  |Polaris Audio|
+  :Validasi format email dan kata sandi;
+  backward:Tampilkan notifikasi format input tidak valid;
+repeat while () is ([Format Tidak Valid]) not ([Format Valid])
+
+:Periksa kecocokan kredensial di basis data;
+if () then ([Kredensial Tidak Cocok])
+  :Tampilkan pesan email atau kata sandi salah;
+  |Audio Engineer|
+  :Gunakan opsi Lupa Kata Sandi (UC-03);
+else ([Kredensial Cocok])
+  |Polaris Audio|
+  :Terbitkan token autentikasi sesi JWT;
+  :Muat profil akun dan saldo token aktif;
+  :Arahkan ke antarmuka Dasbor Utama;
+endif
+
+|Audio Engineer|
+:Melihat antarmuka Dasbor Utama dan sesi mixing aktif;
+stop
+
+@enduml

@@ -1,0 +1,144 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mengklaim Jatah Token Gratis (UC-09)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Dasbor / Dompet Token\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "DailyClaimController\n(API Gateway)" as ClaimCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "PromoClaimService\n(Daily Grant Core)" as PromoSvc
+entity "WalletService\n(Token Ledger Core)" as WalletSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pengecekan Hak Klaim Token Harian (Pre-check) ==
+
+User -> UI : Buka halaman Dasbor Utama atau menu Dompet Token
+activate User
+activate UI
+
+UI -> ClaimCtrl : GET /api/v1/wallet/daily-claim/status (Bearer JWT)
+activate ClaimCtrl
+
+ClaimCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> ClaimCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+ClaimCtrl -> PromoSvc : checkClaimEligibility(user_id)
+activate PromoSvc
+
+PromoSvc -> DB : SELECT last_claimed_at, next_claim_at FROM daily_claims WHERE user_id = ?
+activate DB
+DB --> PromoSvc : Data status klaim (stempel waktu terakhir & jadwal berikutnya)
+deactivate DB
+
+alt Masa Cooldown Belum Berakhir (< 24 Jam)
+  PromoSvc --> ClaimCtrl : ClaimStatus (can_claim: false, remaining_seconds)
+  ClaimCtrl --> UI : 200 OK (can_claim: false, remaining_seconds)
+  UI --> User : Tampilkan tombol nonaktif & hitung mundur waktu tunggu (cooldown timer)
+else Jatah Klaim Tersedia (Cooldown Selesai)
+  PromoSvc --> ClaimCtrl : ClaimStatus (can_claim: true)
+  ClaimCtrl --> UI : 200 OK (can_claim: true)
+  UI --> User : Tampilkan tombol aktif "Klaim 1 Token Gratis Hari Ini"
+end
+
+deactivate PromoSvc
+deactivate ClaimCtrl
+deactivate UI
+
+== Fase 2: Eksekusi Klaim Token Gratis oleh Pengguna ==
+
+User -> UI : Tekan tombol "Klaim 1 Token Gratis Hari Ini"
+activate UI
+
+UI -> ClaimCtrl : POST /api/v1/wallet/daily-claim (Bearer JWT)
+activate ClaimCtrl
+
+ClaimCtrl -> PromoSvc : claimDailyToken(user_id)
+activate PromoSvc
+
+PromoSvc -> DB : SELECT * FROM daily_claims WHERE user_id = ? FOR UPDATE
+activate DB
+DB --> PromoSvc : ClaimRecord (locked)
+deactivate DB
+
+alt Validasi Gagal: Sudah Diklaim Hari Ini (Multi-tab Race Condition)
+  PromoSvc --> ClaimCtrl : Error: ClaimAlreadyRedeemedException
+  ClaimCtrl --> UI : 409 Conflict ("Jatah hari ini sudah pernah diklaim")
+  UI --> User : Tampilkan peringatan: "Anda sudah mengklaim hari ini. Silakan kembali besok"
+else Validasi Berhasil: Hak Klaim Terverifikasi Sah
+  PromoSvc -> DB : UPDATE daily_claims SET last_claimed_at = NOW(), next_claim_at = NOW() + INTERVAL '24 hours' WHERE user_id = ?
+  activate DB
+  DB --> PromoSvc : ClaimCooldownUpdated
+  deactivate DB
+
+  PromoSvc -> WalletSvc : creditDailyToken(user_id, amount=1)
+  activate WalletSvc
+
+  WalletSvc -> DB : UPDATE wallets SET balance = balance + 1 WHERE user_id = ?
+  activate DB
+  DB --> WalletSvc : BalanceUpdated
+  
+  WalletSvc -> DB : INSERT INTO token_ledgers (user_id, type='CREDIT_PROMO', amount=1, description='[Klaim Harian] Jatah Token Gratis')
+  DB --> WalletSvc : LedgerRecorded
+  deactivate DB
+
+  WalletSvc --> PromoSvc : CreditSuccess (new_balance)
+  deactivate WalletSvc
+
+  PromoSvc --> ClaimCtrl : ClaimSuccess (granted=1, new_balance, next_claim_at)
+  deactivate PromoSvc
+
+  ClaimCtrl --> UI : 200 OK (success: true, granted: 1, balance: new_balance)
+  deactivate ClaimCtrl
+
+  UI --> User : Tampilkan notifikasi "Selamat! 1 Token gratis ditambahkan", perbarui saldo, & mulai countdown
+end
+
+deactivate UI
+deactivate User
+
+@enduml

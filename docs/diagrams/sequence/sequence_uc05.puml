@@ -1,0 +1,122 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+}
+
+title Sequence Diagram: Mengubah Kata Sandi (UC-05)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Keamanan\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "PasswordController\n(API Gateway)" as PwdCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "UserService\n(Security Core)" as UserSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+User -> UI : Buka tab "Keamanan" pada halaman Pengaturan
+activate User
+activate UI
+UI --> User : Tampilkan formulir ubah kata sandi (Lama, Baru, Konfirmasi)
+deactivate UI
+
+User -> UI : Input kata sandi lama, kata sandi baru, & konfirmasi
+activate UI
+
+alt Pembatalan (Batal)
+  User -> UI : Tekan tombol "Batal"
+  UI -> UI : Kosongkan seluruh kolom input form
+  UI --> User : Tampilkan formulir bersih tanpa menyimpan perubahan
+else Simpan Kata Sandi Baru
+  User -> UI : Tekan tombol "Simpan Kata Sandi"
+  UI -> UI : Validasi kecocokan konfirmasi & syarat minimal (>= 8 karakter & alfanumerik)
+
+  alt Konfirmasi Tidak Cocok / Password Lemah
+    UI --> User : Tampilkan peringatan: "Konfirmasi kata sandi tidak cocok / terlalu lemah"
+  else Validasi Client-side Sukses
+    UI -> PwdCtrl : PUT /api/v1/auth/change-password (Bearer JWT, oldPassword, newPassword)
+    activate PwdCtrl
+
+    PwdCtrl -> AuthGuard : validateSession(token)
+    activate AuthGuard
+    AuthGuard --> PwdCtrl : SessionValid (user_id)
+    deactivate AuthGuard
+
+    PwdCtrl -> UserSvc : changePassword(user_id, oldPassword, newPassword)
+    activate UserSvc
+
+    UserSvc -> DB : SELECT password_hash FROM users WHERE id = ?
+    activate DB
+    DB --> UserSvc : Current password_hash
+    deactivate DB
+
+    UserSvc -> UserSvc : Verifikasi kecocokan kata sandi lama (verifyPassword)
+
+    alt Kata Sandi Lama Salah
+      UserSvc --> PwdCtrl : Error: IncorrectPasswordException
+      PwdCtrl --> UI : 400 Bad Request ("Kata sandi saat ini salah")
+      UI --> User : Tampilkan peringatan: "Kata sandi saat ini salah. Silakan coba lagi"
+    else Kata Sandi Lama Cocok
+      UserSvc -> UserSvc : Cek apakah kata sandi baru identik dengan kata sandi lama
+
+      alt Kata Sandi Baru Sama dengan Kata Sandi Lama
+        UserSvc --> PwdCtrl : Error: SamePasswordException
+        PwdCtrl --> UI : 422 Unprocessable Entity ("Kata sandi baru tidak boleh sama")
+        UI --> User : Tampilkan notifikasi: "Kata sandi baru tidak boleh sama dengan kata sandi lama"
+      else Kata Sandi Baru Berbeda (Valid)
+        UserSvc -> UserSvc : Hash kata sandi baru (argon2 / bcrypt)
+        UserSvc -> DB : UPDATE users SET password_hash = ?, updated_at = NOW() WHERE id = ?
+        activate DB
+        DB --> UserSvc : Password updated
+        deactivate DB
+
+        UserSvc --> PwdCtrl : PasswordChangeSuccess
+        deactivate UserSvc
+
+        PwdCtrl --> UI : 200 OK ("Kata sandi berhasil diperbarui")
+        deactivate PwdCtrl
+
+        UI -> UI : Reset seluruh kolom formulir ke kondisi kosong
+        UI --> User : Tampilkan notifikasi sukses: "Kata sandi berhasil diperbarui"
+      end
+    end
+  end
+end
+
+deactivate UI
+deactivate User
+
+@enduml

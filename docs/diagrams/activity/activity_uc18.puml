@@ -1,0 +1,71 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengunduh Laporan Diagnostik Sesi (UC-18)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka halaman ringkasan laporan audit teknis sesi;
+
+|Polaris Audio|
+:Menampilkan tombol "Unduh Laporan Audit (PDF)"\ndan opsi ekspor data terstruktur (JSON);
+
+|Audio Engineer|
+:Menekan tombol "Unduh Laporan Audit (PDF)";
+
+|Polaris Audio|
+:Tampilkan jendela pratinjau laporan ringkas\ndan opsi kustomisasi (nama proyek, artis, logo studio);
+
+|Audio Engineer|
+:Menentukan opsi kustomisasi kop laporan\n(logo studio profil atau kop resmi standar) dan klik unduh;
+
+|Polaris Audio|
+:Validasi jumlah trek dan kompleksitas rendering PDF;
+if () then ([Sesi Masif (> 50 Trek) / Beban Berat])
+  :Alihkan ke tata letak "Laporan Ringkas (Teks & Tabel)"\n(cegah risiko server timeout / gagal render);
+else ([Beban Rendering Normal])
+  :Kompilasi laporan PDF lengkap dengan visualisasi\ngrafik fasa resolusi tinggi, tabel audit, & log perbaikan;
+endif
+
+:Hasilkan berkas dokumen laporan audit (PDF/JSON)\ndan picu unduhan otomatis pada peramban web;
+
+|Audio Engineer|
+:Menyimpan berkas dokumen audit ke direktori komputer lokal;
+
+|Polaris Audio|
+:Tampilkan notifikasi bahwa dokumen audit berhasil diunduh;
+
+|Audio Engineer|
+:Melihat notifikasi unduhan sukses dan laporan siap digunakan;
+stop
+
+@enduml

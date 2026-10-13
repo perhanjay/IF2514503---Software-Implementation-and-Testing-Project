@@ -1,0 +1,255 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Meninjau dan Mengoreksi Klasifikasi Track (UC-12)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Klasifikasi & Pairing\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "ClassificationController\n(API Gateway)" as ClassCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "TrackMetadataService\n(Label & Pairing Core)" as MetaSvc
+control "AiClassifierWorker\n(Audio ML Inference Engine)" as AiWorker
+control "DspDiagnosticWorker\n(Phase Analysis Engine)" as DspWorker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Audio Stems)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pemicuan & Eksekusi Inferensi AI Klasifikasi Instrumen ==
+
+User -> UI : Buka antarmuka klasifikasi trek (/sessions/{id}/classify)
+activate User
+activate UI
+
+UI -> ClassCtrl : GET /api/v1/sessions/{id}/classification (Bearer JWT)
+activate ClassCtrl
+
+ClassCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> ClassCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+ClassCtrl -> MetaSvc : getOrRunClassification(session_id)
+activate MetaSvc
+
+MetaSvc -> DB : SELECT status FROM sessions WHERE id = session_id
+activate DB
+DB --> MetaSvc : status = 'VERIFIED_READY_FOR_AI'
+deactivate DB
+
+MetaSvc -> DB : UPDATE sessions SET status = 'PROCESSING_AI_CLASSIFICATION' WHERE id = session_id
+activate DB
+DB --> MetaSvc : StatusUpdated
+deactivate DB
+
+MetaSvc -> AiWorker : dispatch(RunAudioClassificationJob(session_id))
+activate AiWorker
+AiWorker --> MetaSvc : JobDispatched (ws_channel)
+
+MetaSvc --> ClassCtrl : ClassificationProcessing (job_id, ws_channel)
+deactivate MetaSvc
+
+ClassCtrl --> UI : 202 Accepted (processing, ws_channel)
+deactivate ClassCtrl
+
+UI --> User : Tampilkan status: "Model AI sedang menganalisis spektrogram & mengklasifikasikan instrumen..."
+deactivate UI
+
+AiWorker -> Storage : Baca audio mentah dari seluruh trek
+activate Storage
+Storage --> AiWorker : Binary Audio Streams (PCM WAV)
+deactivate Storage
+
+AiWorker -> AiWorker : Ekstraksi Mel-Spectrogram & Feature Embeddings
+AiWorker -> AiWorker : Inferensi Neural Network (AST/CNN): Prediksi Label Instrumen & Skor Keyakinan
+AiWorker -> AiWorker : Analisis Korelasi Akustik & Heuristik Pasangan Multi-Mikrofon (Kick, Snare, Bass)
+
+AiWorker -> DB : UPDATE session_tracks SET detected_instrument = ?, confidence_score = ?, pair_group_id = ?
+activate DB
+DB --> AiWorker : TracksUpdated
+deactivate DB
+
+AiWorker -> DB : UPDATE sessions SET status = 'AI_CLASSIFICATION_COMPLETED' WHERE id = session_id
+activate DB
+DB --> AiWorker : SessionStateUpdated
+deactivate DB
+
+AiWorker --> MetaSvc : ClassificationCompleted(session_id)
+activate MetaSvc
+deactivate AiWorker
+
+MetaSvc -> DB : SELECT id, name, detected_instrument, confidence_score, pair_group_id FROM session_tracks WHERE session_id = ?
+activate DB
+DB --> MetaSvc : Data Prediksi AI Lengkap & Relasi Pasangan
+deactivate DB
+
+MetaSvc -> UI : WebSocket push: EVENT_CLASSIFICATION_READY (tracks_data)
+deactivate MetaSvc
+activate UI
+
+UI --> User : Render daftar trek, label instrumen AI, badge persentase keyakinan, & ikon pasangan
+deactivate UI
+
+== Fase 2: Peninjauan, Penanganan Skor Keyakinan Rendah, & Koreksi Manual ==
+
+alt [Kasus Keyakinan Rendah < 80% (Exceptional Workflow)]
+  User -> UI : Tinjau trek berpenanda peringatan ("Keyakinan < 80%")
+  activate UI
+  UI -> UI : Tandai badge kuning ("Perlu Peninjauan") & wajibkan pemilihan label
+  User -> UI : Pilih dropdown instrumen & tentukan kategori manual yang tepat
+  UI -> ClassCtrl : PATCH /api/v1/sessions/{id}/tracks/{track_id}/label (instrument: "Tambourine")
+  activate ClassCtrl
+  ClassCtrl -> MetaSvc : updateTrackLabel(track_id, "Tambourine")
+  activate MetaSvc
+  MetaSvc -> DB : UPDATE session_tracks SET detected_instrument = 'Tambourine', is_manual_override = true WHERE id = ?
+  activate DB
+  DB --> MetaSvc : TrackUpdated
+  deactivate DB
+  MetaSvc --> ClassCtrl : UpdateSuccess
+  deactivate MetaSvc
+  ClassCtrl --> UI : 200 OK (track_id, "Tambourine")
+  deactivate ClassCtrl
+  UI --> User : Indikator kuning hilang, status trek berubah menjadi valid
+  deactivate UI
+
+else [Opsi A: Mengubah Label Instrumen yang Meleset (Alternative Workflow)]
+  User -> UI : Pilih dropdown & koreksi tebakan AI (misal: "Other" diubah ke "Acoustic Guitar")
+  activate UI
+  UI -> ClassCtrl : PATCH /api/v1/sessions/{id}/tracks/{track_id}/label (instrument: "Acoustic Guitar")
+  activate ClassCtrl
+  ClassCtrl -> MetaSvc : updateTrackLabel(track_id, "Acoustic Guitar")
+  activate MetaSvc
+  MetaSvc -> DB : UPDATE session_tracks SET detected_instrument = 'Acoustic Guitar', is_manual_override = true WHERE id = ?
+  activate DB
+  DB --> MetaSvc : TrackUpdated
+  deactivate DB
+  MetaSvc --> ClassCtrl : UpdateSuccess
+  deactivate MetaSvc
+  ClassCtrl --> UI : 200 OK (track_id, "Acoustic Guitar")
+  deactivate ClassCtrl
+  UI --> User : Perbarui badge label instrumen pada baris trek
+  deactivate UI
+
+else [Opsi B: Membatalkan Pasangan Trek yang Salah / Unpair (Alternative Workflow)]
+  User -> UI : Tekan tombol lepas pasangan (Unpair) pada ikon grup
+  activate UI
+  UI -> ClassCtrl : DELETE /api/v1/sessions/{id}/pairs/{pair_id}
+  activate ClassCtrl
+  ClassCtrl -> MetaSvc : unpairTracks(pair_id)
+  activate MetaSvc
+  MetaSvc -> DB : DELETE FROM track_pairs WHERE id = ?
+  activate DB
+  DB --> MetaSvc : PairDeleted
+  MetaSvc -> DB : UPDATE session_tracks SET pair_group_id = NULL WHERE pair_group_id = ?
+  DB --> MetaSvc : TracksUnlinked
+  deactivate DB
+  MetaSvc --> ClassCtrl : UnpairSuccess
+  deactivate MetaSvc
+  ClassCtrl --> UI : 200 OK (unpaired_track_ids)
+  deactivate ClassCtrl
+  UI --> User : Hapus garis penghubung pasangan trek pada antarmuka
+  deactivate UI
+
+else [Opsi C: Menghubungkan Pasangan Multi-Mikrofon Baru / Pair (Alternative Workflow)]
+  User -> UI : Pilih dua trek mikrofon sejenis (misal: Bass DI & Bass Mic) & tekan "Pasangkan Trek"
+  activate UI
+  UI -> ClassCtrl : POST /api/v1/sessions/{id}/pairs (track_a_id, track_b_id, pair_type='MULTI_MIC')
+  activate ClassCtrl
+  ClassCtrl -> MetaSvc : createTrackPair(session_id, track_a_id, track_b_id)
+  activate MetaSvc
+  MetaSvc -> DB : INSERT INTO track_pairs (session_id, track_a_id, track_b_id, pair_type) VALUES (?, ?, ?, 'MULTI_MIC')
+  activate DB
+  DB --> MetaSvc : PairCreated (pair_id)
+  MetaSvc -> DB : UPDATE session_tracks SET pair_group_id = ? WHERE id IN (track_a_id, track_b_id)
+  DB --> MetaSvc : TracksLinked
+  deactivate DB
+  MetaSvc --> ClassCtrl : PairSuccess (pair_id)
+  deactivate MetaSvc
+  ClassCtrl --> UI : 201 Created (pair_id, paired_tracks)
+  deactivate ClassCtrl
+  UI --> User : Tampilkan badge & garis penghubung pasangan multi-mikrofon
+  deactivate UI
+
+else [Opsi D: Seluruh Prediksi AI Sudah Akurat (Typical Course)]
+  User -> UI : Periksa seluruh label & pasangan (akurasi tebakan AI >= 80%)
+  activate UI
+  UI --> User : Seluruh label & pasangan diverifikasi sesuai, tombol lanjut aktif
+  deactivate UI
+end
+
+== Fase 3: Finalisasi Konfigurasi & Inisiasi Diagnostik DSP ==
+
+User -> UI : Tekan tombol "Konfirmasi & Lanjut ke Analisis"
+activate UI
+
+UI -> ClassCtrl : POST /api/v1/sessions/{id}/finalize-classification (Bearer JWT)
+activate ClassCtrl
+
+ClassCtrl -> MetaSvc : finalizeAndDispatchDiagnostics(session_id)
+activate MetaSvc
+
+MetaSvc -> DB : UPDATE sessions SET status = 'DIAGNOSING_DSP' WHERE id = session_id
+activate DB
+DB --> MetaSvc : SessionStatusUpdated
+deactivate DB
+
+MetaSvc -> DspWorker : dispatch(RunDspDiagnosticAnalysisJob(session_id))
+activate DspWorker
+DspWorker --> MetaSvc : JobQueuedInRedis
+deactivate DspWorker
+
+MetaSvc --> ClassCtrl : FinalizeSuccess
+deactivate MetaSvc
+
+ClassCtrl --> UI : 200 OK (redirect_url: /sessions/{id}/diagnostics)
+deactivate ClassCtrl
+
+UI --> User : Arahkan pengguna ke Dasbor Diagnostik Sesi & Skor Kesehatan (UC-13)
+deactivate UI
+
+deactivate User
+
+@enduml

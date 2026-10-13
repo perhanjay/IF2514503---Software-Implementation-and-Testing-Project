@@ -1,0 +1,213 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Menjalankan Perbaikan Sesi Otomatis (UC-14)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Panel Perbaikan Otomatis\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "AutoFixController\n(API Gateway)" as FixCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "AutoFixService\n(Fix Pipeline Core)" as FixSvc
+entity "WalletService\n(Token Ledger Core)" as WalletSvc
+control "DspRepairWorker\n(Audio DSP Engine)" as DspWorker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Storage)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Permintaan & Konfirmasi Eksekusi Perbaikan Otomatis ==
+
+User -> UI : Tekan tombol "Terapkan Perbaikan Otomatis (1-Click Auto-Fix)"
+activate User
+activate UI
+
+UI --> User : Tampilkan modal konfirmasi (rincian modul DSP, trek bermasalah, & estimasi 4 token)
+deactivate UI
+
+User -> UI : Pilih "Setuju & Proses" pada dialog konfirmasi
+activate UI
+
+UI -> FixCtrl : POST /api/v1/sessions/{id}/auto-fix (Bearer JWT)
+activate FixCtrl
+
+FixCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> FixCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+FixCtrl -> FixSvc : initializeAutoFix(session_id, user_id)
+activate FixSvc
+
+FixSvc -> WalletSvc : reserveTokens(user_id, token_amount=4)
+activate WalletSvc
+
+WalletSvc -> DB : SELECT balance FROM wallets WHERE user_id = ? FOR UPDATE
+activate DB
+DB --> WalletSvc : Saldo aktif pengguna (misal: 20 token)
+deactivate DB
+
+WalletSvc --> FixSvc : TokensReserved
+deactivate WalletSvc
+
+FixSvc -> DB : SELECT recommended_fixes, dsp_target_params FROM session_diagnostics WHERE session_id = ?
+activate DB
+DB --> FixSvc : Resep perbaikan cerdas hasil analisis AI (polaritas, delay offset, filter rumble, target gain)
+deactivate DB
+
+FixSvc -> DB : UPDATE sessions SET status = 'PROCESSING_AUTO_FIX' WHERE id = session_id
+activate DB
+DB --> FixSvc : SessionStatusUpdated
+deactivate DB
+
+FixSvc -> DspWorker : dispatch(ExecuteAutoFixPipelineJob(session_id, ai_fix_recipe))
+activate DspWorker
+DspWorker --> FixSvc : JobQueuedInRedis (ws_channel)
+deactivate DspWorker
+
+FixSvc --> FixCtrl : AutoFixInitiated (job_id, ws_channel)
+deactivate FixSvc
+
+FixCtrl --> UI : 202 Accepted (job_id, ws_channel)
+deactivate FixCtrl
+
+UI --> User : Tampilkan bilah kemajuan (*progress bar*) rendering DSP real-time
+deactivate UI
+
+== Fase 2: Eksekusi Komputasi DSP Berdasarkan Resep AI ==
+
+activate DspWorker
+DspWorker -> Storage : Baca audio mentah trek bermasalah (pass-through untuk trek utuh)
+activate Storage
+Storage --> DspWorker : AudioStream
+deactivate Storage
+
+DspWorker -> DspWorker : Eksekusi parameter AI: Pembalikan polaritas fasa (180 deg) pada trek fasa terbalik
+DspWorker -> DspWorker : Eksekusi parameter AI: Penyelarasan jeda mikrofon (micro-delay time alignment)
+DspWorker -> DspWorker : Eksekusi parameter AI: Koreksi korelasi fake stereo & pembersihan DC offset
+DspWorker -> DspWorker : Eksekusi parameter AI: Filter sub-rumble non-bass & normalisasi gain staging (-18 dBFS RMS)
+
+DspWorker -> Storage : Tulis berkas audio perbaikan (repaired stems)
+activate Storage
+Storage --> DspWorker : RepairedAudioSaved
+deactivate Storage
+
+DspWorker -> UI : WebSocket push: progress_update (10% ... 50% ... 100%)
+activate UI
+UI --> User : Perbarui persentase bilah kemajuan rendering
+deactivate UI
+
+== Fase 3: Evaluasi Hasil Eksekusi & Penanganan Status ==
+
+alt [Gangguan Server / Worker Timeout (Kegagalan Pemrosesan)]
+  DspWorker --> FixSvc : ExecutionFailed (error_log)
+  activate FixSvc
+
+  FixSvc -> WalletSvc : rollbackReservedTokens(user_id, token_amount=4)
+  activate WalletSvc
+
+  WalletSvc -> DB : INSERT INTO token_ledgers (user_id, type='REFUND_FAILURE', amount=4, description='[Refund Otomatis] Gangguan Server')
+  activate DB
+  DB --> WalletSvc : RefundRecorded
+  deactivate DB
+
+  WalletSvc --> FixSvc : RollbackCompleted
+  deactivate WalletSvc
+
+  FixSvc -> DB : UPDATE sessions SET status = 'AUTO_FIX_FAILED' WHERE id = session_id
+  activate DB
+  DB --> FixSvc : SessionStatusFailed
+  deactivate DB
+
+  FixSvc -> UI : WebSocket push: EVENT_FIX_FAILED (refund_confirmed: true)
+  activate UI
+  deactivate FixSvc
+
+  UI --> User : Tampilkan error: "Terjadi gangguan server. Saldo 4 token telah dikembalikan utuh"
+  deactivate UI
+
+else [Eksekusi DSP Berhasil Sempurna (Main Flow)]
+  DspWorker -> DB : UPDATE session_tracks SET is_repaired = true, applied_fixes = ? WHERE session_id = ? AND has_issues = true
+  activate DB
+  DB --> DspWorker : TracksUpdated
+  
+  DspWorker -> DB : UPDATE session_diagnostics SET health_score = 98, status = 'OPTIMAL' WHERE session_id = ?
+  DB --> DspWorker : ScoreUpdated
+  deactivate DB
+
+  DspWorker --> FixSvc : PipelineCompleted (fixed_tracks=4)
+  activate FixSvc
+  deactivate DspWorker
+
+  FixSvc -> WalletSvc : commitTokenDeduction(user_id, session_id, token_amount=4)
+  activate WalletSvc
+
+  WalletSvc -> DB : UPDATE wallets SET balance = balance - 4 WHERE user_id = ?
+  activate DB
+  DB --> WalletSvc : BalanceDeducted
+  
+  WalletSvc -> DB : INSERT INTO token_ledgers (user_id, session_id, type='DEBIT_FIX', amount=-4, description='[Perbaikan Otomatis] 4 Trek')
+  DB --> WalletSvc : LedgerMutationSaved
+  deactivate DB
+
+  WalletSvc --> FixSvc : TokensDeducted
+  deactivate WalletSvc
+
+  FixSvc -> DB : UPDATE sessions SET status = 'REPAIRED_COMPLETED' WHERE id = session_id
+  activate DB
+  DB --> FixSvc : SessionStatusCompleted
+  deactivate DB
+
+  FixSvc -> UI : WebSocket push: EVENT_FIX_SUCCESS (new_health_score: 98, repaired_tracks: 4)
+  activate UI
+  deactivate FixSvc
+
+  UI --> User : Notifikasi sukses, render centang hijau pada seluruh trek, & buka Pemutar Audio A/B (UC-16)
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

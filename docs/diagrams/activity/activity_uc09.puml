@@ -1,0 +1,63 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengklaim Jatah Token Gratis (UC-09)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka halaman Dompet Token atau Dasbor Utama;
+
+|Polaris Audio|
+:Kueri stempel waktu klaim terakhir pengguna dari basis data;
+
+:Validasi ketersediaan jatah klaim 24 jam terakhir;
+if () then ([Klaim Masih Terkunci (Masa Cooldown)])
+  :Tampilkan tombol nonaktif dan hitung mundur reset klaim;
+  |Audio Engineer|
+  :Menunggu siklus klaim berikutnya atau beli paket (UC-07);
+else ([Jatah Klaim Tersedia])
+  |Polaris Audio|
+  :Tampilkan tombol aktif "Klaim 1 Token Gratis Hari Ini";
+  |Audio Engineer|
+  :Menekan tombol "Klaim 1 Token Gratis Hari Ini";
+  |Polaris Audio|
+  :Tambahkan 1 token ke saldo dompet akun pengguna;
+  :Catat mutasi kredit promo harian di buku besar;
+  :Kunci status klaim harian dan setel cooldown 24 jam;
+  :Tampilkan pesan sukses penambahan token gratis;
+endif
+
+|Audio Engineer|
+:Melihat saldo token aktif terbaru dan status tombol klaim harian;
+stop
+
+@enduml

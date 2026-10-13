@@ -1,0 +1,68 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengubah Profil (UC-04)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih menu "Pengaturan Profil";
+
+|Polaris Audio|
+:Menampilkan formulir profil pengguna;
+
+|Audio Engineer|
+repeat
+  :Menyunting informasi profil pengguna;
+  :Menekan tombol "Simpan Perubahan";
+
+  |Polaris Audio|
+  :Validasi kelengkapan isian profil;
+  backward:Tampilkan notifikasi nama lengkap wajib diisi;
+repeat while () is ([Nama Lengkap Kosong]) not ([Data Valid])
+
+:Periksa opsi tindakan pengguna;
+if () then ([Membatalkan Perubahan])
+  :Kembalikan isian formulir ke data awal;
+  |Audio Engineer|
+  :Batalkan perubahan data profil;
+else ([Konfirmasi Simpan Perubahan])
+  |Polaris Audio|
+  :Simpan pembaruan data profil ke basis data;
+  :Tampilkan notifikasi profil berhasil diperbarui;
+  :Perbarui nama tampilan pada bilah navigasi;
+endif
+
+|Audio Engineer|
+:Melihat data profil aktif pada antarmuka sistem;
+stop
+
+@enduml

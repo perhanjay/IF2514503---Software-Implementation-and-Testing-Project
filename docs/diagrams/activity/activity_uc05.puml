@@ -1,0 +1,68 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengubah Kata Sandi (UC-05)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih tab "Keamanan" pada Pengaturan Akun;
+
+|Polaris Audio|
+:Menampilkan formulir pergantian kata sandi;
+
+|Audio Engineer|
+repeat
+  :Memasukkan kata sandi saat ini, kata sandi baru, dan konfirmasi;
+  :Menekan tombol "Simpan Kata Sandi";
+
+  |Polaris Audio|
+  :Validasi kata sandi saat ini di basis data;
+  backward:Tampilkan notifikasi kata sandi saat ini salah;
+repeat while () is ([Kata Sandi Saat Ini Salah]) not ([Kata Sandi Saat Ini Cocok])
+
+:Validasi kekuatan dan konfirmasi kata sandi baru;
+if () then ([Sandi Baru Tidak Sesuai Syarat / Batal])
+  :Tampilkan pesan kesalahan kriteria sandi baru;
+  |Audio Engineer|
+  :Batalkan atau reset isian formulir;
+else ([Sandi Baru Valid & Terkonfirmasi])
+  |Polaris Audio|
+  :Enkripsi kata sandi baru dan simpan ke basis data;
+  :Tampilkan notifikasi kata sandi berhasil diperbarui;
+  :Perbarui stempel keamanan sesi akun;
+endif
+
+|Audio Engineer|
+:Melihat status keamanan akun terkini pada antarmuka sistem;
+stop
+
+@enduml

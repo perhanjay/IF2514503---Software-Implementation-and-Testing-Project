@@ -1,0 +1,62 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Memeriksa Saldo Token (UC-06)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Memilih menu "Dompet Token" pada bilah navigasi;
+
+|Polaris Audio|
+:Kueri data saldo token aktif dari basis data;
+:Menampilkan angka saldo dan rasio pemakaian trek;
+
+:Evaluasi ketersediaan saldo token;
+if () then ([Saldo Kosong / Kurang])
+  :Tampilkan indikator peringatan saldo habis;
+  |Audio Engineer|
+  :Memilih tombol "Beli Token" (UC-07);
+  |Polaris Audio|
+  :Arahkan ke katalog Pembelian Token (UC-07);
+else ([Saldo Cukup / Tersedia])
+  :Tampilkan status saldo aman dan detail kuota;
+  |Audio Engineer|
+  :Menutup panel dompet dan kembali ke workstation;
+  |Polaris Audio|
+  :Arahkan kembali ke antarmuka Dasbor Utama;
+endif
+
+|Audio Engineer|
+:Melihat antarmuka sistem sesuai pilihan navigasi;
+stop
+
+@enduml

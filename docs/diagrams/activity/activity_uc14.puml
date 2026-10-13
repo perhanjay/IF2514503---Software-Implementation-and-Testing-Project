@@ -1,0 +1,76 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Menjalankan Perbaikan Sesi Otomatis (UC-14)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka panel opsi perbaikan sesi mixing;
+
+|Polaris Audio|
+:Tampilkan tombol "Terapkan Perbaikan Otomatis (1-Click Auto-Fix)"\nbeserta ringkasan perbaikan dan estimasi token;
+
+|Audio Engineer|
+:Menekan tombol "Terapkan Perbaikan Otomatis";
+
+|Polaris Audio|
+:Tampilkan modal konfirmasi eksekusi\ndan rincian pemotongan token;
+
+|Audio Engineer|
+:Memilih "Setuju & Proses" pada dialog konfirmasi;
+
+|Polaris Audio|
+:Identifikasi trek bermasalah vs pass-through\n(pemrosesan selektif hanya pada trek cacat);
+:Jalankan pipeline algoritma perbaikan DSP\n(fasa, micro-delay, stereo, rumble, & gain staging);
+:Tampilkan bilah kemajuan (progress bar) rendering;
+
+:Validasi status eksekusi rendering perbaikan DSP;
+if () then ([Gangguan Server / Timeout])
+  :Hentikan proses dan batalkan pemotongan token\n(auto-rollback / refund instan ke dompet);
+  :Tampilkan notifikasi kegagalan server dan saran coba lagi;
+  |Audio Engineer|
+  :Menerima pesan kegagalan dan opsi ulangi proses;
+  |Polaris Audio|
+else ([Eksekusi DSP Berhasil])
+  :Potong saldo token sesuai trek yang diperbaiki\ndan catat mutasi pada buku besar transaksi;
+  :Perbarui skor kesehatan sesi optimal (95–100)\ndan tandai seluruh trek dengan centang hijau;
+  :Tampilkan notifikasi sukses dan siapkan audio perbaikan;
+  |Audio Engineer|
+  :Diarahkan ke Pemutar Audio A/B untuk evaluasi hasil (UC-16);
+  |Polaris Audio|
+endif
+
+|Audio Engineer|
+:Melihat antarmuka sistem sesuai status akhir pemrosesan;
+stop
+
+@enduml

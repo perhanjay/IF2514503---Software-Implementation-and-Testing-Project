@@ -1,0 +1,72 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Memeriksa Skor Kesehatan Sesi & Ringkasan Masalah (UC-13)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka Dasbor Diagnostik\nhasil pemindaian sesi mixing;
+
+|Polaris Audio|
+:Kalkulasi skor kesehatan sesi (0–100)\ndan rekapitulasi anomali teknis;
+
+:Evaluasi kondisi teknis dan skor kesehatan sesi;
+if () then ([Skor 100 (Sesi Sempurna / Clean)])
+  :Tampilkan status "Clean / Mix-Ready"\ndan buka laporan gratis;
+  |Audio Engineer|
+  :Melihat hasil audit sempurna\ndan opsi unduh laporan (UC-18);
+  |Polaris Audio|
+else ([Ditemukan Masalah Teknis (Skor < 100)])
+  :Tampilkan skor kesehatan, kartu anomali,\ndan peringatan distorsi parah (jika ada);
+  :Tampilkan kalkulasi kebutuhan token perbaikan\n(rincian solusi bertanda gembok/terkunci);
+  |Audio Engineer|
+  :Meninjau ringkasan anomali dan\ntekan "Buka Kunci & Perbaiki Sesi";
+  |Polaris Audio|
+  :Validasi kecukupan saldo token dompet pengguna;
+  if () then ([Saldo Token Kurang])
+    :Tampilkan notifikasi saldo kurang\ndan tombol beli token;
+    |Audio Engineer|
+    :Memilih tombol top-up dan\ndiarahkan ke pembelian token (UC-07);
+    |Polaris Audio|
+  else ([Saldo Token Cukup])
+    :Arahkan pengguna ke alur\neksekusi perbaikan DSP;
+    |Audio Engineer|
+    :Memilih mode perbaikan otomatis (UC-14)\natau penyesuaian kustom (UC-15);
+    |Polaris Audio|
+  endif
+endif
+
+|Audio Engineer|
+:Melihat antarmuka sistem sesuai alur tindak lanjut yang dipilih;
+stop
+
+@enduml

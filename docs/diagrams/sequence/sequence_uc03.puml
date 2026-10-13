@@ -1,0 +1,180 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #F8F9FA
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mereset Kata Sandi (UC-03)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Pemulihan\n(Web UI)" as UI
+end box
+
+box "External Communication"
+boundary "Email Client\n(Inbox Pengguna)" as MailClient
+control "Email Service\n(SMTP / Notification)" as MailSvc
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "PasswordResetController\n(API Gateway)" as ResetCtrl
+entity "UserService\n(Auth & Security Core)" as UserSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL & Token Store)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Permintaan Tautan Pemulihan Kata Sandi ==
+
+User -> UI : Pilih tautan "Lupa Kata Sandi?" pada form login
+activate User
+activate UI
+UI --> User : Tampilkan form permintaan pemulihan kata sandi
+deactivate UI
+
+User -> UI : Masukkan alamat email terdaftar
+activate UI
+User -> UI : Tekan tombol "Kirim Tautan Pemulihan"
+
+UI -> ResetCtrl : POST /api/v1/auth/forgot-password (email)
+activate ResetCtrl
+
+ResetCtrl -> UserSvc : requestPasswordReset(email)
+activate UserSvc
+
+UserSvc -> DB : SELECT id, email FROM users WHERE email = ?
+activate DB
+DB --> UserSvc : Data pengguna / null
+deactivate DB
+
+alt Email Tidak Ditemukan
+  UserSvc --> ResetCtrl : Error: UserNotFoundException
+  ResetCtrl --> UI : 404 Not Found ("Email tidak terdaftar")
+  UI --> User : Tampilkan notifikasi: "Alamat email tidak terdaftar di sistem"
+else Email Terdaftar (Valid)
+  UserSvc -> UserSvc : Generate secure reset token & set expiry (30 menit)
+  UserSvc -> DB : INSERT INTO password_reset_tokens (user_id, token, expires_at)
+  activate DB
+  DB --> UserSvc : Token tersimpan
+  deactivate DB
+
+  UserSvc -> MailSvc : sendPasswordResetEmail(email, reset_link, token)
+  activate MailSvc
+  MailSvc -> MailClient : Kirim email berisi tautan verifikasi pemulihan
+  activate MailClient
+  MailSvc --> UserSvc : Email terkirim
+  deactivate MailSvc
+
+  UserSvc --> ResetCtrl : ResetRequestSuccess
+  deactivate UserSvc
+
+  ResetCtrl --> UI : 200 OK ("Tautan pemulihan telah dikirim")
+  deactivate ResetCtrl
+
+  UI --> User : Tampilkan konfirmasi: "Tautan telah dikirim ke email Anda"
+  deactivate UI
+
+== Fase 2: Verifikasi Token & Pembaruan Kata Sandi ==
+
+  User -> MailClient : Buka inbox dan klik tautan pemulihan
+  MailClient -> UI : Buka URL /reset-password?token={token}
+  deactivate MailClient
+  activate UI
+
+  UI -> ResetCtrl : GET /api/v1/auth/verify-reset-token?token={token}
+  activate ResetCtrl
+
+  ResetCtrl -> UserSvc : validateResetToken(token)
+  activate UserSvc
+
+  UserSvc -> DB : SELECT * FROM password_reset_tokens WHERE token = ?
+  activate DB
+  DB --> UserSvc : Data token (expires_at, is_used)
+  deactivate DB
+
+  alt Token Kedaluwarsa (> 30 Menit) atau Sudah Digunakan
+    UserSvc --> ResetCtrl : Error: TokenExpiredOrInvalidException
+    ResetCtrl --> UI : 400 Bad Request ("Tautan kedaluwarsa")
+    UI --> User : Tampilkan error: "Tautan telah kedaluwarsa. Silakan ajukan ulang"
+  else Token Sah & Masih Berlaku
+    UserSvc --> ResetCtrl : TokenValid
+    deactivate UserSvc
+    ResetCtrl --> UI : 200 OK (Token Valid)
+    deactivate ResetCtrl
+
+    UI --> User : Tampilkan formulir input kata sandi baru
+    deactivate UI
+
+    User -> UI : Masukkan Kata Sandi Baru & Konfirmasi Kata Sandi
+    activate UI
+    User -> UI : Tekan tombol "Perbarui Kata Sandi"
+    UI -> UI : Validasi kecocokan kedua kolom & kekuatan password
+
+    alt Konfirmasi Password Tidak Cocok / Lemah
+      UI --> User : Tampilkan peringatan: "Konfirmasi kata sandi tidak cocok / terlalu lemah"
+    else Password Valid & Cocok
+      UI -> ResetCtrl : POST /api/v1/auth/reset-password (token, new_password)
+      activate ResetCtrl
+
+      ResetCtrl -> UserSvc : resetPassword(token, new_password)
+      activate UserSvc
+
+      UserSvc -> UserSvc : Hash kata sandi baru (argon2 / bcrypt)
+      UserSvc -> DB : UPDATE users SET password_hash = ? WHERE id = ?
+      activate DB
+      DB --> UserSvc : Password updated
+
+      UserSvc -> DB : UPDATE password_reset_tokens SET is_used = true WHERE token = ?
+      DB --> UserSvc : Token invalidated
+
+      UserSvc -> DB : DELETE FROM active_sessions WHERE user_id = ?
+      DB --> UserSvc : Sesi perangkat lain dinonaktifkan
+      deactivate DB
+
+      UserSvc --> ResetCtrl : PasswordResetCompleted
+      deactivate UserSvc
+
+      ResetCtrl --> UI : 200 OK ("Kata sandi berhasil diperbarui")
+      deactivate ResetCtrl
+
+      UI --> User : Tampilkan notifikasi sukses & arahkan ke halaman Login (UC-02)
+      deactivate UI
+    end
+  end
+end
+
+deactivate User
+
+@enduml

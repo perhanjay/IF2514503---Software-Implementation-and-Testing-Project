@@ -1,0 +1,215 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mengunduh Laporan Diagnostik Sesi (UC-18)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Modal Laporan Diagnostik\n(Web UI Dialog)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "ReportController\n(API Gateway)" as ReportCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "AuditReportService\n(Report Orchestrator)" as ReportSvc
+control "PdfRenderWorker\n(Headless PDF Engine)" as PdfWorker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Reports)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Pemuatan Pratinjau Laporan & Opsi Kustomisasi ==
+
+User -> UI : Klik tombol "Unduh Laporan Audit (PDF)" pada Ringkasan Sesi
+activate User
+activate UI
+
+UI -> ReportCtrl : GET /api/v1/sessions/{id}/report/preview (Bearer JWT)
+activate ReportCtrl
+
+ReportCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> ReportCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+ReportCtrl -> ReportSvc : getReportPreviewData(session_id, user_id)
+activate ReportSvc
+
+ReportSvc -> DB : SELECT project_name, artist, studio_logo_url, session_health_score, tracks_count, phase_summary FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.id = ?
+activate DB
+DB --> ReportSvc : SessionSummary & StudioBranding
+deactivate DB
+
+ReportSvc --> ReportCtrl : PreviewPayload (branding, metadata, format_options)
+deactivate ReportSvc
+
+ReportCtrl --> UI : 200 OK (preview_data)
+deactivate ReportCtrl
+
+UI --> User : Render modal pratinjau: opsi logo studio, nama proyek, artis, & format ekspor (PDF / JSON)
+deactivate UI
+
+== Fase 2: Konfirmasi & Kompilasi Dokumen PDF Resmi (Typical Course) ==
+
+User -> UI : Pilih "PDF Resmi", konfirmasi kop studio, dan klik "Konfirmasi & Unduh PDF"
+activate UI
+
+UI -> ReportCtrl : POST /api/v1/sessions/{id}/report/generate (format='PDF', include_branding=true)
+activate ReportCtrl
+
+ReportCtrl -> ReportSvc : queuePdfGeneration(session_id, user_id, config)
+activate ReportSvc
+
+ReportSvc -> DB : SELECT * FROM diagnostic_metrics WHERE session_id = ?
+activate DB
+DB --> ReportSvc : FullDiagnosticMetrics (health_score, phase_matrices, issues, applied_fixes)
+deactivate DB
+
+ReportSvc -> PdfWorker : dispatch(RenderPdfReportJob(session_id, metrics, branding))
+activate PdfWorker
+PdfWorker --> ReportSvc : JobDispatched (ws_channel)
+deactivate PdfWorker
+
+ReportSvc --> ReportCtrl : PdfGenerationQueued (job_id, ws_channel)
+deactivate ReportSvc
+
+ReportCtrl --> UI : 202 Accepted (generation_in_progress)
+deactivate ReportCtrl
+
+UI --> User : Tampilkan status: "Mengompilasi laporan audit teknis dan grafik fasa..."
+
+activate PdfWorker
+PdfWorker -> PdfWorker : Evaluasi jumlah trek sesi (misal: 24 trek <= 50 trek)
+PdfWorker -> PdfWorker : Render grafik fasa vektor, skor kesehatan sesi (95-100), kop studio, & tabel perbaikan
+PdfWorker -> Storage : Simpan berkas PDF (Audit_Report_[Project]_[Date].pdf)
+activate Storage
+Storage --> PdfWorker : UploadSuccess (pdf_storage_key)
+deactivate Storage
+
+PdfWorker -> DB : INSERT INTO session_reports (session_id, report_type='PDF', storage_url=?)
+activate DB
+DB --> PdfWorker : ReportRecordCreated
+deactivate DB
+
+PdfWorker --> ReportSvc : PdfRenderCompleted (pdf_storage_key)
+activate ReportSvc
+deactivate PdfWorker
+
+ReportSvc -> Storage : generatePresignedDownloadUrl(pdf_storage_key, expiresIn=1h)
+activate Storage
+Storage --> ReportSvc : PresignedPdfUrl
+deactivate Storage
+
+ReportSvc -> UI : WebSocket push: EVENT_REPORT_PDF_READY (download_url)
+deactivate ReportSvc
+
+UI -> Storage : Trigger direct browser download (GET presigned PDF URL)
+activate Storage
+Storage --> UI : Stream binary PDF document (Content-Type: application/pdf)
+deactivate Storage
+
+UI --> User : Berkas PDF tersimpan otomatis di komputer lokal & konfirmasi unduhan selesai
+deactivate UI
+
+== Fase 3: Opsi Alur Alternatif (Tanpa Logo & Ekspor JSON) ==
+
+alt [Alternative Workflow 1: Laporan Standar Tanpa Logo Studio]
+  User -> UI : Pilih opsi "Format Standar (Tanpa Logo Studio)"
+  activate UI
+  UI -> ReportCtrl : POST /api/v1/sessions/{id}/report/generate (format='PDF', include_branding=false)
+  activate ReportCtrl
+  ReportCtrl -> ReportSvc : generateStandardPdf(session_id)
+  activate ReportSvc
+  ReportSvc -> PdfWorker : dispatch(RenderStandardPdfJob())
+  activate PdfWorker
+  PdfWorker -> PdfWorker : Kompilasi dokumen PDF dengan kop standar resmi Polaris Audio
+  PdfWorker --> ReportSvc : StandardPdfCompleted
+  deactivate PdfWorker
+  ReportSvc --> ReportCtrl : StandardPdfReady
+  deactivate ReportSvc
+  ReportCtrl --> UI : 200 OK (standard_download_url)
+  deactivate ReportCtrl
+  UI --> User : Dokumen PDF ber-kop standar Polaris Audio berhasil diunduh
+  deactivate UI
+
+else [Alternative Workflow 2: Ekspor Format Data Terstruktur (JSON)]
+  User -> UI : Pilih opsi "Ekspor Data Metrik (.JSON)"
+  activate UI
+  UI -> ReportCtrl : GET /api/v1/sessions/{id}/report/json (Bearer JWT)
+  activate ReportCtrl
+  ReportCtrl -> ReportSvc : exportStructuredJsonMetrics(session_id)
+  activate ReportSvc
+  ReportSvc -> DB : SELECT raw_metrics_json FROM diagnostic_metrics WHERE session_id = ?
+  activate DB
+  DB --> ReportSvc : RawMetricsJsonData
+  deactivate DB
+  ReportSvc --> ReportCtrl : JsonExportPayload
+  deactivate ReportSvc
+  ReportCtrl --> UI : 200 OK (Content-Type: application/json)
+  deactivate ReportCtrl
+  UI --> User : Berkas .JSON terstruktur tersimpan untuk integrasi manajemen studio internal
+  deactivate UI
+end
+
+== Fase 4: Penanganan Sesi Skala Masif (> 50 Trek) (Exceptional Workflow) ==
+
+opt [Exceptional Workflow: Sesi Berukuran Masif (> 50 Trek) - Fallback Laporan Ringkas]
+  activate PdfWorker
+  PdfWorker -> PdfWorker : Deteksi jumlah trek > 50 trek (Beban render grafik vektor masif)
+  PdfWorker -> PdfWorker : Beralih otomatis ke "Mode Laporan Ringkas (Teks & Tabel Matriks Kompak)"
+  PdfWorker -> Storage : Tulis berkas PDF Ringkas tanpa grafik visual berat
+  activate Storage
+  Storage --> PdfWorker : CompactPdfUploaded
+  deactivate Storage
+  PdfWorker --> ReportSvc : CompactPdfCompleted
+  deactivate PdfWorker
+  activate ReportSvc
+  ReportSvc -> UI : WebSocket push: EVENT_REPORT_PDF_READY (mode='COMPACT_FALLBACK')
+  deactivate ReportSvc
+  activate UI
+  UI --> User : Tampilkan toast: "Laporan diterbitkan dalam format ringkas (teks & tabel) demi stabilitas render"
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

@@ -1,0 +1,82 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mereset Kata Sandi (UC-03)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka halaman pemulihan kata sandi;
+
+|Polaris Audio|
+:Menampilkan formulir permintaan reset;
+
+|Audio Engineer|
+repeat
+  :Memasukkan alamat email terdaftar;
+  :Menekan tombol "Kirim Tautan Pemulihan";
+
+  |Polaris Audio|
+  :Validasi ketersediaan email di basis data;
+  backward:Tampilkan pesan email tidak terdaftar;
+repeat while () is ([Email Tidak Ditemukan]) not ([Email Terdaftar])
+
+:Terbitkan token reset berbatas waktu (30 menit);
+:Kirimkan tautan reset ke kotak masuk email;
+:Tampilkan notifikasi tautan berhasil dikirim;
+
+|Audio Engineer|
+:Membuka kotak masuk email dan klik tautan;
+
+|Polaris Audio|
+:Validasi masa aktif dan integritas token;
+if () then ([Token Kedaluwarsa / Tidak Valid])
+  :Tampilkan pesan peringatan tautan kedaluwarsa;
+  |Audio Engineer|
+  :Pilih opsi ajukan ulang permintaan reset;
+else ([Token Valid])
+  |Polaris Audio|
+  :Menampilkan halaman pembuatan kata sandi baru;
+  |Audio Engineer|
+  :Memasukkan kata sandi baru dan konfirmasi;
+  :Menekan tombol "Perbarui Kata Sandi";
+  |Polaris Audio|
+  :Validasi kekuatan dan kecocokan kata sandi;
+  :Enkripsi dan simpan kata sandi baru ke basis data;
+  :Revokasi seluruh sesi login aktif lainnya;
+  :Arahkan pengguna kembali ke halaman Login (UC-02);
+endif
+
+|Audio Engineer|
+:Melihat konfirmasi sukses dan antarmuka Login (UC-02);
+stop
+
+@enduml

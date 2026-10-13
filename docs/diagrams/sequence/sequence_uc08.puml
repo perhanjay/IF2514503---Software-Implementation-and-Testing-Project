@@ -1,0 +1,172 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Memeriksa Riwayat Transaksi (UC-08)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Riwayat Transaksi / Dompet\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "TransactionController\n(API Gateway)" as TxCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "LedgerService\n(Audit & Query Core)" as LedgerSvc
+entity "PdfExportService\n(Receipt Generator)" as PdfSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Memuat Daftar Riwayat Mutasi Token (Default View) ==
+
+User -> UI : Pilih tab "Riwayat Transaksi" pada menu Dompet Token
+activate User
+activate UI
+
+UI -> TxCtrl : GET /api/v1/wallet/transactions?page=1&limit=10 (Bearer JWT)
+activate TxCtrl
+
+TxCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> TxCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+TxCtrl -> LedgerSvc : getTransactionHistory(user_id, page=1, limit=10)
+activate LedgerSvc
+
+LedgerSvc -> DB : SELECT * FROM token_ledgers WHERE user_id = ? ORDER BY created_at DESC LIMIT 10
+activate DB
+DB --> LedgerSvc : Data catatan mutasi (Top-up, Pemakaian Sesi, Refund)
+deactivate DB
+
+LedgerSvc --> TxCtrl : TransactionHistoryData (records, pagination)
+deactivate LedgerSvc
+
+TxCtrl --> UI : 200 OK (transactions_list, pagination_meta)
+deactivate TxCtrl
+
+UI --> User : Render tabel riwayat transaksi (Tanggal, Jenis, Jumlah Token, Saldo Akhir)
+deactivate UI
+
+== Fase 2: Menyaring Riwayat Berdasarkan Kategori (Filter History) ==
+
+User -> UI : Pilih filter kategori (misal: "Top-up", "Pemakaian Sesi", atau "Refund")
+activate UI
+User -> UI : Tekan tombol "Terapkan Filter"
+
+UI -> TxCtrl : GET /api/v1/wallet/transactions?type=CREDIT_TOPUP&page=1
+activate TxCtrl
+
+TxCtrl -> LedgerSvc : getFilteredTransactions(user_id, filter_type='CREDIT_TOPUP')
+activate LedgerSvc
+
+LedgerSvc -> DB : SELECT * FROM token_ledgers WHERE user_id = ? AND type = ? ORDER BY created_at DESC
+activate DB
+DB --> LedgerSvc : Hasil filter catatan mutasi
+deactivate DB
+
+LedgerSvc --> TxCtrl : FilteredHistoryData
+deactivate LedgerSvc
+
+TxCtrl --> UI : 200 OK (filtered_records)
+deactivate TxCtrl
+
+UI --> User : Perbarui tampilan tabel dengan daftar transaksi terfilter
+deactivate UI
+
+== Fase 3: Pemeriksaan Rincian Transaksi & Unduh Tanda Terima ==
+
+User -> UI : Klik salah satu baris transaksi untuk melihat rincian
+activate UI
+
+UI -> TxCtrl : GET /api/v1/wallet/transactions/{id}/details
+activate TxCtrl
+
+TxCtrl -> LedgerSvc : getTransactionDetail(user_id, transaction_id)
+activate LedgerSvc
+
+LedgerSvc -> DB : SELECT tl.*, o.gateway_ref, s.track_count FROM token_ledgers tl LEFT JOIN orders o ON tl.order_id = o.id LEFT JOIN sessions s ON tl.session_id = s.id WHERE tl.id = ?
+activate DB
+DB --> LedgerSvc : Rincian lengkap transaksi (ID, trek, referensi pembayaran, stempel waktu)
+deactivate DB
+
+LedgerSvc --> TxCtrl : TransactionDetailData
+deactivate LedgerSvc
+
+TxCtrl --> UI : 200 OK (transaction_detail)
+deactivate TxCtrl
+
+UI --> User : Tampilkan modal panel rincian transaksi
+deactivate UI
+
+alt Tindakan: Mengunduh Bukti Pembayaran Digital (Invoice / Receipt PDF)
+  User -> UI : Tekan tombol "Unduh Tanda Terima"
+  activate UI
+
+  UI -> TxCtrl : GET /api/v1/wallet/transactions/{id}/receipt
+  activate TxCtrl
+
+  TxCtrl -> PdfSvc : generateReceiptPdf(user_id, transaction_id)
+  activate PdfSvc
+
+  PdfSvc -> DB : SELECT * FROM token_ledgers tl JOIN orders o ON tl.order_id = o.id WHERE tl.id = ?
+  activate DB
+  DB --> PdfSvc : Data validasi faktur transaksi
+  deactivate DB
+
+  PdfSvc -> PdfSvc : Render template PDF kuitansi resmi studio & metadata
+  PdfSvc --> TxCtrl : Binary PDF Stream (receipt_INV_XXXX.pdf)
+  deactivate PdfSvc
+
+  TxCtrl --> UI : 200 OK (Content-Type: application/pdf)
+  deactivate TxCtrl
+
+  UI --> User : Simpan / unduh berkas tanda terima digital (PDF) ke perangkat
+  deactivate UI
+
+else Tindakan: Menutup Panel Rincian
+  User -> UI : Tekan tombol "Tutup" pada panel modal
+  activate UI
+  UI --> User : Tutup modal dan kembalikan fokus ke tabel riwayat transaksi
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

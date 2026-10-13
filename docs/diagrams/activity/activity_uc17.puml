@@ -1,0 +1,73 @@
+@startuml
+skinparam {
+    DefaultFontName Arial
+    DefaultFontSize 12
+    DefaultTextAlignment center
+    ActivityBackgroundColor #FFFFFF
+    ActivityBorderColor #000000
+    ActivityBorderThickness 1.2
+    ActivityDiamondBackgroundColor #FFFFFF
+    ActivityDiamondBorderColor #000000
+    ActivityDiamondBorderThickness 1.2
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ArrowFontSize 11
+    SwimlaneBorderColor #000000
+    SwimlaneBorderThickness 1.5
+    SwimlaneTitleBackgroundColor #F8F9FA
+    SwimlaneTitleFontName Arial
+    SwimlaneTitleFontSize 13
+    SwimlaneTitleFontStyle bold
+    TitleBorderColor #000000
+    TitleBorderThickness 1.5
+    TitleBorderRoundCorner 0
+    TitleBackgroundColor #FFFFFF
+    TitleFontSize 13
+    TitleFontStyle bold
+    Shadowing false
+}
+
+title Mengunduh Stems Audio Hasil Perbaikan (UC-17)
+
+|Audio Engineer|
+|Polaris Audio|
+
+|Audio Engineer|
+start
+:Membuka halaman ringkasan dan pengunduhan sesi hasil perbaikan;
+
+|Polaris Audio|
+:Menampilkan tombol utama "Unduh Seluruh Stems (.ZIP)"\ndan daftar ikon unduh individual per baris trek;
+
+|Audio Engineer|
+:Menentukan opsi pengunduhan\n(seluruh paket sesi ZIP atau stem individual);
+
+|Polaris Audio|
+:Evaluasi opsi metode unduhan yang dipilih pengguna;
+if () then ([Unduh Seluruh Paket (.ZIP)])
+  :Kemas seluruh stem bersih ke arsip ZIP di server\n(penamaan rapi FIXED_[NamaTrek].wav);
+  :Pertahankan sample rate dan bit depth asli (lossless);
+else ([Unduh Trek Individual / Satuan])
+  :Siapkan berkas WAV stem tunggal yang dipilih\n(format lossless sesuai resolusi rekaman asli);
+endif
+
+repeat
+  :Hasilkan tautan unduhan aman dan streaming berkas;
+  |Audio Engineer|
+  :Menerima aliran data berkas melalui peramban web;
+  |Polaris Audio|
+  :Validasi keutuhan transmisi berkas unduhan;
+  backward:Tampilkan opsi "Unduh Ulang" gratis (masa retensi aktif);
+repeat while () is ([Koneksi Terputus / Gagal Unduh]) not ([Unduhan Lengkap & Utuh])
+
+|Audio Engineer|
+:Menyimpan berkas stem audio ke media penyimpanan komputer lokal;
+
+|Polaris Audio|
+:Tampilkan konfirmasi unduhan selesai\ndan pengingat sisa waktu retensi berkas (24–48 jam);
+
+|Audio Engineer|
+:Melihat konfirmasi penyimpanan dan status retensi sesi;
+stop
+
+@enduml

@@ -1,0 +1,126 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+}
+
+title Sequence Diagram: Login ke Sistem (UC-02)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Login\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "AuthController\n(API Gateway)" as Auth
+control "RateLimiter / Security\n(Brute-Force Guard)" as Guard
+entity "UserService\n(Auth & Security)" as UserSvc
+entity "WalletService\n(Token Core)" as WalletSvc
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+User -> UI : Buka halaman login
+activate User
+activate UI
+UI --> User : Tampilkan formulir login akun & opsi "Ingat Saya"
+deactivate UI
+
+User -> UI : Masukkan Email, Password, & centang "Ingat Saya"
+activate UI
+User -> UI : Tekan tombol "Masuk"
+
+UI -> Auth : POST /api/v1/auth/login (email, password, remember_me)
+activate Auth
+
+Auth -> Guard : checkLoginAttempts(email, ip_address)
+activate Guard
+
+alt Percobaan Login Melebihi Batas (>= 5x Gagal)
+  Guard --> Auth : Error: AccountLockedException (Kunci 15 menit)
+  Auth --> UI : 429 Too Many Requests ("Upaya login terkunci sementara")
+  UI --> User : Tampilkan peringatan: "Akun dikunci 15 menit karena 5x gagal login"
+else Percobaan Login Diizinkan (< 5x Gagal)
+  Guard --> Auth : Allowed (Upaya login valid)
+  deactivate Guard
+
+  Auth -> UserSvc : authenticate(email, password, remember_me)
+  activate UserSvc
+
+  UserSvc -> DB : SELECT * FROM users WHERE email = ?
+  activate DB
+  DB --> UserSvc : Data pengguna (termasuk password_hash)
+  deactivate DB
+
+  UserSvc -> UserSvc : Verifikasi kecocokan kata sandi (verifyPassword)
+
+  alt Kredensial Tidak Valid (Email / Password Salah)
+    UserSvc -> Guard : recordFailedAttempt(email, ip_address)
+    activate Guard
+    Guard --> UserSvc : Attempt recorded
+    deactivate Guard
+
+    UserSvc --> Auth : Error: InvalidCredentialsException
+    Auth --> UI : 401 Unauthorized ("Email atau kata sandi tidak valid")
+    UI --> User : Tampilkan notifikasi: "Email atau kata sandi tidak valid"
+  else Kredensial Valid (Email & Password Cocok)
+    UserSvc -> Guard : resetFailedAttempts(email)
+    activate Guard
+    Guard --> UserSvc : Counter reset
+    deactivate Guard
+
+    UserSvc -> WalletSvc : getWalletBalance(user_id)
+    activate WalletSvc
+
+    WalletSvc -> DB : SELECT balance FROM wallets WHERE user_id = ?
+    activate DB
+    DB --> WalletSvc : Saldo token saat ini
+    deactivate DB
+
+    WalletSvc --> UserSvc : Data dompet (wallet_balance)
+    deactivate WalletSvc
+
+    UserSvc -> UserSvc : Generate JWT session (masa aktif disesuaikan "Ingat Saya")
+    UserSvc --> Auth : LoginSuccess(user, wallet, jwt_token)
+    deactivate UserSvc
+
+    Auth --> UI : 200 OK (JWT, user profile, token balance)
+    deactivate Auth
+
+    UI -> UI : Simpan JWT ke local storage / secure cookie
+    UI --> User : Arahkan ke Dasbor Utama (tampilkan nama profil & saldo token)
+  end
+end
+
+deactivate UI
+deactivate User
+
+@enduml

@@ -1,0 +1,78 @@
+flowchart TD
+    %% Penyelarasan Kolom Berdampingan (Side-by-Side)
+    subgraph AE ["Audio Engineer"]
+        direction TB
+        StartNode([Mulai])
+        A_BukaForm("Membuka halaman pendaftaran")
+        A_TanyaMetode("Pilihan metode pendaftaran")
+        D_Metode{" "}
+        A_IsiForm("Mengisi nama lengkap, email, dan kata sandi")
+        A_KlikDaftar("Menekan tombol Daftar Akun")
+        A_PilihGoogle("Memilih tombol Daftar dengan Google")
+        A_ErrorFormat("Menerima notifikasi format email atau kata sandi tidak valid")
+        A_ErrorEmail("Menerima notifikasi email sudah terdaftar")
+        A_Dasbor("Melihat Dasbor Utama dan saldo token awal")
+        EndNode([Selesai])
+    end
+
+    subgraph PA ["Polaris Audio"]
+        direction TB
+        S_TampilForm("Menampilkan formulir pendaftaran akun")
+        S_VerifOAuth("Memverifikasi akun melalui Google OAuth API")
+        S_CekFormat("Memeriksa format email dan kekuatan kata sandi")
+        D_Validasi{" "}
+        S_CekEmailDB("Memeriksa ketersediaan email pada basis data")
+        D_Email{" "}
+        S_SimpanAkun("Menyimpan data akun baru ke basis data")
+        S_InisialisasiWallet("Menginisialisasi dompet token virtual pengguna")
+        S_KreditBonus("Menambahkan saldo token selamat datang")
+        S_TerbitkanJWT("Menerbitkan token autentikasi sesi JWT")
+        S_TampilDasbor("Mengarahkan pengguna ke halaman Dasbor Utama")
+    end
+
+    %% Penjaga posisi horizontal agar kedua kolom tetap berdampingan
+    StartNode ~~~ S_TampilForm
+
+    %% Alur Kerja (Workflow)
+    StartNode --> A_BukaForm
+    A_BukaForm --> S_TampilForm
+    S_TampilForm --> A_TanyaMetode
+    A_TanyaMetode --> D_Metode
+
+    %% Cabang 1: Pendaftaran Manual
+    D_Metode -->|Formulir Manual| A_IsiForm
+    A_IsiForm --> A_KlikDaftar
+    A_KlikDaftar --> S_CekFormat
+    S_CekFormat --> D_Validasi
+
+    D_Validasi -->|Tidak Valid| A_ErrorFormat
+    A_ErrorFormat --> A_IsiForm
+
+    D_Validasi -->|Valid| S_CekEmailDB
+    S_CekEmailDB --> D_Email
+
+    D_Email -->|Sudah Terdaftar| A_ErrorEmail
+    A_ErrorEmail --> A_IsiForm
+
+    %% Cabang 2: Google OAuth
+    D_Metode -->|Google OAuth| A_PilihGoogle
+    A_PilihGoogle --> S_VerifOAuth
+    S_VerifOAuth --> S_SimpanAkun
+
+    %% Proses Penyimpanan dan Pembukaan Dasbor
+    D_Email -->|Belum Terdaftar| S_SimpanAkun
+    S_SimpanAkun --> S_InisialisasiWallet
+    S_InisialisasiWallet --> S_KreditBonus
+    S_KreditBonus --> S_TerbitkanJWT
+    S_TerbitkanJWT --> S_TampilDasbor
+    S_TampilDasbor --> A_Dasbor
+    A_Dasbor --> EndNode
+
+    %% Styling Formal UML Tanpa Emoji
+    classDef roundedBox fill:#edf2f7,stroke:#4a5568,stroke-width:1.5px,color:#1a202c;
+    classDef diamond fill:#feebc8,stroke:#dd6b20,stroke-width:1.5px,color:#7b341e;
+    classDef terminal fill:#2d3748,stroke:#1a202c,stroke-width:2px,color:#fff;
+
+    class StartNode,EndNode terminal;
+    class A_BukaForm,A_TanyaMetode,A_IsiForm,A_KlikDaftar,A_PilihGoogle,A_ErrorFormat,A_ErrorEmail,A_Dasbor,S_TampilForm,S_VerifOAuth,S_CekFormat,S_CekEmailDB,S_SimpanAkun,S_InisialisasiWallet,S_KreditBonus,S_TerbitkanJWT,S_TampilDasbor roundedBox;
+    class D_Metode,D_Validasi,D_Email diamond;

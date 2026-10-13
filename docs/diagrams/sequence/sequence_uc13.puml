@@ -1,0 +1,176 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Memeriksa Skor Kesehatan Sesi & Ringkasan Masalah (UC-13)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Dasbor Diagnostik Sesi\n(Web UI)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "DiagnosticController\n(API Gateway)" as DiagCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "DiagnosticReportService\n(Audit Orchestrator)" as DiagSvc
+control "DspDiagnosticWorker\n(DSP Analysis Engine)" as DspWorker
+control "AiRecommendationEngine\n(Contextual Heuristic & Scoring)" as AiEngine
+entity "WalletService\n(Token Balance Core)" as WalletSvc
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Audio Stems)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Eksekusi Diagnostik Hybrid (DSP Sinyal + AI Recommendation Engine) ==
+
+User -> UI : Buka halaman hasil audit sesi (/sessions/{id}/diagnostics)
+activate User
+activate UI
+
+UI -> DiagCtrl : GET /api/v1/sessions/{id}/diagnostics-overview (Bearer JWT)
+activate DiagCtrl
+
+DiagCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> DiagCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+DiagCtrl -> DiagSvc : getOrRunDiagnostics(session_id, user_id)
+activate DiagSvc
+
+DiagSvc -> DB : SELECT status FROM sessions WHERE id = session_id
+activate DB
+DB --> DiagSvc : status = 'DIAGNOSING_DSP'
+deactivate DB
+
+DiagSvc -> DspWorker : triggerAnalysisPipeline(session_id)
+activate DspWorker
+
+DspWorker -> Storage : Baca berkas audio mentah & data pasangan trek
+activate Storage
+Storage --> DspWorker : Audio Streams
+deactivate Storage
+
+DspWorker -> DspWorker : Hitung metrik fisis (korelasi fasa -1 s/d +1, delay mikrofon, DC offset, rumble, crest factor, frequency collision)
+DspWorker -> AiEngine : processDiagnosticMetrics(session_id, physical_metrics_matrix)
+activate AiEngine
+deactivate DspWorker
+
+AiEngine -> AiEngine : Kontekstualisasi metrik berdasarkan instrumen (misal: rumble pada vokal vs bass)
+AiEngine -> AiEngine : Hitung agregasi bobot anomali & Skor Kesehatan Sesi (0–100)
+AiEngine -> AiEngine : Kategorisasi status trek (Critical, Warning, Clean) & deteksi Severe Distortion
+AiEngine -> AiEngine : Susun rekomendasi praktis per trek & kalkulasi kebutuhan token
+
+AiEngine -> DB : INSERT INTO session_diagnostics (session_id, health_score, status, issues_summary, unfixable_warnings) VALUES (?, ?, ?, ?, ?)
+activate DB
+DB --> AiEngine : DiagnosticRecordSaved
+deactivate DB
+
+AiEngine -> DB : UPDATE sessions SET status = 'DIAGNOSTICS_COMPLETED' WHERE id = session_id
+activate DB
+DB --> AiEngine : SessionUpdated
+deactivate DB
+
+AiEngine --> DiagSvc : DiagnosticPipelineCompleted(session_id)
+deactivate AiEngine
+
+== Fase 2: Pemuatan Dasbor Diagnostik & Skor Kesehatan Sesi ==
+
+DiagSvc -> DB : SELECT health_score, status, issues_summary, unfixable_warnings FROM session_diagnostics WHERE session_id = ?
+activate DB
+DB --> DiagSvc : Data ringkasan audit skor kesehatan (0–100) & anomali
+deactivate DB
+
+DiagSvc -> DB : SELECT id, name, instrument, issue_count, severe_distortion FROM session_tracks WHERE session_id = ?
+activate DB
+DB --> DiagSvc : Rincian status masalah per trek
+deactivate DB
+
+DiagSvc -> WalletSvc : checkTokenAffordability(user_id, required_tokens=12)
+activate WalletSvc
+
+WalletSvc -> DB : SELECT balance FROM wallets WHERE user_id = ?
+activate DB
+DB --> WalletSvc : Saldo token aktif pengguna
+deactivate DB
+
+WalletSvc --> DiagSvc : TokenBalanceStatus (balance, is_sufficient)
+deactivate WalletSvc
+
+DiagSvc --> DiagCtrl : DiagnosticOverviewPayload
+deactivate DiagSvc
+
+DiagCtrl --> UI : 200 OK (health_score, status, issues_summary, required_tokens, is_sufficient, warnings)
+deactivate DiagCtrl
+
+UI --> User : Render Skor Kesehatan (0–100), kartu anomali, solusi terkunci (gembok), & info token
+deactivate UI
+
+== Fase 3: Evaluasi Kondisi Sesi & Tindak Lanjut Pengguna ==
+
+alt [Kondisi 1: Sesi Sempurna Tanpa Masalah (Skor 100 - Clean / Mix-Ready)]
+  User -> UI : Tekan tombol "Unduh Laporan Diagnostik Gratis"
+  activate UI
+  UI --> User : Arahkan langsung ke alur Mengunduh Laporan Diagnostik Sesi (UC-18)
+  deactivate UI
+
+else [Kondisi 2: Peringatan Distorsi Permanen (Exceptional Workflow)]
+  User -> UI : Periksa peringatan anomali pada trek dengan distorsi digital ekstrem
+  activate UI
+  UI --> User : Tampilkan catatan gratis: "Distorsi rekaman asli terlalu parah—rekam ulang trek ini disarankan"
+  deactivate UI
+
+else [Kondisi 3: Sesi Bermasalah & Saldo Token Kurang (Saldo < Kebutuhan)]
+  User -> UI : Tekan tombol "Beli Paket Token / Top-up"
+  activate UI
+  UI --> User : Arahkan pengguna ke halaman Pembelian Paket Token (UC-07)
+  deactivate UI
+
+else [Kondisi 4: Sesi Bermasalah & Saldo Token Cukup (Typical Course)]
+  User -> UI : Tekan tombol "Buka Kunci & Perbaiki Sesi (Gunakan 12 Token)"
+  activate UI
+  UI --> User : Munculkan modal dialog pemilihan mode perbaikan (Auto-Fix UC-14 atau Custom Fix UC-15)
+  deactivate UI
+end
+
+deactivate User
+
+@enduml

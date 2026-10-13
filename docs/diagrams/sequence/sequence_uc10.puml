@@ -1,0 +1,201 @@
+@startuml
+skinparam monochrome true
+skinparam shadowing false
+skinparam roundCorner 0
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+
+skinparam titleBorderColor #000000
+skinparam titleBorderThickness 1.5
+skinparam titleBackgroundColor #FFFFFF
+skinparam titleFontSize 14
+skinparam titleFontStyle bold
+
+skinparam sequence {
+    ArrowColor #000000
+    ArrowThickness 1.2
+    ActorBorderColor #000000
+    ActorBackgroundColor #FFFFFF
+    LifeLineBorderColor #000000
+    LifeLineBackgroundColor #FFFFFF
+    ParticipantBorderColor #000000
+    ParticipantBackgroundColor #FFFFFF
+    BoxBorderColor #000000
+    BoxBackgroundColor #FFFFFF
+    GroupBorderColor #000000
+    GroupHeaderFontColor #000000
+    GroupBackgroundColor #FFFFFF
+    DividerBorderColor #000000
+    DividerBackgroundColor #FFFFFF
+    DividerFontColor #000000
+    DividerFontSize 12
+    DividerFontStyle bold
+}
+
+title Sequence Diagram: Mengunggah Sesi Mixing (UC-10)
+
+actor "Audio Engineer" as User
+
+box "Presentation Layer (Frontend)"
+boundary "Halaman Unggah Sesi\n(Web UI / Dropzone)" as UI
+end box
+
+box "Application & Business Logic Layer (Backend API)"
+control "SessionController\n(API Gateway)" as SessionCtrl
+control "AuthMiddleware\n(JWT Guard)" as AuthGuard
+entity "SessionService\n(Session Orchestrator)" as SessionSvc
+control "AudioProcessingWorker\n(Metadata & Waveform Engine)" as Worker
+end box
+
+box "External Storage / Infrastructure"
+control "Cloud Object Storage\n(S3 / MinIO Storage)" as Storage
+end box
+
+box "Persistence Layer"
+database "Database\n(PostgreSQL)" as DB
+end box
+
+autonumber 1 "[00]"
+
+== Fase 1: Inisialisasi Sesi & Penerbitan Presigned Upload URL ==
+
+User -> UI : Buka modul "Unggah Sesi Baru" pada Dasbor
+activate User
+activate UI
+
+UI -> SessionCtrl : GET /api/v1/wallet/balance (Bearer JWT)
+activate SessionCtrl
+
+SessionCtrl -> AuthGuard : validateSession(token)
+activate AuthGuard
+AuthGuard --> SessionCtrl : SessionValid (user_id)
+deactivate AuthGuard
+
+SessionCtrl -> DB : SELECT balance FROM wallets WHERE user_id = ?
+activate DB
+DB --> SessionCtrl : Data saldo token aktif
+deactivate DB
+
+SessionCtrl --> UI : 200 OK (wallet_balance)
+deactivate SessionCtrl
+
+UI --> User : Render area unggah (*dropzone*) & info saldo token aktif
+deactivate UI
+
+User -> UI : Tarik & letakkan berkas multitrack (WAV/FLAC/ZIP) ke area unggah
+activate UI
+
+UI -> SessionCtrl : POST /api/v1/sessions/upload-init (session_name, files_metadata)
+activate SessionCtrl
+
+SessionCtrl -> SessionSvc : initializeSessionUpload(user_id, files_metadata)
+activate SessionSvc
+
+SessionSvc -> DB : INSERT INTO sessions (user_id, name, status='UPLOADING')
+activate DB
+DB --> SessionSvc : SessionCreated (session_id)
+deactivate DB
+
+SessionSvc -> Storage : generatePresignedUploadUrls(session_id, files_metadata)
+activate Storage
+Storage --> SessionSvc : PresignedUrlsList (file_keys, upload_urls)
+deactivate Storage
+
+SessionSvc --> SessionCtrl : UploadInitResponse (session_id, presigned_urls)
+deactivate SessionSvc
+
+SessionCtrl --> UI : 201 Created (session_id, presigned_urls)
+deactivate SessionCtrl
+
+== Fase 2: Transmisi Berkas Audio Langsung ke Cloud Storage ==
+
+loop Untuk setiap berkas audio dalam sesi
+  UI -> Storage : HTTP PUT /upload (Binary Audio Stream)
+  activate Storage
+  Storage --> UI : 200 OK (ETag, upload_success)
+  deactivate Storage
+  UI -> UI : Perbarui indikator bilah kemajuan (*upload progress bar*)
+end
+
+alt Gangguan Jaringan (Koneksi Terputus)
+  UI --> User : Tampilkan status error unggahan & tombol "Coba Lagi (Resume)"
+else Seluruh Berkas Selesai Diunggah
+  UI --> User : Indikator 100% terunggah, mulai verifikasi berkas
+end
+deactivate UI
+
+== Fase 3: Validasi Format Audio & Ekstraksi Bentuk Gelombang (Waveform) ==
+
+UI -> SessionCtrl : POST /api/v1/sessions/{id}/upload-complete
+activate UI
+activate SessionCtrl
+
+SessionCtrl -> SessionSvc : processUploadedSession(session_id)
+activate SessionSvc
+
+SessionSvc -> Worker : dispatch(ValidateAudioAndGenerateWaveformsJob)
+activate Worker
+
+Worker -> Storage : streamAudioHeadersAndPeaks(session_id)
+activate Storage
+Storage --> Worker : Header chunk & binary audio data
+deactivate Storage
+
+Worker -> Worker : Validasi header RIFF/WAVE, sample rate, bit depth, durasi
+Worker -> Worker : Ekstraksi array amplitudo visual (*waveform peak data*)
+
+alt Format Berkas Rusak / Tidak Didukung (Corrupted Audio)
+  Worker --> SessionSvc : ValidationError (corrupted_files_list)
+  SessionSvc --> SessionCtrl : ValidationFailed
+  SessionCtrl --> UI : 422 Unprocessable Entity (error_details)
+  UI --> User : Tandai file berwarna merah: "Format berkas rusak/tidak didukung"
+else Format Valid & Integritas Terverifikasi
+  Worker -> DB : INSERT INTO session_tracks (session_id, name, format, duration, sample_rate, waveform)
+  activate DB
+  DB --> Worker : TracksSaved
+  
+  Worker -> DB : UPDATE sessions SET status = 'UPLOADED', track_count = ? WHERE id = session_id
+  DB --> Worker : SessionStatusUpdated
+  deactivate DB
+
+  Worker --> SessionSvc : ProcessingCompleted (tracks_data, waveforms)
+  deactivate Worker
+
+  SessionSvc --> SessionCtrl : SessionReadyData (tracks_summary, token_estimate)
+  deactivate SessionSvc
+
+  SessionCtrl --> UI : 200 OK (tracks_data, waveforms, token_required)
+  deactivate SessionCtrl
+
+  UI --> User : Render daftar trek, visual waveform interaktif, & estimasi kebutuhan token
+end
+deactivate UI
+
+== Fase 4: Konfirmasi Sesi & Transisi ke Tahap Analisis ==
+
+User -> UI : Tinjau daftar trek dan tekan tombol "Lanjutkan ke Analisis"
+activate UI
+
+UI -> SessionCtrl : POST /api/v1/sessions/{id}/confirm-ready
+activate SessionCtrl
+
+SessionCtrl -> SessionSvc : confirmSessionForVerification(session_id)
+activate SessionSvc
+
+SessionSvc -> DB : UPDATE sessions SET status = 'READY_FOR_VERIFICATION' WHERE id = session_id
+activate DB
+DB --> SessionSvc : SessionConfirmed
+deactivate DB
+
+SessionSvc --> SessionCtrl : ConfirmSuccess
+deactivate SessionSvc
+
+SessionCtrl --> UI : 200 OK (redirect_url: /sessions/{id}/verify)
+deactivate SessionCtrl
+
+UI --> User : Arahkan pengguna ke tahap Memverifikasi Integritas & Sinkronisasi Sesi (UC-11)
+deactivate UI
+
+deactivate User
+
+@enduml
