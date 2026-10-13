@@ -1,0 +1,210 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  AUDIO_ENGINEER
+  ADMIN
+}
+
+enum TransactionType {
+  WELCOME_GRANT
+  TOPUP
+  DEDUCTION
+  REFUND
+}
+
+enum SessionStatus {
+  CREATED
+  UPLOADING
+  PROCESSING
+  READY
+  REPAIRED
+  FAILED
+  EXPIRED
+}
+
+enum TrackStatus {
+  PENDING
+  ANALYZED
+  REPAIRED
+  ERROR
+}
+
+enum PairType {
+  MIC_PAIR
+  STEREO_SPLIT
+  BASS_DI_MIC
+  DRUM_TOP_BOTTOM
+}
+
+model User {
+  id            String             @id @default(uuid())
+  name          String
+  email         String             @unique
+  passwordHash  String             @map("password_hash")
+  role          Role               @default(AUDIO_ENGINEER)
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  wallet        Wallet?
+  sessions      Session[]
+  transactions  TokenTransaction[]
+  orders        TokenOrder[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id           String             @id @default(uuid())
+  userId       String             @unique @map("user_id")
+  balance      Int                @default(5)
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions TokenTransaction[]
+
+  @@map("wallets")
+}
+
+model TokenTransaction {
+  id          String          @id @default(uuid())
+  userId      String          @map("user_id")
+  walletId    String          @map("wallet_id")
+  amount      Int             // Positif untuk kredit (TOPUP/GRANT), negatif untuk debit (DEDUCTION)
+  type        TransactionType
+  description String?
+  referenceId String?         @map("reference_id") // Session ID atau Invoice ID
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet      Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("token_transactions")
+}
+
+model Session {
+  id                 String             @id @default(uuid())
+  userId             String             @map("user_id")
+  title              String
+  sampleRate         Int?               @map("sample_rate")
+  bitDepth           Int?               @map("bit_depth")
+  status             SessionStatus      @default(CREATED)
+  healthScore        Float?             @map("health_score")
+  estimatedTokens    Int                @default(1) @map("estimated_tokens")
+  retentionExpiresAt DateTime?          @map("retention_expires_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks             Track[]
+  trackPairs         TrackPair[]
+  repairConfig       RepairConfig?
+
+  @@map("sessions")
+}
+
+model Track {
+  id                String            @id @default(uuid())
+  sessionId         String            @map("session_id")
+  fileName          String            @map("file_name")
+  originalStorageKey String           @map("original_storage_key")
+  repairedStorageKey String?          @map("repaired_storage_key")
+  instrumentLabel   String?           @map("instrument_label")
+  detectedLabel     String?           @map("detected_label")
+  isStereo          Boolean           @default(false) @map("is_stereo")
+  durationSec       Float?            @map("duration_sec")
+  waveformPeaksJson Json?             @map("waveform_peaks_json")
+  status            TrackStatus       @default(PENDING)
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  session           Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  diagnosticResult  DiagnosticResult?
+
+  pairsAsA          TrackPair[]       @relation("TrackA")
+  pairsAsB          TrackPair[]       @relation("TrackB")
+
+  @@map("tracks")
+}
+
+model TrackPair {
+  id          String    @id @default(uuid())
+  sessionId   String    @map("session_id")
+  trackAId    String    @map("track_a_id")
+  trackBId    String    @map("track_b_id")
+  pairType    PairType  @default(MIC_PAIR) @map("pair_type")
+  isConfirmed Boolean   @default(false) @map("is_confirmed")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  session     Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  trackA      Track     @relation("TrackA", fields: [trackAId], references: [id], onDelete: Cascade)
+  trackB      Track     @relation("TrackB", fields: [trackBId], references: [id], onDelete: Cascade)
+
+  @@map("track_pairs")
+}
+
+model DiagnosticResult {
+  id                  String   @id @default(uuid())
+  trackId             String   @unique @map("track_id")
+  phaseCorrelation    Float?   @map("phase_correlation")
+  hasPolarityInvert   Boolean  @default(false) @map("has_polarity_invert")
+  hasCombFiltering    Boolean  @default(false) @map("has_comb_filtering")
+  hasFakeStereo       Boolean  @default(false) @map("has_fake_stereo")
+  truePeakDbfs        Float?   @map("true_peak_dbfs")
+  hasClipping         Boolean  @default(false) @map("has_clipping")
+  crestFactor         Float?   @map("crest_factor")
+  hasDcOffset         Boolean  @default(false) @map("has_dc_offset")
+  hasSubRumble        Boolean  @default(false) @map("has_sub_rumble")
+  healthStatus        String   @default("Clean") @map("health_status") // Clean, Warning, Critical
+  rawMetrics          Json?    @map("raw_metrics")
+  recommendations     Json?    @map("recommendations")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  track               Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@map("diagnostic_results")
+}
+
+model RepairConfig {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique @map("session_id")
+  settings    Json     @map("settings") // Granular repairs configuration
+  isApplied   Boolean  @default(false) @map("is_applied")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  session     Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("repair_configs")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+}
+
+model TokenOrder {
+  id              String      @id @default(uuid())
+  userId          String      @map("user_id")
+  packageId       String      @map("package_id")
+  tokenAmount     Int         @map("token_amount")
+  priceIdr        Int         @map("price_idr")
+  status          OrderStatus @default(PENDING)
+  snapToken       String?     @map("snap_token")
+  snapRedirectUrl String?     @map("snap_redirect_url")
+  paymentType     String?     @map("payment_type")
+  paidAt          DateTime?   @map("paid_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("token_orders")
+}
