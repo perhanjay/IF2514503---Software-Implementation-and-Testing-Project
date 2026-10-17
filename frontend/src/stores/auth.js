@@ -1,14 +1,20 @@
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
+const initialToken = localStorage.getItem('polaris_token');
+if (initialToken) {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${initialToken}`;
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: JSON.parse(localStorage.getItem('polaris_user') || 'null'),
-    token: localStorage.getItem('polaris_token') || null,
+    token: initialToken || null,
     walletBalance: Number(localStorage.getItem('polaris_wallet_balance') || 0),
   }),
   getters: {
     isAuthenticated: (state) => !!state.token,
+    isGuest: (state) => !state.user || state.user?.isGuest === true || state.user?.email === 'guest@polaris.audio',
   },
   actions: {
     setAuth(user, token, balance) {

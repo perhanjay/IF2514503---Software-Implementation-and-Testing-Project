@@ -205,16 +205,86 @@ export class AuthController {
   }
 
   /**
+   * Sesi Tamu / Guest Session (Instant Studio Access tanpa wajib login)
+   */
+  static async guestSession(req, res) {
+    try {
+      let guestUser = await prisma.user.findUnique({
+        where: { email: 'guest@polaris.audio' },
+        include: { wallet: true }
+      });
+
+      if (!guestUser) {
+        guestUser = await prisma.$transaction(async (tx) => {
+          const user = await tx.user.create({
+            data: {
+              name: 'Guest Studio Engineer',
+              email: 'guest@polaris.audio',
+              passwordHash: 'GUEST_NO_PASSWORD',
+              role: 'AUDIO_ENGINEER'
+            }
+          });
+
+          const wallet = await tx.wallet.create({
+            data: {
+              userId: user.id,
+              balance: 3
+            }
+          });
+
+          await tx.tokenTransaction.create({
+            data: {
+              userId: user.id,
+              walletId: wallet.id,
+              amount: 3,
+              type: 'WELCOME_GRANT',
+              description: 'Bonus Kuota Sesi Tamu / Instant Demo'
+            }
+          });
+
+          return { ...user, wallet };
+        });
+      }
+
+      const token = jwt.sign(
+        { userId: guestUser.id, role: guestUser.role, isGuest: true },
+        process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl',
+        { expiresIn: '30d' }
+      );
+
+      return res.json({
+        message: 'Sesi tamu berhasil diaktifkan',
+        token,
+        user: {
+          id: guestUser.id,
+          name: guestUser.name,
+          email: guestUser.email,
+          role: guestUser.role,
+          isGuest: true
+        },
+        wallet: {
+          balance: guestUser.wallet?.balance ?? 3
+        }
+      });
+    } catch (err) {
+      console.error('[Guest Session Error]', err);
+      return res.status(500).json({ error: 'Gagal membuat sesi tamu' });
+    }
+  }
+
+  /**
    * Mengambil data user yang sedang login saat ini
    */
   static async getMe(req, res) {
     const wallet = await prisma.wallet.findUnique({ where: { userId: req.user.id } });
+    const isGuest = req.user.email === 'guest@polaris.audio';
     return res.json({
       user: {
         id: req.user.id,
         name: req.user.name,
         email: req.user.email,
-        role: req.user.role
+        role: req.user.role,
+        isGuest
       },
       wallet: {
         balance: wallet?.balance ?? 0

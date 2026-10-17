@@ -1,12 +1,18 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import { useAuthStore } from '../stores/auth'
+import AppNavbar from '../components/AppNavbar.vue'
+import SectionBadge from '../components/SectionBadge.vue'
 import UploadSessionModal from './UploadSessionModal.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const isGuest = computed(() => {
+  return !authStore.user || authStore.user?.isGuest || authStore.user?.email === 'guest@polaris.audio'
+})
 
 const walletDetails = ref(null)
 const claiming = ref(false)
@@ -29,7 +35,7 @@ async function loadWallet() {
     walletDetails.value = res.data
     authStore.updateBalance(res.data.balance)
   } catch (err) {
-    console.error('Failed to load wallet', err)
+    console.warn('Wallet not loaded', err)
   }
 }
 
@@ -38,7 +44,7 @@ async function loadPackages() {
     const res = await axios.get('/api/v1/payments/packages')
     packages.value = res.data.packages
   } catch (err) {
-    console.error('Failed to load packages', err)
+    console.warn('Packages not loaded', err)
   }
 }
 
@@ -47,11 +53,17 @@ async function loadSessions() {
     const res = await axios.get('/api/v1/sessions')
     sessions.value = res.data.sessions
   } catch (err) {
-    console.error('Failed to load sessions', err)
+    console.warn('Sessions not loaded', err)
   }
 }
 
 async function handleClaimDaily() {
+  if (isGuest.value) {
+    alert('Silakan daftar akun atau masuk untuk mengklaim bonus token harian')
+    router.push('/register')
+    return
+  }
+
   claimMsg.value = ''
   claimError.value = ''
   claiming.value = true
@@ -67,6 +79,12 @@ async function handleClaimDaily() {
 }
 
 async function handleCheckout() {
+  if (isGuest.value) {
+    alert('Untuk melakukan pembelian paket token via Midtrans, silakan daftar atau masuk ke akun Anda terlebih dahulu.')
+    router.push('/login')
+    return
+  }
+
   checkoutLoading.value = true
   activeOrder.value = null
   try {
@@ -120,17 +138,17 @@ function onSessionUploaded(newSession) {
   loadSessions()
 }
 
-function handleLogout() {
-  authStore.logout()
-  router.push('/login')
-}
-
 onMounted(async () => {
   if (!authStore.isAuthenticated) {
-    router.push('/login')
-    return
+    try {
+      const res = await axios.post('/api/v1/auth/guest-session')
+      authStore.setAuth(res.data.user, res.data.token, res.data.wallet.balance)
+    } catch (err) {
+      console.warn('Guest initialization failed', err)
+    }
+  } else {
+    await authStore.fetchMe()
   }
-  await authStore.fetchMe()
   await loadWallet()
   await loadPackages()
   await loadSessions()
@@ -138,244 +156,260 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-    <!-- Navbar -->
-    <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-10 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center border border-cyan-500/30">
-          P
-        </div>
-        <div>
-          <span class="font-bold text-base text-white tracking-tight">Polaris Audio</span>
-          <span class="text-xs block text-slate-400">Audio Engineer Studio Hub</span>
-        </div>
-      </div>
+  <div class="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
+    <AppNavbar />
 
-      <div class="flex items-center space-x-4">
-        <!-- Saldo Token Badge -->
-        <div class="flex items-center bg-slate-950 border border-cyan-500/30 rounded-xl px-3.5 py-1.5 shadow-inner">
-          <span class="text-xs text-slate-400 mr-2">Saldo Token:</span>
-          <span class="text-cyan-400 font-bold text-sm font-mono">{{ authStore.walletBalance }} Token</span>
-        </div>
+    <main class="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-8">
+      
+      <!-- Studio Header / Banner -->
+      <div class="bg-white border border-slate-200/90 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+        <div class="radial-glow top-0 right-0 w-[300px] h-[300px]"></div>
 
-        <div class="text-xs text-slate-300">
-          {{ authStore.user?.name }}
+        <div class="space-y-2 z-10 max-w-2xl">
+          <SectionBadge :label="isGuest ? 'Mode Studio Instan (Tamu)' : 'Konsol Studio Terverifikasi'" />
+          <h1 class="font-display text-2xl sm:text-3xl text-slate-900 mt-1">
+            Studio Workspace & Session Prep
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
+            Unggah stem multitrack, jalankan verifikasi keselarasan waktu, dan periksa kesehatan fasa sesi mixing sebelum produksi kreatif dimulai.
+          </p>
         </div>
 
-        <button 
-          @click="handleLogout" 
-          class="text-xs text-rose-400 hover:text-rose-300 hover:underline cursor-pointer">
-          Keluar
-        </button>
-      </div>
-    </header>
-
-    <!-- Content -->
-    <main class="flex-1 max-w-5xl w-full mx-auto p-6 space-y-6">
-      <!-- Greeting Banner -->
-      <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 class="text-xl font-bold text-white">Selamat Datang, {{ authStore.user?.name }}</h2>
-          <p class="text-xs text-slate-400 mt-1">Siapkan berkas sesi multitrack Anda untuk diagnostik fasa, fake stereo, dan perbaikan DSP.</p>
-        </div>
-
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 z-10 w-full md:w-auto">
           <button 
             @click="handleClaimDaily" 
             :disabled="claiming"
-            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl cursor-pointer transition-colors shadow-lg shadow-emerald-950">
-            {{ claiming ? 'Mengklaim...' : '🎁 Klaim 2 Token Harian' }}
+            class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2">
+            <span>🎁</span>
+            <span>{{ claiming ? 'Mengklaim...' : 'Klaim Token Harian' }}</span>
+          </button>
+          
+          <button 
+            @click="showUploadModal = true"
+            class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white text-xs font-bold shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2">
+            <span class="text-base leading-none">+</span>
+            <span>Unggah Sesi Baru</span>
           </button>
         </div>
       </div>
 
-      <!-- Notifikasi Claim -->
-      <div v-if="claimMsg" class="bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs rounded-xl p-3">
+      <!-- Guest Upgrade Banner Warning (jika masih akun tamu) -->
+      <div v-if="isGuest" class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2.5 text-blue-900">
+          <span class="text-base">💡</span>
+          <span>Anda menggunakan <strong>Sesi Studio Instan</strong> (Jatah 3 Token Demo). Daftar akun gratis untuk menyimpan riwayat sesi secara permanen dan top-up kuota besar.</span>
+        </div>
+        <router-link to="/register" class="font-bold text-[#0052FF] hover:underline whitespace-nowrap">
+          Daftar Akun Permanen →
+        </router-link>
+      </div>
+
+      <!-- Notifikasi Claim Feedback -->
+      <div v-if="claimMsg" class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 font-medium">
         {{ claimMsg }}
       </div>
-      <div v-if="claimError" class="bg-amber-950/50 border border-amber-800 text-amber-300 text-xs rounded-xl p-3">
+      <div v-if="claimError" class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl p-3.5 font-medium">
         {{ claimError }}
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- Panel 1: Sesi Mixing (Fase 3 UC-10 & UC-11) -->
-        <div class="md:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div class="flex justify-between items-center">
+      <!-- Main Layout Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-8">
+        
+        <!-- Column 1: Sesi Multitrack Aktif -->
+        <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-sm space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <h3 class="font-bold text-sm text-white uppercase tracking-wider">Sesi Multitrack Aktif</h3>
-              <p class="text-xs text-slate-400 mt-0.5">Daftar rekaman multitrack yang siap dianalisis</p>
+              <h2 class="font-display text-xl text-slate-900">Daftar Sesi Multitrack</h2>
+              <span class="font-mono-accent text-xs text-slate-500">Total {{ sessions.length }} Sesi Aktif</span>
             </div>
             <button 
-              @click="showUploadModal = true"
-              class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-lg shadow-cyan-950 flex items-center gap-2">
-              <span>+ Unggah Sesi Baru</span>
+              @click="loadSessions"
+              class="text-xs font-semibold text-[#0052FF] hover:underline cursor-pointer">
+              Segarkan
             </button>
           </div>
 
           <!-- Empty State -->
-          <div v-if="!sessions.length" class="border-2 border-dashed border-slate-800 rounded-xl p-10 text-center flex flex-col items-center justify-center">
-            <div class="w-12 h-12 rounded-2xl bg-slate-800/80 text-slate-400 flex items-center justify-center mb-3">
+          <div v-if="!sessions.length" class="border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
+            <div class="w-14 h-14 rounded-2xl bg-[#0052FF]/5 text-[#0052FF] flex items-center justify-center text-2xl font-display">
               🎵
             </div>
-            <p class="text-sm font-semibold text-slate-300">Belum ada sesi audio yang diunggah</p>
-            <p class="text-xs text-slate-500 mt-1 max-w-sm">
-              Klik tombol "+ Unggah Sesi Baru" di atas untuk menambahkan berkas multitrack (WAV/FLAC/ZIP) ke MinIO S3 Storage.
-            </p>
+            <div class="space-y-1">
+              <h3 class="font-display text-lg text-slate-800">Belum ada sesi multitrack</h3>
+              <p class="text-xs text-slate-500 max-w-sm">
+                Tarik berkas stem WAV atau ZIP rekaman DAW Anda untuk memulai proses verifikasi fasa otomatis.
+              </p>
+            </div>
+            <button 
+              @click="showUploadModal = true"
+              class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs shadow-sm hover:bg-slate-800 cursor-pointer transition-all mt-2">
+              Unggah Stem Pertama
+            </button>
           </div>
 
-          <!-- Session List Cards -->
-          <div v-else class="space-y-3">
+          <!-- Active Sessions Cards -->
+          <div v-else class="space-y-4">
             <div 
               v-for="s in sessions" 
-              :key="s.id" 
-              class="bg-slate-950 border border-slate-800/80 rounded-xl p-4 space-y-3">
-              <div class="flex items-center justify-between">
+              :key="s.id"
+              class="border border-slate-200 hover:border-[#0052FF]/40 rounded-2xl p-5 transition-all bg-[#FAFAFA] space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h4 class="text-sm font-bold text-white">{{ s.title }}</h4>
-                  <span class="text-[11px] text-slate-400 font-mono">
-                    {{ s.tracks?.length || 0 }} Stems Audio • Status: 
-                    <span class="text-cyan-400 font-semibold">{{ s.status }}</span>
-                  </span>
+                  <h3 class="font-display text-lg text-slate-900">{{ s.title }}</h3>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="font-mono-accent text-[11px] text-slate-500">
+                      {{ s.tracks?.length || 0 }} Stems Audio
+                    </span>
+                    <span class="text-slate-300">•</span>
+                    <span class="font-mono-accent text-[11px] px-2 py-0.5 rounded bg-[#0052FF]/10 text-[#0052FF] font-semibold">
+                      {{ s.status }}
+                    </span>
+                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button 
-                    @click="handleVerify(s)" 
-                    :disabled="verifyingSessionId === s.id"
-                    class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg cursor-pointer transition-colors">
-                    {{ verifyingSessionId === s.id ? 'Memindai...' : '🔍 Verifikasi Sinkronisasi (UC-11)' }}
-                  </button>
-                </div>
+
+                <button 
+                  @click="handleVerify(s)"
+                  :disabled="verifyingSessionId === s.id"
+                  class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
+                  <span>{{ verifyingSessionId === s.id ? 'Memindai...' : '🔍 Verifikasi Sinkronisasi (UC-11)' }}</span>
+                </button>
               </div>
 
-              <!-- Track list preview badges -->
-              <div class="flex flex-wrap gap-1.5 pt-2 border-t border-slate-800/60">
+              <!-- Badges list of stems -->
+              <div class="flex flex-wrap gap-1.5 pt-3 border-t border-slate-200/60">
                 <span 
                   v-for="t in s.tracks" 
                   :key="t.id"
-                  class="bg-slate-900 border border-slate-800 text-[10px] text-slate-300 px-2 py-0.5 rounded font-mono truncate max-w-xs">
+                  class="font-mono-accent text-[10px] bg-white border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md truncate max-w-xs">
                   {{ t.fileName }}
                 </span>
               </div>
 
-              <!-- Verification Result Alert -->
+              <!-- Verification Result Card (Inverted Deep Slate Theme) -->
               <div 
                 v-if="verificationResult && verificationResult.sessionId === s.id"
-                :class="verificationResult.status === 'PASSED' ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300' : 'bg-amber-950/40 border-amber-800 text-amber-300'"
-                class="border rounded-xl p-3 text-xs space-y-1">
-                <div class="font-bold flex items-center justify-between">
-                  <span>Hasil Verifikasi Sesi: {{ verificationResult.status }}</span>
-                  <span class="font-mono text-[10px]">{{ verificationResult.sampleRateConsistency }}</span>
+                class="rounded-xl p-4 bg-[#0F172A] text-white border border-slate-800 space-y-2 animate-fade-in">
+                <div class="flex items-center justify-between">
+                  <span class="font-mono-accent text-[11px] uppercase tracking-wider text-cyan-400 font-bold">
+                    Integritas Sesi: {{ verificationResult.status }}
+                  </span>
+                  <span class="font-mono-accent text-[10px] text-slate-400">
+                    {{ verificationResult.sampleRateConsistency }}
+                  </span>
                 </div>
-                <p class="text-[11px] opacity-90">{{ verificationResult.message }}</p>
+                <p class="text-xs text-slate-300 leading-relaxed font-normal">
+                  {{ verificationResult.message }}
+                </p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Panel 2: Midtrans Token Top-up Gateway (UC-07) -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="font-bold text-sm text-white uppercase tracking-wider">Midtrans Gateway</h3>
-            <span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-2 py-0.5 rounded font-mono">SANDBOX</span>
-          </div>
-
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-center">
-            <span class="text-xs text-slate-400 block mb-1">Saldo Tersedia</span>
-            <span class="text-3xl font-extrabold text-cyan-400 font-mono">{{ authStore.walletBalance }}</span>
-            <span class="text-xs text-slate-500 block mt-1">1 token = 1 sesi mixing</span>
-          </div>
-
-          <!-- Checkout Form -->
-          <div class="space-y-3 pt-2 border-t border-slate-800">
-            <label class="block text-xs text-slate-400 font-medium">Pilih Paket Token:</label>
-            <div class="space-y-1.5">
-              <label 
-                v-for="pkg in packages" 
-                :key="pkg.id" 
-                :class="selectedPackage === pkg.id ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800 bg-slate-950'"
-                class="flex items-center justify-between p-2.5 rounded-xl border cursor-pointer transition-colors text-xs">
-                <div class="flex items-center space-x-2">
-                  <input type="radio" v-model="selectedPackage" :value="pkg.id" class="text-cyan-500" />
-                  <span class="font-semibold text-slate-200">{{ pkg.name }} ({{ pkg.tokens }} Tkn)</span>
-                </div>
-                <span class="font-mono text-cyan-400 font-bold">Rp {{ pkg.priceIdr.toLocaleString() }}</span>
-              </label>
-            </div>
-
-            <button 
-              @click="handleCheckout" 
-              :disabled="checkoutLoading"
-              class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-xs font-bold text-white rounded-xl cursor-pointer transition-colors mt-2">
-              {{ checkoutLoading ? 'Menghubungkan Midtrans...' : 'Beli Paket via Midtrans' }}
-            </button>
-          </div>
-
-          <!-- Modal / Active Invoice Display -->
-          <div v-if="activeOrder" class="p-4 bg-slate-950 border border-cyan-800/80 rounded-xl space-y-3">
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Order ID:</span>
-              <span class="font-mono text-slate-300 text-[11px]">{{ activeOrder.orderId }}</span>
-            </div>
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-slate-400">Total Tagihan:</span>
-              <span class="font-bold text-white">Rp {{ activeOrder.package?.priceIdr?.toLocaleString() }}</span>
-            </div>
-
-            <div class="pt-2 border-t border-slate-800/80 flex flex-col gap-2">
-              <button 
-                @click="handleSimulatePayment" 
-                class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg cursor-pointer">
-                Simulasi Bayar Berhasil (Webhook)
-              </button>
-              <span class="text-[10px] text-slate-500 text-center">
-                Memicu webhook Midtrans instant settlement & kredit token
+        <!-- Column 2: Dompet Virtual & Midtrans Top-up Gateway -->
+        <div class="space-y-6">
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-sm space-y-6">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+              <h2 class="font-display text-xl text-slate-900">Dompet & Pembelian</h2>
+              <span class="font-mono-accent text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-bold">
+                MIDTRANS SANDBOX
               </span>
             </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Riwayat Transaksi Token -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h3 class="font-bold text-sm text-white uppercase tracking-wider mb-4">Riwayat Mutasi Saldo Token (Ledger)</h3>
-        
-        <div class="overflow-x-auto">
-          <table class="w-full text-xs text-left">
-            <thead class="text-slate-400 border-b border-slate-800">
-              <tr>
-                <th class="py-2.5">Waktu</th>
-                <th class="py-2.5">Jenis Transaksi</th>
-                <th class="py-2.5">Keterangan</th>
-                <th class="py-2.5 text-right">Jumlah Token</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <tr v-for="tx in walletDetails?.transactions" :key="tx.id" class="text-slate-300">
-                <td class="py-3 text-slate-500 font-mono">{{ new Date(tx.createdAt).toLocaleDateString() }} {{ new Date(tx.createdAt).toLocaleTimeString() }}</td>
-                <td class="py-3 font-semibold">
-                  <span :class="tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'">
-                    {{ tx.type }}
-                  </span>
-                </td>
-                <td class="py-3 text-slate-400">{{ tx.description || '-' }}</td>
-                <td class="py-3 text-right font-mono font-bold" :class="tx.amount > 0 ? 'text-emerald-400' : 'text-rose-400'">
-                  {{ tx.amount > 0 ? '+' + tx.amount : tx.amount }}
-                </td>
-              </tr>
-              <tr v-if="!walletDetails?.transactions?.length">
-                <td colspan="4" class="py-4 text-center text-slate-500">Belum ada riwayat transaksi</td>
-              </tr>
-            </tbody>
-          </table>
+            <!-- Current Balance Display -->
+            <div class="bg-[#F1F5F9] border border-slate-200 rounded-2xl p-6 text-center space-y-1">
+              <span class="font-mono-accent text-xs uppercase tracking-wider text-slate-500">Saldo Kuota Tersedia</span>
+              <div class="font-display text-5xl text-[#0052FF] leading-tight">
+                {{ authStore.walletBalance }}
+              </div>
+              <span class="text-xs text-slate-500 font-mono-accent block">Token Perbaikan Sesi</span>
+            </div>
+
+            <!-- Package Selection Form -->
+            <div class="space-y-3 pt-2">
+              <label class="block font-mono-accent text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Pilih Paket Token:
+              </label>
+
+              <div class="space-y-2">
+                <label 
+                  v-for="pkg in packages" 
+                  :key="pkg.id"
+                  :class="selectedPackage === pkg.id ? 'border-[#0052FF] bg-[#0052FF]/5 shadow-sm' : 'border-slate-200 bg-white'"
+                  class="flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all text-xs">
+                  <div class="flex items-center gap-2.5">
+                    <input type="radio" v-model="selectedPackage" :value="pkg.id" class="text-[#0052FF]" />
+                    <span class="font-semibold text-slate-800">{{ pkg.name }} ({{ pkg.tokens }} Token)</span>
+                  </div>
+                  <span class="font-mono-accent font-bold text-[#0052FF]">Rp {{ pkg.priceIdr.toLocaleString() }}</span>
+                </label>
+              </div>
+
+              <button 
+                @click="handleCheckout"
+                :disabled="checkoutLoading"
+                class="w-full py-3 bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] hover:brightness-110 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer mt-2">
+                {{ checkoutLoading ? 'Menghubungkan Midtrans...' : (isGuest ? 'Daftar untuk Beli Token' : 'Beli Paket via Midtrans') }}
+              </button>
+            </div>
+
+            <!-- Invoice Card Modal Preview -->
+            <div v-if="activeOrder" class="p-4 bg-slate-900 text-white border border-slate-800 rounded-xl space-y-3">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-400 font-mono-accent">Invoice ID:</span>
+                <span class="font-mono-accent text-cyan-400 font-bold">{{ activeOrder.orderId }}</span>
+              </div>
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-400 font-mono-accent">Total Pembayaran:</span>
+                <span class="font-bold">Rp {{ activeOrder.package?.priceIdr?.toLocaleString() }}</span>
+              </div>
+              <div class="pt-2 border-t border-slate-800">
+                <button 
+                  @click="handleSimulatePayment"
+                  class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg cursor-pointer transition-all">
+                  Simulasi Bayar Berhasil (Webhook)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ledger Table -->
+          <div class="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm space-y-4">
+            <h3 class="font-display text-base text-slate-900">Riwayat Mutasi Token</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead class="text-slate-400 font-mono-accent border-b border-slate-100">
+                  <tr>
+                    <th class="py-2">Waktu</th>
+                    <th class="py-2">Tipe</th>
+                    <th class="py-2 text-right">Mutasi</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-mono-accent">
+                  <tr v-for="tx in walletDetails?.transactions" :key="tx.id">
+                    <td class="py-2.5 text-slate-500 text-[11px]">{{ new Date(tx.createdAt).toLocaleDateString() }}</td>
+                    <td class="py-2.5 font-semibold text-slate-800 text-[11px]">{{ tx.type }}</td>
+                    <td class="py-2.5 text-right font-bold text-[11px]" :class="tx.amount > 0 ? 'text-[#0052FF]' : 'text-rose-500'">
+                      {{ tx.amount > 0 ? '+' + tx.amount : tx.amount }}
+                    </td>
+                  </tr>
+                  <tr v-if="!walletDetails?.transactions?.length">
+                    <td colspan="3" class="py-4 text-center text-slate-400 text-xs">Belum ada mutasi</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
+
       </div>
     </main>
 
     <!-- Upload Modal -->
     <UploadSessionModal 
-      v-if="showUploadModal" 
-      @close="showUploadModal = false" 
-      @uploaded="onSessionUploaded" 
+      v-if="showUploadModal"
+      @close="showUploadModal = false"
+      @uploaded="onSessionUploaded"
     />
   </div>
 </template>
