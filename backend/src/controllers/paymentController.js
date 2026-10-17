@@ -134,7 +134,12 @@ export class PaymentController {
         }
       }
 
-      // Cek apakah order sudah diselesaikan sebelumnya
+      // Validasi nominal gross_amount terhadap tagihan order asli (Anti-Tampering)
+      if (gross_amount && Math.round(parseFloat(gross_amount)) !== order.priceIdr) {
+        return res.status(400).json({ error: 'Nominal pembayaran tidak sesuai dengan total tagihan order' });
+      }
+
+      // Cek apakah order sudah diselesaikan sebelumnya (Idempotency Guard)
       if (order.status === 'PAID') {
         return res.status(200).json({ message: 'Order sudah diproses sebelumnya' });
       }

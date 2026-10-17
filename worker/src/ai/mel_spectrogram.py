@@ -56,6 +56,10 @@ def extract_mel_spectrogram(audio_data, sample_rate, n_mels=128, n_fft=2048, hop
     else:
         signal = audio_data
 
+    # Zero-pad if signal length is shorter than n_fft (prevents ValueError: nperseg > length)
+    if len(signal) < n_fft:
+        signal = np.pad(signal, (0, n_fft - len(signal)), mode='constant')
+
     # STFT using Hann window
     f, t, Zxx = scipy.signal.stft(
         signal,
