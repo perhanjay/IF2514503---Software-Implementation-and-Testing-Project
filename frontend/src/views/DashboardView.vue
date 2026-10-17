@@ -6,6 +6,8 @@ import AppNavbar from '../components/AppNavbar.vue'
 import SectionBadge from '../components/SectionBadge.vue'
 import UploadSessionModal from './UploadSessionModal.vue'
 import TrackClassificationCard from '../components/TrackClassificationCard.vue'
+import HealthScoreGauge from '../components/HealthScoreGauge.vue'
+import DiagnosticTrackCard from '../components/DiagnosticTrackCard.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -27,6 +29,10 @@ const pairTrackB = ref('')
 const pairType = ref('MIC_PAIR')
 const isPairing = ref(false)
 const finalizingSessionId = ref(null)
+
+const diagnosingSessionId = ref(null)
+const openDiagnosticSessionId = ref(null)
+const diagnosticResults = ref({})
 
 const packages = ref([])
 const selectedPackage = ref('PKG-25')
@@ -216,14 +222,65 @@ async function handleFinalizeClassification(sessionId) {
   finalizingSessionId.value = sessionId
   try {
     await axios.post(`/api/v1/sessions/${sessionId}/finalize-classification`)
-    alert('Konfigurasi label trek dan pasangan mikrofon berhasil dikunci! Siap untuk tahap Diagnostik DSP (UC-13).')
-    await loadSessions()
+    const sessionObj = sessions.value.find(s => s.id === sessionId)
+    if (sessionObj) {
+      await handleDiagnose(sessionObj)
+    } else {
+      await loadSessions()
+    }
   } catch (err) {
     alert('Gagal mengonfirmasi klasifikasi')
   } finally {
     finalizingSessionId.value = null
   }
 }
+
+async function handleDiagnose(session) {
+  diagnosingSessionId.value = session.id
+  try {
+    const res = await axios.post(`/api/v1/sessions/${session.id}/diagnose`)
+    diagnosticResults.value[session.id] = res.data
+    openDiagnosticSessionId.value = session.id
+    await loadSessions()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Gagal menjalankan pemindaian diagnostik DSP')
+  } finally {
+    diagnosingSessionId.value = null
+  }
+}
+
+function getSessionHealthData(session) {
+  const cached = diagnosticResults.value[session.id]?.sessionHealth
+  if (cached) return cached
+
+  const tracks = session.tracks || []
+  const cleanCount = tracks.filter(t => t.diagnosticResult?.healthStatus === 'Clean').length
+  const warningCount = tracks.filter(t => t.diagnosticResult?.healthStatus === 'Warning').length
+  const criticalCount = tracks.filter(t => t.diagnosticResult?.healthStatus === 'Critical').length
+  const score = session.healthScore ?? 100
+
+  let rating = 'EXCELLENT'
+  let label = 'Optimal & Siap Mix'
+  if (score < 65) {
+    rating = 'CRITICAL'
+    label = 'Kritis & Butuh Perbaikan Fasa'
+  } else if (score < 90) {
+    rating = 'WARNING'
+    label = 'Perlu Penyesuaian'
+  }
+
+  return {
+    health_score: score,
+    session_rating: rating,
+    rating_label: label,
+    total_tracks: tracks.length,
+    clean_tracks: cleanCount,
+    warning_tracks: warningCount,
+    critical_tracks: criticalCount,
+    estimated_tokens: session.estimatedTokens || 1
+  }
+}
+
 
 function onSessionUploaded(newSession) {
   showUploadModal.value = false
@@ -356,6 +413,12 @@ onMounted(async () => {
                     <span class="font-mono-accent text-[11px] px-2 py-0.5 rounded bg-[#0052FF]/10 text-[#0052FF] font-semibold">
                       {{ s.status }}
                     </span>
+                    <span 
+                      v-if="s.healthScore !== null"
+                      :class="s.healthScore >= 90 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : (s.healthScore >= 65 ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-rose-100 text-rose-800 border-rose-300')"
+                      class="font-mono-accent text-[11px] font-bold px-2 py-0.5 rounded-full border">
+                      Mix Health: {{ Math.round(s.healthScore) }}/100
+                    </span>
                   </div>
                 </div>
 
@@ -363,19 +426,32 @@ onMounted(async () => {
                   <button 
                     @click="handleVerify(s)"
                     :disabled="verifyingSessionId === s.id"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
+                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
                     <span>{{ verifyingSessionId === s.id ? 'Memindai...' : '🔍 Verifikasi (UC-11)' }}</span>
                   </button>
 
                   <button 
                     @click="handleClassify(s)"
                     :disabled="classifyingSessionId === s.id"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white text-xs font-semibold rounded-xl shadow-accent hover:shadow-accent-lg transition-all cursor-pointer">
-                    <span>{{ classifyingSessionId === s.id ? 'AI Memproses Spektrogram...' : '🤖 Klasifikasi AI & Pairing (UC-12)' }}</span>
+                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
+                    <span>{{ classifyingSessionId === s.id ? 'AI Memproses...' : '🤖 AI Pairing (UC-12)' }}</span>
                   </button>
 
                   <button 
-                    v-if="s.tracks?.some(t => t.detectedLabel)"
+                    @click="handleDiagnose(s)"
+                    :disabled="diagnosingSessionId === s.id"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white text-xs font-semibold rounded-xl shadow-accent hover:shadow-accent-lg transition-all cursor-pointer">
+                    <span>{{ diagnosingSessionId === s.id ? 'DSP Menganalisis...' : '🔬 Diagnostik DSP (UC-13)' }}</span>
+                  </button>
+
+                  <button 
+                    v-if="s.healthScore !== null || s.tracks?.some(t => t.diagnosticResult)"
+                    @click="openDiagnosticSessionId = (openDiagnosticSessionId === s.id ? null : s.id)"
+                    class="px-2.5 py-2 text-xs font-bold text-[#0052FF] hover:underline cursor-pointer">
+                    {{ openDiagnosticSessionId === s.id ? 'Tutup Audit DSP ▲' : 'Buka Audit DSP ▼' }}
+                  </button>
+                  <button 
+                    v-else-if="s.tracks?.some(t => t.detectedLabel)"
                     @click="openClassificationSessionId = (openClassificationSessionId === s.id ? null : s.id)"
                     class="px-2.5 py-2 text-xs font-medium text-slate-500 hover:text-[#0052FF] cursor-pointer">
                     {{ openClassificationSessionId === s.id ? 'Tutup Panel ▲' : 'Buka Panel ▼' }}
@@ -497,6 +573,92 @@ onMounted(async () => {
                     class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white font-semibold text-xs shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer">
                     <span>{{ finalizingSessionId === s.id ? 'Mengunci...' : 'Konfirmasi & Lanjut ke Diagnostik Fasa (UC-13)' }}</span>
                     <span class="font-mono text-sm">→</span>
+                  </button>
+                </div>
+
+              </div>
+
+              <!-- UC-13 DSP Diagnostics & Mix Health Audit Panel -->
+              <div 
+                v-if="openDiagnosticSessionId === s.id || (s.healthScore !== null && s.tracks?.some(t => t.diagnosticResult))"
+                class="rounded-2xl p-5 sm:p-6 bg-white border border-slate-200/90 shadow-md space-y-6 animate-fade-in">
+
+                <!-- Header -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <h4 class="font-display text-base sm:text-lg text-slate-900">Audit Diagnostik DSP & Kesehatan Sesi (UC-13)</h4>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      Laporan deterministik ITU-R BS.1770-4: korelasi stereo & multi-mic, clipping inter-sample, DC offset, dan sub-rumble.
+                    </p>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button 
+                      @click="handleDiagnose(s)"
+                      :disabled="diagnosingSessionId === s.id"
+                      class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 cursor-pointer flex items-center gap-1.5 transition-all">
+                      <span>🔄</span>
+                      <span>{{ diagnosingSessionId === s.id ? 'Memindai Ulang...' : 'Pindai Ulang DSP' }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Radial Gauge Meter Component -->
+                <HealthScoreGauge 
+                  :score="getSessionHealthData(s).health_score"
+                  :rating="getSessionHealthData(s).session_rating"
+                  :rating-label="getSessionHealthData(s).rating_label"
+                  :total-tracks="getSessionHealthData(s).total_tracks"
+                  :clean-tracks="getSessionHealthData(s).clean_tracks"
+                  :warning-tracks="getSessionHealthData(s).warning_tracks"
+                  :critical-tracks="getSessionHealthData(s).critical_tracks"
+                  :estimated-tokens="getSessionHealthData(s).estimated_tokens"
+                />
+
+                <!-- Stems Diagnostic Cards -->
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="font-display text-sm text-slate-900">Rincian Audit per Stem Audio</span>
+                    <span class="font-mono-accent text-xs text-slate-500">{{ s.tracks?.length || 0 }} Stems Terverifikasi</span>
+                  </div>
+
+                  <DiagnosticTrackCard 
+                    v-for="track in s.tracks"
+                    :key="'diag-' + track.id"
+                    :track="track"
+                    :diagnostic="track.diagnosticResult"
+                    :paired-track="getPairedTrack(s, track.id)"
+                    :pair-info="getTrackPairInfo(s, track.id)"
+                  />
+                </div>
+
+                <!-- Banner CTA for Auto-Repair (UC-14/15) -->
+                <div class="rounded-2xl p-5 bg-gradient-to-r from-slate-900 to-[#0F172A] text-white border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-md">
+                  <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono-accent text-[11px] uppercase tracking-wider text-cyan-400 font-bold">
+                        Tahap Berikutnya: Automated Fixer (UC-14 & UC-15)
+                      </span>
+                      <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold font-mono-accent">
+                        Siap Eksekusi
+                      </span>
+                    </div>
+                    <h5 class="font-display text-base sm:text-lg text-white">
+                      Perbaiki Anomali Fasa & Headroom Secara Deterministik
+                    </h5>
+                    <p class="text-xs text-slate-400 max-w-xl font-normal leading-relaxed">
+                      Engine akan membalik polaritas fasa terbalik, menyelaraskan micro-delay milidetik, membersihkan DC offset, dan menerapkan true-peak gain staging tanpa mengubah tone musikal.
+                    </p>
+                  </div>
+
+                  <button 
+                    @click="alert('Fitur Perbaikan Batch Otomatis (UC-14/15) akan diaktifkan pada milestone berikutnya!')"
+                    class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white font-bold text-xs shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 shrink-0">
+                    <span>🛠️</span>
+                    <span>Perbaiki Sesi ({{ getSessionHealthData(s).estimated_tokens }} Token)</span>
                   </button>
                 </div>
 
