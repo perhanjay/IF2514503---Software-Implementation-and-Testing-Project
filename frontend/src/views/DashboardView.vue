@@ -160,6 +160,13 @@ function getPairedTrack(session, trackId) {
   return session.tracks.find(t => t.id === otherId)
 }
 
+function getTrackDiagnostic(session, track) {
+  if (track?.diagnosticResult) return track.diagnosticResult
+  const cached = diagnosticResults.value[session?.id]?.tracksDiagnostics
+  if (!cached) return null
+  return cached.find(t => t.trackId === track?.id) || null
+}
+
 async function handleClassify(session) {
   classifyingSessionId.value = session.id
   try {
@@ -629,7 +636,7 @@ onMounted(async () => {
                     v-for="track in s.tracks"
                     :key="'diag-' + track.id"
                     :track="track"
-                    :diagnostic="track.diagnosticResult"
+                    :diagnostic="getTrackDiagnostic(s, track)"
                     :paired-track="getPairedTrack(s, track.id)"
                     :pair-info="getTrackPairInfo(s, track.id)"
                   />

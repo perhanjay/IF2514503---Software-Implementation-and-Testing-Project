@@ -267,7 +267,9 @@ export class SessionService {
     return await prisma.session.findMany({
       where: { userId },
       include: {
-        tracks: true,
+        tracks: {
+          include: { diagnosticResult: true }
+        },
         trackPairs: {
           include: {
             trackA: true,
@@ -367,7 +369,9 @@ export class SessionService {
         where: { id: sessionId },
         data: { status: 'READY' },
         include: {
-          tracks: true,
+          tracks: {
+            include: { diagnosticResult: true }
+          },
           trackPairs: {
             include: { trackA: true, trackB: true }
           }
@@ -434,7 +438,9 @@ export class SessionService {
       where: { id: sessionId },
       data: { status: 'READY' },
       include: {
-        tracks: true,
+        tracks: {
+          include: { diagnosticResult: true }
+        },
         trackPairs: {
           include: { trackA: true, trackB: true }
         }

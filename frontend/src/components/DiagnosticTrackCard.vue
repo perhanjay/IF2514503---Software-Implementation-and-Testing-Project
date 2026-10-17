@@ -40,6 +40,9 @@ const correlationColorClass = computed(() => {
 })
 
 const statusBadge = computed(() => {
+  if (!diag.value) {
+    return { label: 'Belum Dipindai', bg: 'bg-slate-100 text-slate-500 border-slate-200', dot: 'bg-slate-400' }
+  }
   const s = diag.value?.healthStatus || 'Clean'
   if (s === 'Critical') {
     return { label: 'Kritis', bg: 'bg-rose-100 text-rose-700 border-rose-300', dot: 'bg-rose-500' }
@@ -242,13 +245,13 @@ const statusBadge = computed(() => {
 
     <!-- Recommendations Accordion (FR-4.3) -->
     <div 
-      v-if="showDetails && diag && diag.recommendations && diag.recommendations.length"
+      v-if="showDetails"
       class="border-t border-slate-100 pt-3 space-y-2 animate-fade-in">
       <span class="font-display text-xs text-slate-800 block">
         💡 Rekomendasi Solusi Teknis:
       </span>
       
-      <div class="space-y-2">
+      <div v-if="diag && diag.recommendations && diag.recommendations.length" class="space-y-2">
         <div 
           v-for="(rec, idx) in diag.recommendations" 
           :key="idx"
@@ -261,6 +264,14 @@ const statusBadge = computed(() => {
             {{ rec.message }}
           </p>
         </div>
+      </div>
+      <div v-else-if="diag" class="p-3 bg-emerald-50/50 border border-emerald-200/60 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+        <span>✓</span>
+        <span>Trek ini tidak memiliki anomali atau rekomendasi perbaikan (Kondisi Bersih & Optimal).</span>
+      </div>
+      <div v-else class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-500 italic flex items-center gap-2">
+        <span>ℹ️</span>
+        <span>Data diagnostik DSP untuk trek ini belum tersedia. Jalankan pemindaian via tombol 'Diagnostik DSP (UC-13)'.</span>
       </div>
     </div>
 
