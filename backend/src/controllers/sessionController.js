@@ -175,5 +175,37 @@ export class SessionController {
       return res.status(500).json({ error: 'Gagal mengonfirmasi klasifikasi' });
     }
   }
+
+  /**
+   * UC-13: Menjalankan Core DSP Diagnostic Engine & Mix Health Score
+   */
+  static async diagnoseSession(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await SessionService.diagnoseSession(id);
+      return res.json({
+        message: 'Pemindaian diagnostik DSP dan audit kesehatan sesi selesai',
+        ...result
+      });
+    } catch (err) {
+      console.error('[Diagnose Session Error]', err);
+      return res.status(500).json({ error: err.message || 'Gagal menjalankan diagnostik DSP' });
+    }
+  }
+
+  /**
+   * UC-13: Mengambil laporan metrik diagnostik sesi
+   */
+  static async getDiagnostics(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await SessionService.getSessionDiagnostics(id);
+      return res.json(result);
+    } catch (err) {
+      console.error('[Get Diagnostics Error]', err);
+      return res.status(500).json({ error: err.message || 'Gagal mengambil data diagnostik sesi' });
+    }
+  }
 }
+
 

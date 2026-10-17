@@ -12,9 +12,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '../../../');
 
-function runPythonWorker(payload) {
+function runPythonWorker(payload, mode = '--classify-stdin') {
   return new Promise((resolve, reject) => {
-    const py = spawn('python3', ['-m', 'worker.src.worker', '--classify-stdin'], {
+    const py = spawn('python3', ['-m', 'worker.src.worker', mode], {
       cwd: projectRoot,
       env: process.env
     });
@@ -440,6 +440,150 @@ export class SessionService {
         }
       }
     });
+  }
+
+  /**
+   * UC-13: Menjalankan Core DSP Diagnostic Engine & Menghitung Mix Health Score (FR-3.1 s.d. FR-4.3)
+   */
+  static async diagnoseSession(sessionId) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: true,
+        trackPairs: true
+      }
+    });
+
+    if (!session) throw new Error('Sesi tidak ditemukan');
+    if (!session.tracks.length) throw new Error('Sesi belum memiliki berkas trek audio');
+
+    // 1. Set status PROCESSING
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { status: 'PROCESSING' }
+    });
+
+    try {
+      // 2. Siapkan payload untuk Python DSP worker
+      const payload = {
+        sessionId: session.id,
+        tracks: session.tracks.map(t => ({
+          id: t.id,
+          fileName: t.fileName,
+          originalStorageKey: t.originalStorageKey,
+          instrumentLabel: t.instrumentLabel || t.detectedLabel,
+          isStereo: t.isStereo
+        })),
+        pairs: session.trackPairs.map(p => ({
+          id: p.id,
+          trackAId: p.trackAId,
+          trackBId: p.trackBId,
+          pairType: p.pairType
+        }))
+      };
+
+      // 3. Eksekusi diagnostik DSP via Python worker
+      const workerResult = await runPythonWorker(payload, '--diagnose-stdin');
+
+      // 4. Simpan hasil diagnostik ke tabel diagnostic_results
+      for (const item of (workerResult.tracksDiagnostics || [])) {
+        await prisma.diagnosticResult.upsert({
+          where: { trackId: item.trackId },
+          update: {
+            phaseCorrelation: item.phaseCorrelation,
+            hasPolarityInvert: item.hasPolarityInvert,
+            hasCombFiltering: item.hasCombFiltering,
+            hasFakeStereo: item.hasFakeStereo,
+            truePeakDbfs: item.truePeakDbfs,
+            hasClipping: item.hasClipping,
+            crestFactor: item.crestFactor,
+            hasDcOffset: item.hasDcOffset,
+            hasSubRumble: item.hasSubRumble,
+            healthStatus: item.healthStatus,
+            rawMetrics: item.rawMetrics || {},
+            recommendations: item.recommendations || []
+          },
+          create: {
+            trackId: item.trackId,
+            phaseCorrelation: item.phaseCorrelation,
+            hasPolarityInvert: item.hasPolarityInvert,
+            hasCombFiltering: item.hasCombFiltering,
+            hasFakeStereo: item.hasFakeStereo,
+            truePeakDbfs: item.truePeakDbfs,
+            hasClipping: item.hasClipping,
+            crestFactor: item.crestFactor,
+            hasDcOffset: item.hasDcOffset,
+            hasSubRumble: item.hasSubRumble,
+            healthStatus: item.healthStatus,
+            rawMetrics: item.rawMetrics || {},
+            recommendations: item.recommendations || []
+          }
+        });
+
+        // Update track status to ANALYZED
+        await prisma.track.update({
+          where: { id: item.trackId },
+          data: { status: 'ANALYZED' }
+        });
+      }
+
+      // 5. Perbarui session healthScore & status
+      const updatedSession = await prisma.session.update({
+        where: { id: sessionId },
+        data: {
+          status: 'READY',
+          healthScore: workerResult.sessionHealth.health_score,
+          estimatedTokens: workerResult.sessionHealth.estimated_tokens || 1
+        },
+        include: {
+          tracks: {
+            include: { diagnosticResult: true }
+          },
+          trackPairs: {
+            include: { trackA: true, trackB: true }
+          }
+        }
+      });
+
+      return {
+        session: updatedSession,
+        sessionHealth: workerResult.sessionHealth,
+        tracksDiagnostics: workerResult.tracksDiagnostics,
+        pairsDiagnostics: workerResult.pairsDiagnostics
+      };
+    } catch (err) {
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: { status: 'READY' }
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * UC-13: Mengambil hasil diagnostik sesi lengkap
+   */
+  static async getSessionDiagnostics(sessionId) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: {
+          include: { diagnosticResult: true }
+        },
+        trackPairs: {
+          include: { trackA: true, trackB: true }
+        }
+      }
+    });
+
+    if (!session) throw new Error('Sesi tidak ditemukan');
+
+    return {
+      session,
+      healthScore: session.healthScore,
+      tracks: session.tracks,
+      trackPairs: session.trackPairs
+    };
   }
 }
 

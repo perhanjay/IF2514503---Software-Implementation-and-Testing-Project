@@ -24,4 +24,9 @@ router.post('/:id/pairs', SessionController.createPair);
 router.delete('/:id/pairs/:pairId', SessionController.deletePair);
 router.post('/:id/finalize-classification', SessionController.finalizeClassification);
 
+// UC-13: Core DSP Diagnostic Engine & Mix Health Score
+router.post('/:id/diagnose', SessionController.diagnoseSession);
+router.get('/:id/diagnostics', SessionController.getDiagnostics);
+
 export default router;
+
