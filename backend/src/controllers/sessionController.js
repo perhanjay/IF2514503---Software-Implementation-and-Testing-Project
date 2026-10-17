@@ -83,4 +83,97 @@ export class SessionController {
       return res.status(500).json({ error: 'Gagal memuat detail sesi' });
     }
   }
+
+  /**
+   * UC-12: Memicu proses inferensi AI klasifikasi instrumen & multi-mic pairing
+   */
+  static async classifySession(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await SessionService.classifySession(id);
+      return res.json({
+        message: 'Klasifikasi instrumen AI dan deteksi pasangan mikrofon selesai',
+        ...result
+      });
+    } catch (err) {
+      console.error('[Classify Session Error]', err);
+      return res.status(500).json({ error: err.message || 'Gagal menjalankan klasifikasi AI' });
+    }
+  }
+
+  /**
+   * UC-12: Mengoreksi label instrumen secara manual (FR-2.3)
+   */
+  static async updateTrackLabel(req, res) {
+    try {
+      const { trackId } = req.params;
+      const { label } = req.body;
+      if (!label) {
+        return res.status(400).json({ error: 'Label instrumen baru wajib ditentukan' });
+      }
+
+      const updatedTrack = await SessionService.updateTrackLabel(trackId, label);
+      return res.json({
+        message: 'Label instrumen berhasil diperbarui',
+        track: updatedTrack
+      });
+    } catch (err) {
+      console.error('[Update Label Error]', err);
+      return res.status(500).json({ error: 'Gagal memperbarui label instrumen' });
+    }
+  }
+
+  /**
+   * UC-12: Membuat pasangan track mikrofon manual
+   */
+  static async createPair(req, res) {
+    try {
+      const { id } = req.params;
+      const { trackAId, trackBId, pairType } = req.body;
+      if (!trackAId || !trackBId) {
+        return res.status(400).json({ error: 'ID kedua trek wajib ditentukan untuk berpasangan' });
+      }
+
+      const pair = await SessionService.createTrackPair(id, trackAId, trackBId, pairType || 'MIC_PAIR');
+      return res.status(201).json({
+        message: 'Pasangan trek mikrofon berhasil dibuat',
+        pair
+      });
+    } catch (err) {
+      console.error('[Create Pair Error]', err);
+      return res.status(500).json({ error: 'Gagal membuat pasangan trek' });
+    }
+  }
+
+  /**
+   * UC-12: Menghapus / melepas pasangan trek (Unpair)
+   */
+  static async deletePair(req, res) {
+    try {
+      const { pairId } = req.params;
+      await SessionService.deleteTrackPair(pairId);
+      return res.json({ message: 'Pasangan trek berhasil dilepas (unpaired)' });
+    } catch (err) {
+      console.error('[Delete Pair Error]', err);
+      return res.status(500).json({ error: 'Gagal melepas pasangan trek' });
+    }
+  }
+
+  /**
+   * UC-12: Konfirmasi klasifikasi & lanjut ke diagnostik DSP
+   */
+  static async finalizeClassification(req, res) {
+    try {
+      const { id } = req.params;
+      const session = await SessionService.finalizeClassification(id);
+      return res.json({
+        message: 'Konfigurasi trek dan pasangan berhasil dikunci. Siap untuk analisis DSP.',
+        session
+      });
+    } catch (err) {
+      console.error('[Finalize Error]', err);
+      return res.status(500).json({ error: 'Gagal mengonfirmasi klasifikasi' });
+    }
+  }
 }
+

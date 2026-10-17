@@ -17,4 +17,11 @@ router.post('/upload-init', SessionController.initUpload);
 router.post('/upload-direct', upload.array('files', 30), SessionController.uploadDirect);
 router.post('/:id/verify-integrity', SessionController.verifySession);
 
+// UC-12: AI Instrument Classification & Multi-Mic Pairing
+router.post('/:id/classify', SessionController.classifySession);
+router.patch('/:id/tracks/:trackId/label', SessionController.updateTrackLabel);
+router.post('/:id/pairs', SessionController.createPair);
+router.delete('/:id/pairs/:pairId', SessionController.deletePair);
+router.post('/:id/finalize-classification', SessionController.finalizeClassification);
+
 export default router;
