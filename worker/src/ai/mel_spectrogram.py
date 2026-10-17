@@ -140,8 +140,8 @@ def extract_spectral_features(audio_data, sample_rate):
 
     # 7. Transient Peak-to-RMS (Crest Factor in dB)
     rms = np.sqrt(np.mean(sig_slice ** 2)) + 1e-12
-    peak = np.max(np.abs(sig_slice))
-    crest_factor_db = 20.0 * np.log10(peak / rms)
+    peak = float(np.max(np.abs(sig_slice))) if len(sig_slice) > 0 else 0.0
+    crest_factor_db = 20.0 * np.log10(max(peak / rms, 1.0)) if peak > 0.0 else 0.0
 
     # 8. Transient Attack Sharpness
     frame_len = int(sample_rate * 0.02)  # 20ms frames

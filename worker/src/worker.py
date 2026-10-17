@@ -335,6 +335,22 @@ def diagnose_session_tracks(tracks_data, pairs_data=None):
         "pairsDiagnostics": pairs_diagnostics
     }
 
+def sanitize_floats(obj):
+    if isinstance(obj, bool):
+        return obj
+    elif isinstance(obj, (float, np.floating)):
+        val = float(obj)
+        if np.isnan(val) or np.isinf(val):
+            return 0.0
+        return val
+    elif isinstance(obj, (int, np.integer)):
+        return int(obj)
+    elif isinstance(obj, dict):
+        return {k: sanitize_floats(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_floats(v) for v in obj]
+    return obj
+
 if __name__ == "__main__":
     if "--test" in sys.argv or "--test-connection" in sys.argv:
         success = test_connections()
@@ -345,7 +361,8 @@ if __name__ == "__main__":
         payload = json.loads(input_data)
         tracks = payload.get("tracks", [])
         output = classify_session_tracks(tracks)
-        print(json.dumps(output))
+        clean_output = sanitize_floats(output)
+        print(json.dumps(clean_output))
         sys.exit(0)
 
     elif "--diagnose-stdin" in sys.argv:
@@ -354,7 +371,8 @@ if __name__ == "__main__":
         tracks = payload.get("tracks", [])
         pairs = payload.get("pairs", [])
         output = diagnose_session_tracks(tracks, pairs)
-        print(json.dumps(output))
+        clean_output = sanitize_floats(output)
+        print(json.dumps(clean_output))
         sys.exit(0)
 
     else:
