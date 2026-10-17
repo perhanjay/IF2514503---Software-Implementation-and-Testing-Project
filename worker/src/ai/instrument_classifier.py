@@ -33,13 +33,14 @@ FILENAME_PATTERNS = {
 }
 
 def compute_filename_prior(file_name):
-    clean_name = file_name.lower().replace("-", "_").replace(".", "_")
+    clean_name = re.sub(r'[^a-zA-Z0-9]+', ' ', file_name).lower()
+    raw_clean = file_name.lower().replace("-", "_").replace(".", "_")
     priors = {cls: 1.0 for cls in INSTRUMENT_CLASSES}
 
     matched = False
     for cls, patterns in FILENAME_PATTERNS.items():
         for pat in patterns:
-            if re.search(pat, clean_name):
+            if re.search(pat, clean_name) or re.search(pat, raw_clean):
                 priors[cls] += 30.0
                 matched = True
                 break
