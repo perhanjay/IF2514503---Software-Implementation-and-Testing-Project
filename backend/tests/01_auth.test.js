@@ -20,7 +20,6 @@ describe('Phase T1: Auth, User Security & Guest Session (UC-01, UC-02, UC-04, UC
 
   after(async () => {
     await cleanupTestData();
-    await prisma.$disconnect();
   });
 
   // ==========================================
