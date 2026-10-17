@@ -5,6 +5,7 @@ import axios from 'axios'
 import AppNavbar from '../components/AppNavbar.vue'
 import SectionBadge from '../components/SectionBadge.vue'
 import UploadSessionModal from './UploadSessionModal.vue'
+import TrackClassificationCard from '../components/TrackClassificationCard.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -18,6 +19,14 @@ const walletDetails = ref(null)
 const claiming = ref(false)
 const claimMsg = ref('')
 const claimError = ref('')
+
+const classifyingSessionId = ref(null)
+const openClassificationSessionId = ref(null)
+const pairTrackA = ref('')
+const pairTrackB = ref('')
+const pairType = ref('MIC_PAIR')
+const isPairing = ref(false)
+const finalizingSessionId = ref(null)
 
 const packages = ref([])
 const selectedPackage = ref('PKG-25')
@@ -130,6 +139,89 @@ async function handleVerify(session) {
     alert(err.response?.data?.error || 'Gagal memverifikasi sinkronisasi sesi')
   } finally {
     verifyingSessionId.value = null
+  }
+}
+
+function getTrackPairInfo(session, trackId) {
+  if (!session?.trackPairs) return null
+  return session.trackPairs.find(p => p.trackAId === trackId || p.trackBId === trackId)
+}
+
+function getPairedTrack(session, trackId) {
+  const pair = getTrackPairInfo(session, trackId)
+  if (!pair || !session.tracks) return null
+  const otherId = pair.trackAId === trackId ? pair.trackBId : pair.trackAId
+  return session.tracks.find(t => t.id === otherId)
+}
+
+async function handleClassify(session) {
+  classifyingSessionId.value = session.id
+  try {
+    await axios.post(`/api/v1/sessions/${session.id}/classify`)
+    openClassificationSessionId.value = session.id
+    await loadSessions()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Gagal menjalankan klasifikasi AI')
+  } finally {
+    classifyingSessionId.value = null
+  }
+}
+
+async function handleUpdateTrackLabel(sessionId, { trackId, label }) {
+  try {
+    await axios.patch(`/api/v1/sessions/${sessionId}/tracks/${trackId}/label`, { label })
+    await loadSessions()
+  } catch (err) {
+    alert('Gagal memperbarui label trek')
+  }
+}
+
+async function handleUnpair(sessionId, pairId) {
+  if (!pairId) return
+  try {
+    await axios.delete(`/api/v1/sessions/${sessionId}/pairs/${pairId}`)
+    await loadSessions()
+  } catch (err) {
+    alert('Gagal melepas pasangan trek')
+  }
+}
+
+async function handleCreatePair(sessionId) {
+  if (!pairTrackA.value || !pairTrackB.value) {
+    alert('Pilih kedua trek audio yang ingin dihubungkan')
+    return
+  }
+  if (pairTrackA.value === pairTrackB.value) {
+    alert('Trek A dan Trek B tidak boleh sama')
+    return
+  }
+  isPairing.value = true
+  try {
+    await axios.post(`/api/v1/sessions/${sessionId}/pairs`, {
+      trackAId: pairTrackA.value,
+      trackBId: pairTrackB.value,
+      pairType: pairType.value
+    })
+    pairTrackA.value = ''
+    pairTrackB.value = ''
+    await loadSessions()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Gagal membuat pasangan trek')
+  } finally {
+    isPairing.value = false
+  }
+}
+
+async function handleFinalizeClassification(sessionId) {
+  finalizingSessionId.value = sessionId
+  try {
+    await axios.post(`/api/v1/sessions/${sessionId}/finalize-classification`)
+    alert('Konfigurasi label trek dan pasangan mikrofon berhasil dikunci! Siap untuk tahap Diagnostik DSP (UC-13).')
+    await loadSessions()
+  } catch (err) {
+    alert('Gagal mengonfirmasi klasifikasi')
+  } finally {
+    finalizingSessionId.value = null
   }
 }
 
@@ -267,12 +359,28 @@ onMounted(async () => {
                   </div>
                 </div>
 
-                <button 
-                  @click="handleVerify(s)"
-                  :disabled="verifyingSessionId === s.id"
-                  class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
-                  <span>{{ verifyingSessionId === s.id ? 'Memindai...' : '🔍 Verifikasi Sinkronisasi (UC-11)' }}</span>
-                </button>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button 
+                    @click="handleVerify(s)"
+                    :disabled="verifyingSessionId === s.id"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-xl shadow-sm hover:shadow-accent transition-all cursor-pointer">
+                    <span>{{ verifyingSessionId === s.id ? 'Memindai...' : '🔍 Verifikasi (UC-11)' }}</span>
+                  </button>
+
+                  <button 
+                    @click="handleClassify(s)"
+                    :disabled="classifyingSessionId === s.id"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white text-xs font-semibold rounded-xl shadow-accent hover:shadow-accent-lg transition-all cursor-pointer">
+                    <span>{{ classifyingSessionId === s.id ? 'AI Memproses Spektrogram...' : '🤖 Klasifikasi AI & Pairing (UC-12)' }}</span>
+                  </button>
+
+                  <button 
+                    v-if="s.tracks?.some(t => t.detectedLabel)"
+                    @click="openClassificationSessionId = (openClassificationSessionId === s.id ? null : s.id)"
+                    class="px-2.5 py-2 text-xs font-medium text-slate-500 hover:text-[#0052FF] cursor-pointer">
+                    {{ openClassificationSessionId === s.id ? 'Tutup Panel ▲' : 'Buka Panel ▼' }}
+                  </button>
+                </div>
               </div>
 
               <!-- Badges list of stems -->
@@ -300,6 +408,98 @@ onMounted(async () => {
                 <p class="text-xs text-slate-300 leading-relaxed font-normal">
                   {{ verificationResult.message }}
                 </p>
+              </div>
+
+              <!-- UC-12 Classification & Pairing Panel -->
+              <div 
+                v-if="openClassificationSessionId === s.id || s.tracks?.some(t => t.detectedLabel)"
+                class="rounded-2xl p-5 bg-white border border-slate-200/90 shadow-md space-y-5 animate-fade-in">
+                
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full bg-[#0052FF]" />
+                      <h4 class="font-display text-base text-slate-900">Hasil Klasifikasi Audio CNN & Deteksi Pasangan</h4>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      Tinjau tebakan instrumen AI dan relasi pasangan mikrofon sebelum masuk ke analisis diagnostik fasa.
+                    </p>
+                  </div>
+
+                  <span class="font-mono-accent text-[11px] px-2.5 py-1 rounded bg-slate-100 text-slate-600 font-semibold self-start sm:self-auto">
+                    {{ s.trackPairs?.length || 0 }} Pasangan Terhubung
+                  </span>
+                </div>
+
+                <!-- Stems List with TrackClassificationCard -->
+                <div class="space-y-3">
+                  <TrackClassificationCard 
+                    v-for="track in s.tracks" 
+                    :key="track.id"
+                    :track="track"
+                    :paired-track="getPairedTrack(s, track.id)"
+                    :pair-info="getTrackPairInfo(s, track.id)"
+                    :available-tracks="s.tracks.filter(t => t.id !== track.id)"
+                    @update-label="handleUpdateTrackLabel(s.id, $event)"
+                    @unpair="handleUnpair(s.id, $event)"
+                  />
+                </div>
+
+                <!-- Manual Pairing Form -->
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold text-xs text-slate-800">Hubungkan Pasangan Mikrofon Baru Secara Manual</span>
+                    <span class="font-mono-accent text-[10px] text-slate-400">UC-12 Pairing Form</span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                    <select 
+                      v-model="pairTrackA" 
+                      class="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                      <option value="" disabled>Pilih Trek Pertama (A)</option>
+                      <option v-for="t in s.tracks" :key="'a-' + t.id" :value="t.id">
+                        {{ t.fileName }}
+                      </option>
+                    </select>
+
+                    <select 
+                      v-model="pairTrackB" 
+                      class="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                      <option value="" disabled>Pilih Trek Kedua (B)</option>
+                      <option v-for="t in s.tracks" :key="'b-' + t.id" :value="t.id">
+                        {{ t.fileName }}
+                      </option>
+                    </select>
+
+                    <select 
+                      v-model="pairType" 
+                      class="text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                      <option value="MIC_PAIR">MIC_PAIR (Kick In/Sub)</option>
+                      <option value="DRUM_TOP_BOTTOM">DRUM_TOP_BOTTOM (Snare Top/Bottom)</option>
+                      <option value="BASS_DI_MIC">BASS_DI_MIC (Bass DI/Amp)</option>
+                      <option value="STEREO_SPLIT">STEREO_SPLIT (L/R Split)</option>
+                    </select>
+
+                    <button 
+                      @click="handleCreatePair(s.id)"
+                      :disabled="isPairing || !pairTrackA || !pairTrackB"
+                      class="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+                      <span>🔗 Hubungkan</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Finalize CTA Button -->
+                <div class="pt-2 flex justify-end">
+                  <button 
+                    @click="handleFinalizeClassification(s.id)"
+                    :disabled="finalizingSessionId === s.id"
+                    class="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white font-semibold text-xs shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer">
+                    <span>{{ finalizingSessionId === s.id ? 'Mengunci...' : 'Konfirmasi & Lanjut ke Diagnostik Fasa (UC-13)' }}</span>
+                    <span class="font-mono text-sm">→</span>
+                  </button>
+                </div>
+
               </div>
             </div>
           </div>
