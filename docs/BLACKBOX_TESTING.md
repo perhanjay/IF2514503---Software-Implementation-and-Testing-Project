@@ -119,6 +119,19 @@ Dokumen ini disusun sebagai panduan pengujian fungsional independen (*Blackbox T
 
 ---
 
+### Modul 9: Pemutar Audisi Multitrack A/B & Analisis Fase Real-time (UC-16)
+
+| ID Test | Kategori / Fitur | Tindakan Pengguna / Masukan | Hasil yang Diharapkan (*Expected Result*) | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **TC-AUD-01** | **Presigned Audio Sources API (UC-16)** | Panggil API `GET /api/v1/sessions/:id/audio-sources` dengan bearer token pemilik sesi | • Sistem mengembalikan daftar stem lengkap dengan `rawAudioUrl` dan `repairedAudioUrl` bertanda presigned S3 URL.<br>• Menolak session ID fiktif (404) dan user bukan pemilik sesi (403). | [x] PASSED |
+| **TC-AUD-02** | **Sample-Accurate Multitrack Playback (FR-6.1)** | Buka modal *"Dengar Perbandingan A/B"* dan tekan tombol Play / Spasi | • Seluruh stem audio dimuat ke Web Audio API dan diputar secara sinkron (*sample-accurate*).<br>• Timeline scrubber bergerak mulus dan durasi terhitung dari trek terpanjang. | [x] PASSED |
+| **TC-AUD-03** | **Instant A/B Switching (NFR-01, FR-6.2)** | Beralih antara tombol **"A: Audio Asli"** dan **"B: Hasil Perbaikan"** saat audio sedang berputar | • Audio langsung beralih secara instan dengan micro-crossfade gain 5 ms.<br>• Latensi pergantian $< 50\text{ ms}$ tanpa jeda buffering dan tanpa letupan (*click/pop*). | [x] PASSED |
+| **TC-AUD-04** | **Pemeriksaan Mono Real-Time (FR-6.4)** | Klik tombol **"MONO CHECK (L+R)"** saat audisi berlangsung | • Sinyal kiri dan kanan dijumlahkan ($L+R$) secara real-time ke kedua kanal.<br>• Pengguna dapat langsung mendengar perbedaan sebelum vs sesudah perbaikan fasa tanpa pembatalan frekuensi. | [x] PASSED |
+| **TC-AUD-05** | **Goniometer Lissajous Phase Scope (FR-6.3)** | Amati pola Lissajous pada kanvas visualizer saat memutar Mode A vs Mode B | • Menampilkan pola gelombang terotasi $45^\circ$ ($X=(L-R)/\sqrt{2}, Y=(L+R)/\sqrt{2}$) dengan efek trailing phosphor CRT.<br>• Bar korelasi fasa $[-1.0 \text{ s.d. } +1.0]$ diperbarui secara real-time. | [x] PASSED |
+| **TC-AUD-06** | **Multitrack Channel Strip Controls (FR-6.1)** | Atur slider Volume, Panning (-100% s.d. +100%), serta tombol Mute (M) dan Solo (S) per stem | • Volume fader mengatur gain trek individual secara responsif.<br>• Panning mengarahkan sinyal ke stereo field L/R.<br>• Mengaktifkan Solo (S) membungkam seluruh track lain secara instan; Mute (M) mematikan stem terkait. | [x] PASSED |
+
+---
+
 ## 3. Skenario Pengujian Alur Penuh (End-to-End Walkthrough) di Browser
 
 Anda dapat memverifikasi seluruh sistem dari hulu ke hilir secara berurutan dengan alur berikut:
@@ -132,21 +145,22 @@ Anda dapat memverifikasi seluruh sistem dari hulu ke hilir secara berurutan deng
 7. **Uji Diagnostik DSP & Health Score**: Klik tombol *"🔬 Diagnostik DSP (UC-13)"* $\rightarrow$ Amati perputaran radial meter Health Score, deteksi fasa/clipping, dan rekomendasi berbahasa Indonesia (*TC-DSP-01 s.d. TC-DSP-06*).
 8. **Uji Eksekusi 1-Click Auto-Fix**: Klik tombol *"Terapkan Perbaikan (X Token)"* $\rightarrow$ Amati pemotongan token saldo, status sesi berubah menjadi `REPAIRED`, dan seluruh track tertandai centang hijau (*TC-REP-01 s.d. TC-REP-03*).
 9. **Uji Kustomisasi Granular Fixes**: Klik tombol *"Kustomisasi Perbaikan"* $\rightarrow$ Pilih/nonaktifkan modul perbaikan tertentu per track $\rightarrow$ Simpan (*TC-REP-05*).
-10. **Uji Registrasi Akun Permanen**: Klik *"Daftar Akun"* di navbar $\rightarrow$ Masukkan email baru $\rightarrow$ Periksa bonus 5 token dan saldo dompet (*TC-AUTH-01*).
-11. **Uji Top-up Midtrans**: Pilih paket token di panel kanan $\rightarrow$ Klik *"Beli Paket via Midtrans"* $\rightarrow$ Klik *"Simulasi Konfirmasi Pembayaran"* $\rightarrow$ Pastikan saldo bertambah secara real-time (*TC-PAY-02, TC-PAY-03*).
+10. **Uji Audisi Komparasi A/B Multitrack**: Klik tombol *"Dengar Perbandingan A/B"* $\rightarrow$ Tekan Play (Spasi) $\rightarrow$ Tekan A dan B bergantian untuk merasakan transisi halus $< 50\text{ ms}$ $\rightarrow$ Aktifkan *Mono Check* dan amati visualizer *Goniometer Lissajous* serta fader mixer track (*TC-AUD-01 s.d. TC-AUD-06*).
+11. **Uji Registrasi Akun Permanen**: Klik *"Daftar Akun"* di navbar $\rightarrow$ Masukkan email baru $\rightarrow$ Periksa bonus 5 token dan saldo dompet (*TC-AUTH-01*).
+12. **Uji Top-up Midtrans**: Pilih paket token di panel kanan $\rightarrow$ Klik *"Beli Paket via Midtrans"* $\rightarrow$ Klik *"Simulasi Konfirmasi Pembayaran"* $\rightarrow$ Pastikan saldo bertambah secara real-time (*TC-PAY-02, TC-PAY-03*).
 
 ---
 
-## 4. Eksekusi Otomatis Pengujian (Automated Test Suites - 108 Tests)
+## 4. Eksekusi Otomatis Pengujian (Automated Test Suites - 112 Tests)
 
-Selain pengujian manual via browser di atas, seluruh fungsionalitas didukung oleh **108 Automated Unit & Integration Tests** yang dapat dieksekusi melalui terminal:
+Selain pengujian manual via browser di atas, seluruh fungsionalitas didukung oleh **112 Automated Unit & Integration Tests** yang dapat dieksekusi melalui terminal:
 
-### A. Menjalankan Backend Test Suite (64 Tests)
+### A. Menjalankan Backend Test Suite (68 Tests)
 ```bash
 cd backend
 npm test
 ```
-*Menguji*: Auth, Proteksi JWT, Guest Session, Dompet Token, Midtrans Webhook Idempotency, Multitrack S3 Ingestion, Zero-Aligned Sync, Integrasi API E2E UC-12 & UC-13, serta Automated & Granular Audio Repair Engine (UC-14 & UC-15).
+*Menguji*: Auth, Proteksi JWT, Guest Session, Dompet Token, Midtrans Webhook Idempotency, Multitrack S3 Ingestion, Zero-Aligned Sync, Integrasi API E2E UC-12 & UC-13, Automated & Granular Audio Repair Engine (UC-14 & UC-15), serta Presigned Multitrack Audition Audio Sources (UC-16).
 
 ### B. Menjalankan Python Worker Test Suite (44 Tests)
 ```bash
