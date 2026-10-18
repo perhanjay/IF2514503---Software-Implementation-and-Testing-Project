@@ -284,6 +284,23 @@ export class SessionController {
       return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan kustom' });
     }
   }
+
+  /**
+   * UC-16: Mengambil URL streaming audio presigned untuk pemutar multitrack A/B
+   */
+  static async getAudioSources(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await SessionService.getSessionAudioSources(id, req.user.id);
+      return res.json(result);
+    } catch (err) {
+      console.error('[Get Audio Sources Error]', err);
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      const isForbidden = err.message.includes('Akses ditolak');
+      const status = isNotFound ? 404 : (isForbidden ? 403 : 500);
+      return res.status(status).json({ error: err.message || 'Gagal mengambil URL audio sesi' });
+    }
+  }
 }
 
 

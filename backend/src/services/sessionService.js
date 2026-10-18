@@ -786,5 +786,74 @@ export class SessionService {
       throw err;
     }
   }
+
+  /**
+   * UC-16: Mengambil URL streaming audio presigned untuk pemutar multitrack A/B
+   * Menyediakan rawAudioUrl dan repairedAudioUrl untuk setiap track
+   */
+  static async getSessionAudioSources(sessionId, userId) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: {
+          include: { diagnosticResult: true }
+        },
+        trackPairs: {
+          include: { trackA: true, trackB: true }
+        }
+      }
+    });
+
+    if (!session) throw new Error('Sesi tidak ditemukan');
+    if (session.userId !== userId) throw new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+
+    const tracksWithUrls = await Promise.all(
+      session.tracks.map(async (track) => {
+        let rawAudioUrl = null;
+        let repairedAudioUrl = null;
+
+        if (track.originalStorageKey) {
+          const rawCommand = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: track.originalStorageKey
+          });
+          rawAudioUrl = await getSignedUrl(s3Client, rawCommand, { expiresIn: 3600 });
+        }
+
+        if (track.repairedStorageKey) {
+          const repairedCommand = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: track.repairedStorageKey
+          });
+          repairedAudioUrl = await getSignedUrl(s3Client, repairedCommand, { expiresIn: 3600 });
+        }
+
+        return {
+          id: track.id,
+          fileName: track.fileName,
+          instrumentLabel: track.instrumentLabel || track.detectedLabel || 'Other',
+          isStereo: track.isStereo,
+          durationSec: track.durationSec,
+          status: track.status,
+          rawAudioUrl,
+          repairedAudioUrl,
+          diagnostic: track.diagnosticResult
+        };
+      })
+    );
+
+    return {
+      session: {
+        id: session.id,
+        title: session.title,
+        status: session.status,
+        healthScore: session.healthScore,
+        sampleRate: session.sampleRate,
+        bitDepth: session.bitDepth
+      },
+      tracks: tracksWithUrls,
+      trackPairs: session.trackPairs
+    };
+  }
 }
 

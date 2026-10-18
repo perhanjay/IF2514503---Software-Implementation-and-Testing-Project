@@ -34,5 +34,8 @@ router.get('/:id/diagnostics', SessionController.getDiagnostics);
 router.post('/:id/repair-auto', SessionController.repairAuto);
 router.post('/:id/repair-custom', SessionController.repairCustom);
 
+// UC-16: A/B Multitrack Auditioning Player Audio Sources
+router.get('/:id/audio-sources', SessionController.getAudioSources);
+
 export default router;
 
