@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../config/prisma.js';
 import { s3Client, BUCKET_NAME } from '../config/s3.js';
+import { WalletService } from './walletService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -304,6 +305,40 @@ export class SessionService {
   }
 
   /**
+   * Mengubah judul sesi (Rename Session)
+   */
+  static async updateSessionTitle(sessionId, userId, title) {
+    if (!title || !title.trim()) {
+      throw new Error('Judul sesi tidak boleh kosong');
+    }
+    const session = await prisma.session.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error('Sesi tidak ditemukan');
+    }
+    return await prisma.session.update({
+      where: { id: sessionId },
+      data: { title: title.trim() }
+    });
+  }
+
+  /**
+   * Menghapus sesi multitrack beserta seluruh relasinya
+   */
+  static async deleteSession(sessionId, userId) {
+    const session = await prisma.session.findFirst({
+      where: { id: sessionId, userId }
+    });
+    if (!session) {
+      throw new Error('Sesi tidak ditemukan');
+    }
+    return await prisma.session.delete({
+      where: { id: sessionId }
+    });
+  }
+
+  /**
    * UC-12: Memicu proses klasifikasi instrumen AI & deteksi pasangan multi-mikrofon
    */
   static async classifySession(sessionId) {
@@ -590,6 +625,166 @@ export class SessionService {
       tracks: session.tracks,
       trackPairs: session.trackPairs
     };
+  }
+
+  /**
+   * UC-14 & UC-15: Menjalankan Perbaikan Sesi Audio (Auto 1-Click & Granular Custom Fixes)
+   * Dilengkapi proteksi validasi token, mutasi DEDUCTION, dan Auto-Refund instan (NFR-09) jika worker gagal.
+   */
+  static async repairSession(sessionId, userId, mode = 'AUTO', customSettings = null) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: {
+          include: { diagnosticResult: true }
+        },
+        trackPairs: true
+      }
+    });
+
+    if (!session) throw new Error('Sesi tidak ditemukan');
+    if (session.userId !== userId) throw new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+    if (!session.tracks || session.tracks.length === 0) {
+      throw new Error('Sesi belum memiliki berkas trek audio untuk diperbaiki');
+    }
+
+    // 1. Validasi saldo token (FR-7.2)
+    const tokensNeeded = session.estimatedTokens || 1;
+    const wallet = await WalletService.getWalletDetails(userId);
+    if (!wallet || wallet.balance < tokensNeeded) {
+      const currentBalance = wallet ? wallet.balance : 0;
+      const err = new Error(`Saldo token tidak mencukupi untuk melakukan perbaikan audio. Saldo Anda: ${currentBalance} Token, dibutuhkan: ${tokensNeeded} Token.`);
+      err.statusCode = 402;
+      throw err;
+    }
+
+    // 2. Pemotongan Saldo Token secara Atomik (FR-7.5, FR-7.6)
+    await WalletService.debitToken(
+      userId,
+      tokensNeeded,
+      'DEDUCTION',
+      `Perbaikan Audio DSP Sesi (${mode === 'CUSTOM' ? 'Granular Custom' : '1-Click Auto-Fix'}): ${session.title}`,
+      session.id
+    );
+
+    let tokenDeducted = true;
+
+    try {
+      // 3. Simpan konfigurasi perbaikan ke tabel repair_configs
+      await prisma.repairConfig.upsert({
+        where: { sessionId: session.id },
+        update: {
+          settings: { mode, customSettings: customSettings || {} },
+          isApplied: false
+        },
+        create: {
+          sessionId: session.id,
+          settings: { mode, customSettings: customSettings || {} },
+          isApplied: false
+        }
+      });
+
+      // 4. Perbarui status sesi ke PROCESSING
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { status: 'PROCESSING' }
+      });
+
+      // 5. Siapkan payload untuk Python Worker
+      const payload = {
+        sessionId: session.id,
+        repairMode: mode,
+        customSettings: customSettings || {},
+        tracks: session.tracks.map(t => ({
+          id: t.id,
+          fileName: t.fileName,
+          originalStorageKey: t.originalStorageKey,
+          instrumentLabel: t.instrumentLabel || t.detectedLabel,
+          isStereo: t.isStereo,
+          diagnostic: t.diagnosticResult || {}
+        })),
+        pairs: session.trackPairs.map(p => ({
+          id: p.id,
+          trackAId: p.trackAId,
+          trackBId: p.trackBId,
+          pairType: p.pairType
+        }))
+      };
+
+      // 6. Eksekusi DSP repair di Python worker
+      const workerResult = await runPythonWorker(payload, '--repair-stdin');
+
+      // 7. Simpan hasil perbaikan trek ke database
+      for (const item of (workerResult.tracksRepaired || [])) {
+        await prisma.track.update({
+          where: { id: item.trackId },
+          data: {
+            repairedStorageKey: item.repairedStorageKey,
+            status: 'REPAIRED'
+          }
+        });
+
+        // Tandai status kesehatan diagnostik menjadi Clean pasca-perbaikan
+        await prisma.diagnosticResult.updateMany({
+          where: { trackId: item.trackId },
+          data: { healthStatus: 'Clean' }
+        });
+      }
+
+      // 8. Tandai RepairConfig selesai diterapkan
+      await prisma.repairConfig.update({
+        where: { sessionId: session.id },
+        data: { isApplied: true }
+      });
+
+      // 9. Perbarui status Sesi menjadi REPAIRED dan update healthScore
+      const updatedSession = await prisma.session.update({
+        where: { id: session.id },
+        data: {
+          status: 'REPAIRED',
+          healthScore: workerResult.sessionHealth?.health_score || 98.0
+        },
+        include: {
+          tracks: {
+            include: { diagnosticResult: true }
+          },
+          trackPairs: {
+            include: { trackA: true, trackB: true }
+          },
+          repairConfig: true
+        }
+      });
+
+      return {
+        session: updatedSession,
+        sessionHealth: workerResult.sessionHealth,
+        tracksRepaired: workerResult.tracksRepaired
+      };
+
+    } catch (err) {
+      // 10. Auto-Refund Instan jika terjadi kegagalan rendering (NFR-09)
+      if (tokenDeducted) {
+        try {
+          await WalletService.creditToken(
+            userId,
+            tokensNeeded,
+            'REFUND',
+            `[Auto-Refund] Kegagalan Pemrosesan Sesi Audio: ${session.title}`,
+            session.id
+          );
+        } catch (refundErr) {
+          console.error('[SessionService Auto-Refund Failed]', refundErr);
+        }
+      }
+
+      // Kembalikan status sesi ke READY
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { status: 'READY' }
+      });
+
+      throw err;
+    }
   }
 }
 

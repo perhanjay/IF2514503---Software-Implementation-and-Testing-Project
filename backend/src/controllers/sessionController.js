@@ -206,6 +206,84 @@ export class SessionController {
       return res.status(500).json({ error: err.message || 'Gagal mengambil data diagnostik sesi' });
     }
   }
+
+  /**
+   * Mengubah judul sesi (Rename Session)
+   */
+  static async updateTitle(req, res) {
+    try {
+      const { id } = req.params;
+      const { title } = req.body;
+      if (!title || !title.trim()) {
+        return res.status(400).json({ error: 'Judul sesi tidak boleh kosong' });
+      }
+      const session = await SessionService.updateSessionTitle(id, req.user.id, title);
+      return res.json({
+        message: 'Judul sesi berhasil diperbarui',
+        session
+      });
+    } catch (err) {
+      console.error('[Update Session Title Error]', err);
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      return res.status(isNotFound ? 404 : 400).json({
+        error: err.message || 'Gagal mengubah judul sesi'
+      });
+    }
+  }
+
+  /**
+   * Menghapus sesi multitrack
+   */
+  static async deleteSession(req, res) {
+    try {
+      const { id } = req.params;
+      await SessionService.deleteSession(id, req.user.id);
+      return res.json({ message: 'Sesi berhasil dihapus' });
+    } catch (err) {
+      console.error('[Delete Session Error]', err);
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      return res.status(isNotFound ? 404 : 500).json({
+        error: err.message || 'Gagal menghapus sesi'
+      });
+    }
+  }
+
+  /**
+   * UC-14: Menjalankan Perbaikan Sesi Otomatis (1-Click Auto-Fix)
+   */
+  static async repairAuto(req, res) {
+    try {
+      const { id } = req.params;
+      const result = await SessionService.repairSession(id, req.user.id, 'AUTO');
+      return res.json({
+        message: 'Perbaikan otomatis DSP sesi berhasil diterapkan',
+        ...result
+      });
+    } catch (err) {
+      console.error('[Repair Auto Error]', err);
+      const status = err.statusCode || (err.message.includes('tidak ditemukan') ? 404 : 400);
+      return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan otomatis' });
+    }
+  }
+
+  /**
+   * UC-15: Menyesuaikan Perbaikan Kecil (Granular DSP Fixes)
+   */
+  static async repairCustom(req, res) {
+    try {
+      const { id } = req.params;
+      const { customSettings } = req.body;
+      const result = await SessionService.repairSession(id, req.user.id, 'CUSTOM', customSettings);
+      return res.json({
+        message: 'Perbaikan kustom DSP sesi berhasil diterapkan',
+        ...result
+      });
+    } catch (err) {
+      console.error('[Repair Custom Error]', err);
+      const status = err.statusCode || (err.message.includes('tidak ditemukan') ? 404 : 400);
+      return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan kustom' });
+    }
+  }
 }
 
 

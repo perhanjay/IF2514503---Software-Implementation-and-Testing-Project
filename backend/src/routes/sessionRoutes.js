@@ -13,6 +13,8 @@ router.use(authenticate);
 
 router.get('/', SessionController.listSessions);
 router.get('/:id', SessionController.getDetails);
+router.patch('/:id/title', SessionController.updateTitle);
+router.delete('/:id', SessionController.deleteSession);
 router.post('/upload-init', SessionController.initUpload);
 router.post('/upload-direct', upload.array('files', 30), SessionController.uploadDirect);
 router.post('/:id/verify-integrity', SessionController.verifySession);
@@ -27,6 +29,10 @@ router.post('/:id/finalize-classification', SessionController.finalizeClassifica
 // UC-13: Core DSP Diagnostic Engine & Mix Health Score
 router.post('/:id/diagnose', SessionController.diagnoseSession);
 router.get('/:id/diagnostics', SessionController.getDiagnostics);
+
+// UC-14 & UC-15: DSP Audio Repair Engine
+router.post('/:id/repair-auto', SessionController.repairAuto);
+router.post('/:id/repair-custom', SessionController.repairCustom);
 
 export default router;
 
