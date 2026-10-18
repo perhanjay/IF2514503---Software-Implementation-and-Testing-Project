@@ -291,18 +291,25 @@ async function handleRepairCustom() {
   }
 }
 
+const auditionInitialized = ref({})
+
 function isAuditionDetailsOpen(sessionId) {
   return Boolean(auditionDetailsOpen.value[sessionId])
 }
 
 function toggleAuditionDetails(sessionId) {
-  auditionDetailsOpen.value[sessionId] = !isAuditionDetailsOpen(sessionId)
+  const willOpen = !isAuditionDetailsOpen(sessionId)
+  auditionDetailsOpen.value[sessionId] = willOpen
+  if (willOpen) {
+    auditionInitialized.value[sessionId] = true
+  }
 }
 
 function openAuditionSection(session) {
   if (!session) return
   expandedSessions.value[session.id] = true
   auditionDetailsOpen.value[session.id] = true
+  auditionInitialized.value[session.id] = true
 }
 
 function countTrackChannels(session) {
@@ -1114,9 +1121,9 @@ onMounted(async () => {
                     </div>
                   </div>
 
-                  <!-- Dropdown Content: Multitrack Audition Panel -->
-                  <div v-if="isAuditionDetailsOpen(s.id)" class="pt-2 space-y-3">
-                    <MultitrackAuditionPanel :session="s" />
+                  <!-- Dropdown Content: Multitrack Audition Panel (Cached via v-show after first load) -->
+                  <div v-if="auditionInitialized[s.id]" v-show="isAuditionDetailsOpen(s.id)" class="pt-2 space-y-3">
+                    <MultitrackAuditionPanel :session="s" :is-open="isAuditionDetailsOpen(s.id)" />
 
                     <!-- Close Button at bottom of Step 3 -->
                     <div class="flex justify-end pt-1">

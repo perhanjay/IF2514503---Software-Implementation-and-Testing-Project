@@ -10,12 +10,23 @@ const props = defineProps({
   session: {
     type: Object,
     required: true
+  },
+  isOpen: {
+    type: Boolean,
+    default: true
   }
 })
 
 const emit = defineEmits(['close'])
 
 const player = useMultitrackPlayer()
+
+// Auto-pause bila panel ditutup (v-show = false)
+watch(() => props.isOpen, (open) => {
+  if (!open && player.isPlaying.value) {
+    player.pause()
+  }
+})
 
 const isFetchingSources = ref(false)
 const fetchError = ref(null)
@@ -48,6 +59,7 @@ async function loadAudioSources() {
 }
 
 function handleKeydown(e) {
+  if (!props.isOpen) return
   if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return
 
   if (e.code === 'Space') {
