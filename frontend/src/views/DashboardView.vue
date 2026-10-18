@@ -8,7 +8,7 @@ import UploadSessionModal from './UploadSessionModal.vue'
 import TrackClassificationCard from '../components/TrackClassificationCard.vue'
 import HealthScoreGauge from '../components/HealthScoreGauge.vue'
 import DiagnosticTrackCard from '../components/DiagnosticTrackCard.vue'
-import MultitrackAuditionModal from '../components/audio/MultitrackAuditionModal.vue'
+import MultitrackAuditionPanel from '../components/audio/MultitrackAuditionPanel.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -49,8 +49,7 @@ const showCustomRepairModal = ref(false)
 const activeRepairSession = ref(null)
 const customRepairSettings = ref({})
 
-const showAuditionModal = ref(false)
-const activeAuditionSession = ref(null)
+const auditionDetailsOpen = ref({})
 
 const sessions = ref([])
 const showUploadModal = ref(false)
@@ -292,14 +291,18 @@ async function handleRepairCustom() {
   }
 }
 
-function openAuditionModal(session) {
-  activeAuditionSession.value = session
-  showAuditionModal.value = true
+function isAuditionDetailsOpen(sessionId) {
+  return Boolean(auditionDetailsOpen.value[sessionId])
 }
 
-function closeAuditionModal() {
-  showAuditionModal.value = false
-  activeAuditionSession.value = null
+function toggleAuditionDetails(sessionId) {
+  auditionDetailsOpen.value[sessionId] = !isAuditionDetailsOpen(sessionId)
+}
+
+function openAuditionSection(session) {
+  if (!session) return
+  expandedSessions.value[session.id] = true
+  auditionDetailsOpen.value[session.id] = true
 }
 
 function countTrackChannels(session) {
@@ -672,7 +675,7 @@ onMounted(async () => {
 
                   <button 
                     v-if="s.status === 'REPAIRED'"
-                    @click="openAuditionModal(s)"
+                    @click="openAuditionSection(s)"
                     class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
                     title="Buka Studio Audisi Komparasi A/B">
                     <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1010,7 +1013,7 @@ onMounted(async () => {
                           Sesuaikan Ulang
                         </button>
                         <button 
-                          @click="openAuditionModal(s)"
+                          @click="openAuditionSection(s)"
                           class="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
                           <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -1063,6 +1066,62 @@ onMounted(async () => {
                     <div class="flex justify-end pt-1">
                       <button 
                         @click="toggleDiagnosticDetails(s.id)"
+                        class="text-xs text-[#0052FF] hover:underline font-semibold cursor-pointer">
+                        Tutup ▲
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Step 3: Studio Audisi Multitrack A/B & Analisis Fase -->
+                <div 
+                  class="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 transition-all shadow-xs"
+                  :class="{'space-y-4': isAuditionDetailsOpen(s.id)}">
+                  <!-- Header -->
+                  <div 
+                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    :class="{'border-b border-slate-200/80 pb-3': isAuditionDetailsOpen(s.id)}">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-6 h-6 rounded-lg bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                        3
+                      </div>
+                      <div>
+                        <h4 class="font-display text-base font-semibold text-slate-900">
+                          Studio Audisi Multitrack A/B & Analisis Fase
+                        </h4>
+                      </div>
+                    </div>
+
+                    <!-- Status Badge & Controls -->
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span 
+                        v-if="s.status === 'REPAIRED'"
+                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+                        Komparasi A/B Tersedia
+                      </span>
+                      <span 
+                        v-else 
+                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium">
+                        Mode Audio Mentah
+                      </span>
+
+                      <button 
+                        @click="toggleAuditionDetails(s.id)"
+                        class="px-3 py-1.5 rounded-lg border border-[#0052FF]/30 hover:border-[#0052FF] hover:bg-[#0052FF]/5 bg-white text-[#0052FF] text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                        <span>{{ isAuditionDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
+                        <span class="text-[10px]">{{ isAuditionDetailsOpen(s.id) ? '▲' : '▼' }}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Dropdown Content: Multitrack Audition Panel -->
+                  <div v-if="isAuditionDetailsOpen(s.id)" class="pt-2 space-y-3">
+                    <MultitrackAuditionPanel :session="s" />
+
+                    <!-- Close Button at bottom of Step 3 -->
+                    <div class="flex justify-end pt-1">
+                      <button 
+                        @click="toggleAuditionDetails(s.id)"
                         class="text-xs text-[#0052FF] hover:underline font-semibold cursor-pointer">
                         Tutup ▲
                       </button>
@@ -1227,12 +1286,5 @@ onMounted(async () => {
         </div>
       </div>
     </div>
-
-    <!-- Modal Multitrack Audisi A/B -->
-    <MultitrackAuditionModal 
-      v-if="showAuditionModal && activeAuditionSession"
-      :session="activeAuditionSession"
-      @close="closeAuditionModal"
-    />
   </div>
 </template>
