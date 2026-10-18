@@ -106,6 +106,19 @@ Dokumen ini disusun sebagai panduan pengujian fungsional independen (*Blackbox T
 
 ---
 
+### Modul 8: Automated & Granular DSP Audio Repair Engine (UC-14 & UC-15)
+
+| ID Test | Kategori / Fitur | Tindakan Pengguna / Masukan | Hasil yang Diharapkan (*Expected Result*) | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **TC-REP-01** | **UC-14: Eksekusi 1-Click Auto-Fix** | Pada kartu sesi beranomali fasa, klik tombol **"Terapkan Perbaikan (X Token)"** | • Sistem memvalidasi saldo token, mendebit token secara atomik, dan menjalankan worker DSP.<br>• Status sesi berubah menjadi `REPAIRED` dan Mix Health Score melonjak optimal ($\ge 95$).<br>• Setiap track yang diperbaiki berstatus *Clean* dan memiliki storage key `FIXED_[TrackName].wav` di MinIO S3. | [x] PASSED |
+| **TC-REP-02** | **Proteksi Saldo Kurang (FR-7.2)** | Jalankan perbaikan pada akun dengan saldo token 0 atau tidak mencukupi | • Sistem menolak permintaan (HTTP 402 Payment Required).<br>• Muncul pesan: *"Saldo token tidak mencukupi untuk melakukan perbaikan audio"*. Audio tidak diproses. | [x] PASSED |
+| **TC-REP-03** | **Pencatatan Buku Besar DEDUCTION (FR-7.6)** | Periksa riwayat transaksi setelah perbaikan berhasil | • Tercatat mutasi `DEDUCTION` bertanda negatif `-X Token` dengan deskripsi sesi dan ID referensi yang akurat. | [x] PASSED |
+| **TC-REP-04** | **Auto-Refund Instan bila Gagal (NFR-09)** | Simulasikan gangguan rendering worker pada audio perbaikan | • Sistem secara otomatis membatalkan pemotongan dan mengembalikan saldo token pengguna dalam waktu $< 5$ detik dengan mutasi `REFUND`. | [x] PASSED |
+| **TC-REP-05** | **UC-15: Kustomisasi Granular Repair (FR-5.8)** | 1. Klik **"Kustomisasi Perbaikan"**.<br>2. Nonaktifkan modul tertentu (misal matikan Sub-Rumble cut, nyalakan Polarity Flip).<br>3. Klik **"Terapkan Perbaikan Kustom"** | • Request `POST /sessions/:id/repair-custom` berhasil dieksekusi.<br>• Hanya modul yang dicentang yang diterapkan ke audio stem.<br>• `RepairConfig` tersimpan di database dengan status `isApplied = true`. | [x] PASSED |
+| **TC-REP-06** | **Integritas Waktu & Preservasi Resolusi (NFR-03, NFR-04)** | Periksa durasi dan sample rate berkas `FIXED_...` di MinIO S3 | • Audio hasil perbaikan berformat 24-bit PCM WAV lossless.<br>• Durasi dan sinkronisasi zero-alignment antar-track tidak bergeser sama sekali. | [x] PASSED |
+
+---
+
 ## 3. Skenario Pengujian Alur Penuh (End-to-End Walkthrough) di Browser
 
 Anda dapat memverifikasi seluruh sistem dari hulu ke hilir secara berurutan dengan alur berikut:
@@ -117,29 +130,32 @@ Anda dapat memverifikasi seluruh sistem dari hulu ke hilir secara berurutan deng
 5. **Uji Koreksi Label**: Coba ganti label salah satu track melalui tombol *"Ubah"* $\rightarrow$ Pastikan label tersimpan (*TC-AI-03*).
 6. **Uji Finalisasi**: Klik tombol *"Konfirmasi & Lanjut ke Diagnostik Fasa (UC-13)"* (*TC-AI-07*).
 7. **Uji Diagnostik DSP & Health Score**: Klik tombol *"🔬 Diagnostik DSP (UC-13)"* $\rightarrow$ Amati perputaran radial meter Health Score, deteksi fasa/clipping, dan rekomendasi berbahasa Indonesia (*TC-DSP-01 s.d. TC-DSP-06*).
-8. **Uji Registrasi Akun Permanen**: Klik *"Daftar Akun"* di navbar $\rightarrow$ Masukkan email baru $\rightarrow$ Periksa bonus 5 token dan saldo dompet (*TC-AUTH-01*).
-9. **Uji Top-up Midtrans**: Pilih paket token di panel kanan $\rightarrow$ Klik *"Beli Paket via Midtrans"* $\rightarrow$ Klik *"Simulasi Konfirmasi Pembayaran"* $\rightarrow$ Pastikan saldo bertambah secara real-time (*TC-PAY-02, TC-PAY-03*).
+8. **Uji Eksekusi 1-Click Auto-Fix**: Klik tombol *"Terapkan Perbaikan (X Token)"* $\rightarrow$ Amati pemotongan token saldo, status sesi berubah menjadi `REPAIRED`, dan seluruh track tertandai centang hijau (*TC-REP-01 s.d. TC-REP-03*).
+9. **Uji Kustomisasi Granular Fixes**: Klik tombol *"Kustomisasi Perbaikan"* $\rightarrow$ Pilih/nonaktifkan modul perbaikan tertentu per track $\rightarrow$ Simpan (*TC-REP-05*).
+10. **Uji Registrasi Akun Permanen**: Klik *"Daftar Akun"* di navbar $\rightarrow$ Masukkan email baru $\rightarrow$ Periksa bonus 5 token dan saldo dompet (*TC-AUTH-01*).
+11. **Uji Top-up Midtrans**: Pilih paket token di panel kanan $\rightarrow$ Klik *"Beli Paket via Midtrans"* $\rightarrow$ Klik *"Simulasi Konfirmasi Pembayaran"* $\rightarrow$ Pastikan saldo bertambah secara real-time (*TC-PAY-02, TC-PAY-03*).
 
 ---
 
-## 4. Eksekusi Otomatis Pengujian (Automated Test Suites - 90 Tests)
+## 4. Eksekusi Otomatis Pengujian (Automated Test Suites - 108 Tests)
 
-Selain pengujian manual via browser di atas, seluruh fungsionalitas didukung oleh **90 Automated Unit & Integration Tests** yang dapat dieksekusi melalui terminal:
+Selain pengujian manual via browser di atas, seluruh fungsionalitas didukung oleh **108 Automated Unit & Integration Tests** yang dapat dieksekusi melalui terminal:
 
-### A. Menjalankan Backend Test Suite (56 Tests)
+### A. Menjalankan Backend Test Suite (64 Tests)
 ```bash
 cd backend
 npm test
 ```
-*Menguji*: Auth, Proteksi JWT, Guest Session, Dompet Token, Midtrans Webhook Idempotency, Multitrack S3 Ingestion, Zero-Aligned Sync, serta Integrasi API E2E UC-12 & UC-13.
+*Menguji*: Auth, Proteksi JWT, Guest Session, Dompet Token, Midtrans Webhook Idempotency, Multitrack S3 Ingestion, Zero-Aligned Sync, Integrasi API E2E UC-12 & UC-13, serta Automated & Granular Audio Repair Engine (UC-14 & UC-15).
 
-### B. Menjalankan Python Worker Test Suite (34 Tests)
+### B. Menjalankan Python Worker Test Suite (44 Tests)
 ```bash
 python3 -m pytest worker/tests -v
 ```
 *Menguji*:
 1. `worker/tests/test_ai_engine.py` (19 tests): Mel-Spectrogram 128 bins, Taksonomi 12 instrumen, Ambang batas confidence $< 0.80$, dan Deteksi Pasangan Multi-Mic.
 2. `worker/tests/test_dsp_engine.py` (15 tests): Korelasi Pearson, Mono Sum Loss dB, Deteksi Fake Stereo Haas, 4x True-Peak Inter-Sample Peak, Deteksi DC Offset, Filter Sub-Rumble, dan Kalkulator Mix Health Score.
+3. `worker/tests/test_repair_engine.py` (10 tests): Null Test Inversi Polaritas $180^\circ$, Penyelarasan Micro-Delay Pasangan Mikrofon, Restorasi Fake Stereo Haas ke True Mono, Eliminasi DC Offset, Filter Sub-Rumble $<35\text{ Hz}$, dan Headroom Gain Staging $-3.0\text{ dBFS}$.
 
 ---
 *Dokumen ini diverifikasi dan diperbarui secara otomatis pada 18 Oktober 2026.*
