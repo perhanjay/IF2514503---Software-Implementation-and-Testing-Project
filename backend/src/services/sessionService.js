@@ -830,7 +830,9 @@ export class SessionService {
 
         return {
           id: track.id,
+          name: track.fileName,
           fileName: track.fileName,
+          label: track.instrumentLabel || track.detectedLabel || 'Other',
           instrumentLabel: track.instrumentLabel || track.detectedLabel || 'Other',
           isStereo: track.isStereo,
           durationSec: track.durationSec,

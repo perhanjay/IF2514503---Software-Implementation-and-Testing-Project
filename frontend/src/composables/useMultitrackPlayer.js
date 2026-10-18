@@ -170,8 +170,8 @@ export function useMultitrackPlayer() {
 
         newTracks.push({
           id: t.id,
-          name: t.name,
-          label: t.label || 'Trek',
+          name: t.fileName || t.name || 'Trek Audio',
+          label: t.instrumentLabel || t.detectedLabel || t.label || 'Other',
           isStereo: t.isStereo,
           rawAudioUrl: t.rawAudioUrl,
           repairedAudioUrl: t.repairedAudioUrl,
