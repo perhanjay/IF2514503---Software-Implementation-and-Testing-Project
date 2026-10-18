@@ -1,7 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import SectionBadge from '../components/SectionBadge.vue'
 
 const emit = defineEmits(['close', 'uploaded'])
 
@@ -11,6 +10,20 @@ const isDragging = ref(false)
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const errorMsg = ref('')
+
+function handleKeyDown(e) {
+  if (e.key === 'Escape' && !uploading.value) {
+    emit('close')
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 function handleFileSelect(e) {
   const files = Array.from(e.target.files || [])
@@ -60,18 +73,26 @@ async function startUpload() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white border border-slate-200/90 max-w-xl w-full rounded-2xl p-7 shadow-2xl space-y-6">
+  <div 
+    @click.self="$emit('close')"
+    class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div 
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      class="bg-white border border-slate-200 max-w-xl w-full rounded-2xl p-7 shadow-xl space-y-6 animate-fade-in">
       
       <!-- Modal Header -->
       <div class="flex items-start justify-between border-b border-slate-100 pb-4">
         <div>
-          <SectionBadge label="Direct Ingestion" :pulse="false" />
-          <h3 class="font-display text-2xl text-slate-900 mt-2">Unggah Sesi Multitrack</h3>
+          <span class="text-xs font-semibold text-[#0052FF] bg-blue-50 px-2 py-0.5 rounded">Ingestion Studio</span>
+          <h3 id="modal-title" class="font-display text-2xl text-slate-900 mt-2">Unggah Sesi Multitrack</h3>
           <p class="text-xs text-slate-500 mt-0.5">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
         </div>
         <button 
           @click="$emit('close')" 
+          type="button"
+          aria-label="Tutup Dialog"
           class="text-slate-400 hover:text-slate-700 cursor-pointer text-xl font-bold p-1">
           ✕
         </button>
@@ -83,8 +104,8 @@ async function startUpload() {
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 font-mono-accent">
-            Judul Sesi / Lagu
+          <label class="block text-xs font-semibold text-slate-700 mb-1.5 font-mono-accent">
+            JUDUL SESI / NAMA PROYEK
           </label>
           <input 
             v-model="sessionTitle" 
@@ -94,12 +115,12 @@ async function startUpload() {
           />
         </div>
 
-        <!-- Dropzone Area -->
+        <!-- Dropzone Area with SVG Icon -->
         <div 
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleDrop"
-          :class="isDragging ? 'border-[#0052FF] bg-[#0052FF]/5' : 'border-slate-300 bg-[#FAFAFA]'"
+          :class="isDragging ? 'border-[#0052FF] bg-blue-50/30' : 'border-slate-300 bg-[#FAFAFA]'"
           class="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all relative group">
           
           <input 
@@ -110,12 +131,14 @@ async function startUpload() {
             class="absolute inset-0 opacity-0 cursor-pointer"
           />
 
-          <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white flex items-center justify-center mx-auto mb-3 shadow-accent text-2xl group-hover:scale-105 transition-transform">
-            🎙️
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#0052FF] border border-blue-200 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+            </svg>
           </div>
 
           <p class="text-sm font-semibold text-slate-800">
-            Tarik & jatuhkan stem ke sini, atau <span class="text-[#0052FF] underline">pilih berkas</span>
+            Tarik &amp; jatuhkan stem ke sini, atau <span class="text-[#0052FF] underline">pilih berkas</span>
           </p>
           <p class="text-xs text-slate-500 mt-1">
             Maksimal 2 GB per sesi multitrack • Bit-depth 24/32-bit float terjaga
@@ -143,7 +166,7 @@ async function startUpload() {
             <span class="font-bold text-[#0052FF]">{{ uploadProgress }}%</span>
           </div>
           <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
+            <div class="h-full bg-[#0052FF] transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
           </div>
         </div>
       </div>
@@ -159,7 +182,7 @@ async function startUpload() {
         <button 
           @click="startUpload" 
           :disabled="uploading || !selectedFiles.length"
-          class="px-6 py-2.5 bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] hover:brightness-110 disabled:opacity-50 text-white text-xs font-bold rounded-xl cursor-pointer shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all">
+          class="px-6 py-2.5 bg-[#0052FF] hover:bg-[#0043D6] disabled:opacity-50 text-white text-xs font-bold rounded-xl cursor-pointer shadow-accent transition-all">
           {{ uploading ? 'Mengunggah & Mengekstrak...' : 'Mulai Transmisi Audio' }}
         </button>
       </div>

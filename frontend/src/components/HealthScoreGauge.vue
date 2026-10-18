@@ -48,43 +48,31 @@ const colorConfig = computed(() => {
   if (props.score >= 90) {
     return {
       stroke: '#10B981', // emerald-500
-      glow: 'rgba(16, 185, 129, 0.25)',
       badgeBg: 'bg-emerald-50',
       badgeBorder: 'border-emerald-200',
-      badgeText: 'text-emerald-700',
-      icon: '✨'
+      badgeText: 'text-emerald-700'
     }
   } else if (props.score >= 65) {
     return {
       stroke: '#F59E0B', // amber-500
-      glow: 'rgba(245, 158, 11, 0.25)',
       badgeBg: 'bg-amber-50',
       badgeBorder: 'border-amber-200',
-      badgeText: 'text-amber-700',
-      icon: '⚠️'
+      badgeText: 'text-amber-700'
     }
   } else {
     return {
       stroke: '#EF4444', // red-500
-      glow: 'rgba(239, 68, 68, 0.25)',
       badgeBg: 'bg-rose-50',
       badgeBorder: 'border-rose-200',
-      badgeText: 'text-rose-700',
-      icon: '🚨'
+      badgeText: 'text-rose-700'
     }
   }
 })
 </script>
 
 <template>
-  <div class="bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-lg relative overflow-hidden">
-    <!-- Subtle glow background -->
-    <div 
-      class="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-all duration-700"
-      :style="{ backgroundColor: colorConfig.glow }"
-    />
-
-    <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+  <div class="bg-slate-50/70 text-slate-900 border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs relative">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
       
       <!-- Left: Radial SVG Gauge -->
       <div class="flex items-center gap-6">
@@ -95,7 +83,7 @@ const colorConfig = computed(() => {
               cx="64"
               cy="64"
               :r="radius"
-              stroke="#1E293B"
+              stroke="#E2E8F0"
               stroke-width="10"
               fill="transparent"
             />
@@ -110,13 +98,13 @@ const colorConfig = computed(() => {
               stroke-linecap="round"
               :stroke-dasharray="circumference"
               :stroke-dashoffset="strokeDashoffset"
-              class="transition-all duration-1000 ease-out"
+              class="transition-all duration-700 ease-out"
             />
           </svg>
 
           <!-- Inside score readout -->
           <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span class="font-display text-3xl font-bold leading-none tracking-tight">
+            <span class="font-display text-3xl font-bold leading-none tracking-tight text-slate-900">
               {{ Math.round(score) }}
             </span>
             <span class="font-mono-accent text-[9px] uppercase tracking-widest text-slate-400 mt-1">
@@ -130,55 +118,52 @@ const colorConfig = computed(() => {
           <div class="flex items-center justify-center md:justify-start gap-2">
             <span 
               :class="[colorConfig.badgeBg, colorConfig.badgeBorder, colorConfig.badgeText]"
-              class="font-mono-accent text-[11px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1">
-              <span>{{ colorConfig.icon }}</span>
-              <span>{{ rating }}</span>
+              class="font-mono-accent text-[11px] font-bold px-2.5 py-0.5 rounded-md border">
+              {{ rating }}
             </span>
-            <span class="font-mono-accent text-[11px] text-slate-400">
+            <span class="font-mono-accent text-[11px] text-slate-500">
               Mix Health Score
             </span>
           </div>
           
-          <h3 class="font-display text-xl sm:text-2xl text-white">
+          <h3 class="font-display text-xl sm:text-2xl text-slate-900">
             {{ ratingLabel }}
           </h3>
-          
-          <p class="text-xs text-slate-400 max-w-sm leading-relaxed">
-            Audit komprehensif fase, clipping inter-sample, DC offset, dan integritas multi-mikrofon berdasarkan standar ITU-R BS.1770-4.
-          </p>
         </div>
       </div>
 
       <!-- Right: Stems Breakdown Stats & Token Estimation -->
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-        <div class="grid grid-cols-3 gap-2.5 bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 text-center min-w-[220px]">
+        <div class="grid grid-cols-3 gap-2.5 bg-white border border-slate-200/90 rounded-xl p-3.5 text-center min-w-[220px] shadow-xs">
           <div>
-            <span class="font-mono-accent text-xs font-bold text-emerald-400 block">
+            <span class="font-mono-accent text-xs font-bold text-emerald-600 block">
               {{ cleanTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate-400 uppercase">Bersih</span>
+            <span class="font-mono-accent text-[10px] text-slate-500 uppercase">Bersih</span>
           </div>
-          <div class="border-x border-slate-700/60">
-            <span class="font-mono-accent text-xs font-bold text-amber-400 block">
+          <div class="border-x border-slate-200">
+            <span class="font-mono-accent text-xs font-bold text-amber-600 block">
               {{ warningTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate-400 uppercase">Warning</span>
+            <span class="font-mono-accent text-[10px] text-slate-500 uppercase">Warning</span>
           </div>
           <div>
-            <span class="font-mono-accent text-xs font-bold text-rose-400 block">
+            <span class="font-mono-accent text-xs font-bold text-rose-600 block">
               {{ criticalTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate-400 uppercase">Kritis</span>
+            <span class="font-mono-accent text-[10px] text-slate-500 uppercase">Kritis</span>
           </div>
         </div>
 
-        <div class="bg-gradient-to-r from-[#0052FF]/20 to-[#4D7CFF]/20 border border-[#0052FF]/40 rounded-xl p-3.5 text-center sm:text-left flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-[#0052FF] text-white flex items-center justify-center font-display text-sm shrink-0">
-            ⚡
+        <div class="bg-white border border-slate-200/90 rounded-xl p-3.5 text-center sm:text-left flex items-center gap-3 shadow-xs">
+          <div class="w-8 h-8 rounded-lg bg-blue-50 text-[#0052FF] border border-blue-200 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </div>
           <div class="text-xs">
-            <div class="font-semibold text-slate-200">Estimasi Perbaikan:</div>
-            <div class="font-mono-accent font-bold text-cyan-400">{{ estimatedTokens }} Token Polaris</div>
+            <div class="font-semibold text-slate-700">Estimasi Perbaikan:</div>
+            <div class="font-mono-accent font-bold text-[#0052FF]">{{ estimatedTokens }} Token Polaris</div>
           </div>
         </div>
       </div>

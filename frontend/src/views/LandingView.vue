@@ -43,28 +43,22 @@ onMounted(async () => {
   <div class="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
     <AppNavbar />
 
-    <!-- HERO SECTION (Asymmetric 1.1fr / 0.9fr Layout) -->
-    <section class="relative pt-16 pb-24 md:pt-24 md:pb-36 overflow-hidden">
-      <!-- Ambient Radial Glows -->
-      <div class="radial-glow top-0 left-1/4 w-[500px] h-[500px]"></div>
-      <div class="radial-glow -top-24 right-10 w-[450px] h-[450px]"></div>
-
+    <!-- HERO SECTION (Asymmetric 1.15fr / 0.85fr Workbench Layout) -->
+    <section class="relative pt-12 pb-20 md:pt-20 md:pb-28">
       <div class="max-w-6xl mx-auto px-6">
         <div class="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-12 lg:gap-8 items-center">
           
           <!-- Left Column: Typography & CTAs -->
-          <div class="space-y-8 z-10">
-            <SectionBadge label="Zero-Loss Audio Prep Engine" />
-
+          <div class="space-y-6 z-10">
             <div class="space-y-4">
-              <h1 class="font-display text-4xl sm:text-5xl lg:text-[4.25rem] leading-[1.08] tracking-[-0.02em] text-slate-900">
+              <h1 class="font-display text-4xl sm:text-5xl lg:text-[4rem] leading-[1.08] tracking-[-0.02em] text-slate-900">
                 Diagnostik fasa presisi, <br class="hidden sm:inline" />
                 perbaikan stem <br class="hidden sm:inline" />
-                <span class="gradient-text gradient-underline">tanpa kompromi.</span>
+                <span class="text-[#0052FF]">tanpa kompromi.</span>
               </h1>
 
-              <p class="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl font-normal pt-2">
-                Otomatisasi pembersihan multitrack mixing berbasis hybrid DSP & AI. Deteksi fasa terbalik, fake stereo, DC offset, dan normalisasi headroom secara transparan dalam hitungan detik.
+              <p class="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl font-normal pt-1">
+                Otomatisasi pembersihan multitrack mixing berbasis hybrid DSP &amp; AI. Deteksi fasa terbalik, fake stereo, DC offset, dan normalisasi headroom secara transparan dalam hitungan detik.
               </p>
             </div>
 
@@ -73,14 +67,13 @@ onMounted(async () => {
               <button 
                 @click="launchStudioInstantly"
                 :disabled="isLaunching"
-                class="inline-flex items-center justify-center gap-3 px-7 py-4 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white font-semibold text-sm shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer">
+                class="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl bg-[#0052FF] hover:bg-[#0043D6] text-white font-semibold text-sm shadow-accent hover:shadow-accent-lg transition-all cursor-pointer">
                 <span>{{ isLaunching ? 'Menyiapkan Studio...' : 'Buka Studio Instan (Tanpa Login)' }}</span>
-                <span class="font-mono text-base">→</span>
               </button>
 
               <router-link 
                 to="/register"
-                class="inline-flex items-center justify-center px-6 py-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-sm hover:border-[#0052FF]/40 transition-all shadow-sm">
+                class="inline-flex items-center justify-center px-6 py-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold text-sm hover:border-[#0052FF]/40 transition-all shadow-sm">
                 Daftar Akun Permanen
               </router-link>
             </div>
@@ -102,46 +95,48 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Right Column: Abstract Animated Hero Composition -->
-          <div class="relative flex items-center justify-center lg:justify-end">
-            <div class="relative w-[340px] h-[340px] sm:w-[420px] sm:h-[420px]">
-              
-              <!-- Rotating Outer Ring -->
-              <div class="absolute inset-0 rounded-full border border-dashed border-[#0052FF]/30 animate-slow-rotate"></div>
-              
-              <!-- Subtle Background Disc -->
-              <div class="absolute inset-8 rounded-full bg-gradient-to-tr from-slate-100 to-white shadow-xl border border-slate-200/60"></div>
-
-              <!-- Floating Card 1: Phase Correlation Lissajous Status -->
-              <div class="absolute -top-4 -left-4 sm:top-2 sm:-left-6 w-56 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-slate-200 shadow-lg animate-float-slow z-20">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="font-mono-accent text-[10px] text-slate-400 uppercase tracking-wider">Korelasi Fasa</span>
-                  <span class="text-[10px] font-bold font-mono-accent px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200">-0.84 INV</span>
+          <!-- Right Column: Honest Product Preview Card (R-17 & R-38 Compliance) -->
+          <div class="flex items-center justify-center lg:justify-end">
+            <div class="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-md space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span class="font-display text-sm font-semibold text-slate-900">Console Telemetry</span>
                 </div>
-                <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mb-2">
-                  <div class="h-full bg-rose-500 w-[20%]"></div>
-                </div>
-                <p class="text-[11px] text-slate-600 font-medium">Overhead L/R: Terdeteksi pembatalan frekuensi rendah.</p>
+                <span class="text-[10px] font-mono-accent font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-500">
+                  [PREVIEW]
+                </span>
               </div>
 
-              <!-- Floating Card 2: AI Stem Detection Status -->
-              <div class="absolute -bottom-6 -right-2 sm:bottom-4 sm:-right-4 w-60 bg-[#0F172A] text-white rounded-2xl p-4 border border-slate-800 shadow-2xl animate-float-fast z-20">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="font-mono-accent text-[10px] text-cyan-400 uppercase tracking-wider">AI Classifier</span>
-                  <span class="text-[10px] font-mono-accent text-emerald-400 font-bold">98.4% MATCH</span>
+              <!-- Paired Track Demonstration -->
+              <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-medium text-slate-700">Kick In / Kick Sub (Mic Pair)</span>
+                  <span class="font-mono-accent text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                    +0.92 Phase Sync
+                  </span>
                 </div>
-                <div class="flex items-center gap-2 mb-2">
-                  <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-dot"></div>
-                  <span class="text-xs font-semibold text-slate-200">Kick In / Kick Sub</span>
+                <div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-emerald-500 w-[92%]"></div>
                 </div>
-                <p class="text-[11px] text-slate-400">Microphone time alignment: Auto-adjusted +2.3ms</p>
+                <div class="flex justify-between text-[11px] text-slate-500 font-mono-accent">
+                  <span>Delta Alignment: +2.1ms</span>
+                  <span>Stereo Haar: 0.0% Clean</span>
+                </div>
               </div>
 
-              <!-- Center Core Graphic -->
-              <div class="absolute inset-20 rounded-2xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] shadow-accent-lg flex flex-col items-center justify-center text-white p-6 text-center">
-                <span class="font-display text-4xl mb-1">0.0</span>
-                <span class="font-mono-accent text-[11px] uppercase tracking-widest text-cyan-200">dB True Peak</span>
-                <span class="text-[10px] text-white/80 mt-2 font-medium">Headroom Normalized</span>
+              <!-- Core Metrics Grid -->
+              <div class="grid grid-cols-2 gap-3 pt-1 text-xs">
+                <div class="border border-slate-200 rounded-xl p-3 bg-[#FAFAFA]">
+                  <span class="text-[10px] font-mono-accent text-slate-500 block">TRUE-PEAK HEADROOM</span>
+                  <span class="font-display text-xl text-slate-900 font-bold block mt-0.5">-0.3 dBFS</span>
+                  <span class="text-[10px] text-emerald-600 font-medium">ITU-R BS.1770 Guard</span>
+                </div>
+                <div class="border border-slate-200 rounded-xl p-3 bg-[#FAFAFA]">
+                  <span class="text-[10px] font-mono-accent text-slate-500 block">DC OFFSET LEVEL</span>
+                  <span class="font-display text-xl text-slate-900 font-bold block mt-0.5">0.00%</span>
+                  <span class="text-[10px] text-emerald-600 font-medium">Pure Center Balance</span>
+                </div>
               </div>
             </div>
           </div>
@@ -150,14 +145,14 @@ onMounted(async () => {
       </div>
     </section>
 
-    <!-- INVERTED CONTRAST SECTION (Deep Slate #0F172A with Dot Grid Texture) -->
-    <section class="bg-[#0F172A] text-white py-24 md:py-36 relative overflow-hidden bg-dot-pattern">
-      <div class="radial-glow top-1/2 left-0 w-[400px] h-[400px]"></div>
-      
-      <div class="max-w-6xl mx-auto px-6 relative z-10 space-y-16">
+    <!-- INVERTED CONTRAST SECTION (Clean Deep Slate Studio Console) -->
+    <section class="bg-[#0F172A] text-white py-20 md:py-28">
+      <div class="max-w-6xl mx-auto px-6 space-y-14">
         <!-- Section Header -->
-        <div class="text-center max-w-2xl mx-auto space-y-4">
-          <SectionBadge label="Fitur Diagnostik Mendalam" />
+        <div class="text-center max-w-2xl mx-auto space-y-3">
+          <span class="inline-block text-xs font-semibold text-cyan-400 font-mono-accent uppercase tracking-wider">
+            Fitur Diagnostik Mendalam
+          </span>
           <h2 class="font-display text-3xl sm:text-4xl lg:text-5xl leading-tight">
             Standar audit audio studio tanpa tebak-tebakan.
           </h2>
@@ -166,57 +161,70 @@ onMounted(async () => {
           </p>
         </div>
 
-        <!-- 3 Feature Cards Grid -->
+        <!-- 3 Feature Cards Grid with Purposeful SVG Icons -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           
           <!-- Card 1 -->
-          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 hover:border-[#0052FF]/60 transition-all group">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] flex items-center justify-center text-white text-xl mb-6 shadow-accent group-hover:scale-110 transition-transform">
-              ⚡
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-7 hover:border-slate-700 transition-all flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="w-11 h-11 rounded-xl bg-blue-600/20 text-[#4D7CFF] border border-blue-500/30 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 class="font-display text-xl text-white">Deteksi Fasa &amp; Comb Filtering</h3>
+              <p class="text-slate-400 text-xs sm:text-sm leading-relaxed font-normal">
+                Memindai korelasi stereo dari -1.0 hingga +1.0 serta menyelaraskan waktu mikrofon berpasangan dalam skala sub-milidetik untuk mencegah vokal dan bass terdengar hampa.
+              </p>
             </div>
-            <h3 class="font-display text-xl text-white mb-2">Deteksi Fasa & Comb Filtering</h3>
-            <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
-              Memindai korelasi stereo dari -1.0 hingga +1.0 serta menyelaraskan waktu mikrofon berpasangan dalam skala sub-milidetik untuk mencegah vokal dan bass terdengar hampa.
-            </p>
+            <div class="mt-6 pt-4 border-t border-slate-800 text-[11px] text-slate-400 font-mono-accent">
+              Sub-sample Micro-delay
+            </div>
           </div>
 
-          <!-- Card 2: Featured 2px Gradient Stroke -->
-          <div class="gradient-border-card group">
-            <div class="gradient-border-card-inner p-8 bg-[#0F172A]! text-white flex flex-col justify-between">
-              <div>
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] flex items-center justify-center text-white text-xl mb-6 shadow-accent group-hover:scale-110 transition-transform">
-                  🎯
-                </div>
-                <h3 class="font-display text-xl text-white mb-2">Pembersihan Fake Stereo</h3>
-                <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                  Mengidentifikasi manipulasi Haas effect artifisial yang merusak kompatibilitas mono. Kembalikan ke true mono murni tanpa degradasi frekuensi.
-                </p>
+          <!-- Card 2 -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-7 hover:border-slate-700 transition-all flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="w-11 h-11 rounded-xl bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                </svg>
               </div>
-              <div class="mt-6 pt-4 border-t border-slate-800 font-mono-accent text-[11px] text-cyan-400">
-                100% Mono-Safe Processing
-              </div>
+              <h3 class="font-display text-xl text-white">Pembersihan Fake Stereo</h3>
+              <p class="text-slate-400 text-xs sm:text-sm leading-relaxed font-normal">
+                Mengidentifikasi manipulasi Haas effect artifisial yang merusak kompatibilitas mono. Kembalikan ke true mono murni tanpa degradasi frekuensi.
+              </p>
+            </div>
+            <div class="mt-6 pt-4 border-t border-slate-800 text-[11px] text-cyan-400 font-mono-accent">
+              100% Mono-Safe Processing
             </div>
           </div>
 
           <!-- Card 3 -->
-          <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-8 hover:border-[#0052FF]/60 transition-all group">
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] flex items-center justify-center text-white text-xl mb-6 shadow-accent group-hover:scale-110 transition-transform">
-              📊
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-7 hover:border-slate-700 transition-all flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="w-11 h-11 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h3 class="font-display text-xl text-white">True-Peak &amp; DC Offset Guard</h3>
+              <p class="text-slate-400 text-xs sm:text-sm leading-relaxed font-normal">
+                Kalkulasi 4x oversampling untuk menangkal inter-sample peaks (ISP), membuang getaran subsonik di bawah 30Hz, dan menstabilkan gain staging DAW.
+              </p>
             </div>
-            <h3 class="font-display text-xl text-white mb-2">True-Peak & DC Offset Guard</h3>
-            <p class="text-slate-400 text-xs sm:text-sm leading-relaxed">
-              Kalkulasi 4x oversampling untuk menangkal inter-sample peaks (ISP), membuang getaran subsonik di bawah 30Hz, dan menstabilkan gain staging DAW.
-            </p>
+            <div class="mt-6 pt-4 border-t border-slate-800 text-[11px] text-emerald-400 font-mono-accent">
+              ITU-R BS.1770-4 Standard
+            </div>
           </div>
 
         </div>
       </div>
     </section>
 
-    <!-- PRICING / TOKEN TIERS (Midtrans Gateway Highlight) -->
-    <section class="py-24 md:py-36 max-w-6xl mx-auto px-6 w-full space-y-16">
-      <div class="text-center max-w-2xl mx-auto space-y-4">
-        <SectionBadge label="Paket Kuota Fleksibel" />
+    <!-- PRICING / TOKEN TIERS (Clean Studio Capacity Presentation) -->
+    <section class="py-20 md:py-28 max-w-6xl mx-auto px-6 w-full space-y-12">
+      <div class="text-center max-w-2xl mx-auto space-y-3">
         <h2 class="font-display text-3xl sm:text-4xl text-slate-900">
           Bayar sesuai kebutuhan produksi studio Anda.
         </h2>
@@ -225,33 +233,33 @@ onMounted(async () => {
         </p>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
         <div 
           v-for="p in packages" 
           :key="p.id" 
-          :class="p.featured ? 'gradient-border-card shadow-xl md:-translate-y-3' : 'bg-white border border-slate-200/80 shadow-md'"
-          class="rounded-2xl transition-all">
-          <div :class="p.featured ? 'gradient-border-card-inner p-8' : 'p-8'" class="space-y-6">
+          class="bg-white border border-slate-200 rounded-2xl p-7 shadow-sm flex flex-col justify-between">
+          <div class="space-y-5">
             <div class="flex justify-between items-center">
-              <span class="font-mono-accent text-xs uppercase tracking-wider text-slate-500">{{ p.name }}</span>
-              <span v-if="p.featured" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#0052FF]/10 text-[#0052FF] font-mono-accent">
-                POPULAR
+              <span class="text-xs font-semibold text-slate-700">{{ p.name }}</span>
+              <span class="font-mono-accent text-xs font-semibold text-[#0052FF] bg-blue-50 px-2 py-0.5 rounded">
+                {{ p.tokens }} Token
               </span>
             </div>
 
             <div>
-              <span class="font-display text-4xl text-slate-900 font-normal">Rp {{ p.priceIdr.toLocaleString() }}</span>
-              <span class="text-xs text-slate-500 block mt-1 font-mono-accent">/ {{ p.tokens }} Token Perbaikan Sesi</span>
+              <span class="font-display text-3xl sm:text-4xl text-slate-900 font-normal">Rp {{ p.priceIdr.toLocaleString() }}</span>
+              <span class="text-xs text-slate-500 block mt-1">Total kapasitas perbaikan stem sesi</span>
             </div>
 
             <p class="text-xs text-slate-600 leading-relaxed border-t border-slate-100 pt-4">
               {{ p.description }}
             </p>
+          </div>
 
+          <div class="pt-6">
             <button 
               @click="launchStudioInstantly"
-              :class="p.featured ? 'bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white shadow-accent' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'"
-              class="w-full py-3 rounded-xl font-semibold text-xs transition-all cursor-pointer">
+              class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-colors cursor-pointer">
               Gunakan Sekarang
             </button>
           </div>
@@ -260,14 +268,14 @@ onMounted(async () => {
     </section>
 
     <!-- FOOTER -->
-    <footer class="mt-auto border-t border-slate-200 bg-white py-12">
+    <footer class="mt-auto border-t border-slate-200 bg-white py-8">
       <div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
         <div class="flex items-center gap-2">
           <span class="font-display text-slate-900 font-bold text-sm">Polaris Audio</span>
-          <span>— IF2514503 Software Implementation & Testing</span>
+          <span>: IF2514503 Software Implementation and Testing</span>
         </div>
         <div>
-          <span>Design Style: Minimalist Modern (Electric Blue & Calistoga)</span>
+          <span>Polaris Audio Studio Prep Suite</span>
         </div>
       </div>
     </footer>

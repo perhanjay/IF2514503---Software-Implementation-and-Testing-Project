@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import SectionBadge from '../components/SectionBadge.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -34,40 +33,33 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FAFAFA] flex flex-col justify-center items-center p-6 relative overflow-hidden selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
-    <!-- Ambient Radial Glows -->
-    <div class="radial-glow top-0 right-1/4 w-[500px] h-[500px]"></div>
-    <div class="radial-glow bottom-0 left-10 w-[450px] h-[450px]"></div>
-
-    <!-- Top Navigation Link -->
-    <div class="w-full max-w-md flex justify-between items-center mb-6 z-10">
-      <router-link to="/" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">
-        <span class="font-mono text-sm">←</span>
+  <div class="min-h-screen bg-[#FAFAFA] flex flex-col justify-center items-center p-6 selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
+    <!-- Top Navigation Links -->
+    <div class="w-full max-w-md flex justify-between items-center mb-6">
+      <router-link to="/" class="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">
         <span>Kembali ke Beranda</span>
       </router-link>
-      <router-link to="/dashboard" class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0052FF] hover:underline font-mono-accent">
+      <router-link to="/dashboard" class="inline-flex items-center text-xs font-semibold text-[#0052FF] hover:underline font-mono-accent">
         <span>Studio Instan</span>
-        <span>→</span>
       </router-link>
     </div>
 
     <!-- Main Card -->
-    <div class="max-w-md w-full bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl relative z-10">
+    <div class="max-w-md w-full bg-white border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm">
       <div class="text-center mb-8">
         <router-link to="/" class="inline-block">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0052FF] to-[#4D7CFF] text-white flex items-center justify-center font-display text-2xl shadow-accent mx-auto mb-4 hover:scale-105 transition-transform">
+          <div class="w-12 h-12 rounded-2xl bg-[#0052FF] text-white flex items-center justify-center font-display text-2xl shadow-accent mx-auto mb-4 hover:bg-[#0043D6] transition-colors">
             P
           </div>
         </router-link>
-        <div class="flex justify-center mb-3">
-          <SectionBadge label="Registrasi Studio" />
-        </div>
         <h1 class="font-display text-2xl sm:text-3xl text-slate-900 tracking-tight">Daftar Akun Baru</h1>
         <p class="text-xs sm:text-sm text-slate-500 mt-1">Dapatkan bonus 5 token gratis untuk menguji perbaikan stem sesi mixing Anda</p>
       </div>
 
-      <div v-if="errorMsg" class="bg-rose-50 border border-rose-200/80 text-rose-700 text-xs rounded-xl p-3.5 mb-6 flex items-start gap-2.5">
-        <span class="text-rose-500 font-bold">⚠️</span>
+      <div v-if="errorMsg" class="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl p-3.5 mb-6 flex items-start gap-2.5">
+        <svg class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
         <div class="leading-relaxed">{{ errorMsg }}</div>
       </div>
 
@@ -78,8 +70,8 @@ async function handleRegister() {
             v-model="name" 
             type="text" 
             required 
-            placeholder="Muhammad Iqbal Ferhan"
-            class="w-full bg-slate-50/70 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all font-sans"
+            placeholder="Nama Lengkap Engineer"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all"
           />
         </div>
 
@@ -90,7 +82,7 @@ async function handleRegister() {
             type="email" 
             required 
             placeholder="engineer@studio.com"
-            class="w-full bg-slate-50/70 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all font-sans"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all"
           />
         </div>
 
@@ -101,15 +93,15 @@ async function handleRegister() {
             type="password" 
             required 
             placeholder="Minimal 8 karakter alfanumerik"
-            class="w-full bg-slate-50/70 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all font-sans"
+            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/20 transition-all"
           />
-          <span class="text-[11px] text-slate-400 mt-1.5 block font-mono-accent">Min. 8 karakter (kombinasi huruf & angka)</span>
+          <span class="text-[11px] text-slate-400 mt-1.5 block">Minimal 8 karakter (kombinasi huruf &amp; angka)</span>
         </div>
 
         <button 
           type="submit" 
           :disabled="loading"
-          class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0052FF] to-[#4D7CFF] text-white font-semibold text-sm shadow-accent hover:shadow-accent-lg hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 transition-all cursor-pointer mt-3">
+          class="w-full py-3.5 rounded-xl bg-[#0052FF] hover:bg-[#0043D6] text-white font-semibold text-sm shadow-accent transition-all cursor-pointer mt-3">
           {{ loading ? 'Mendaftarkan Akun...' : 'Daftar & Klaim 5 Token' }}
         </button>
       </form>

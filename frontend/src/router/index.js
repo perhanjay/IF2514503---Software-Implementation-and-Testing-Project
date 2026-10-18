@@ -3,12 +3,14 @@ import LandingView from '../views/LandingView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import DashboardView from '../views/DashboardView.vue';
+import BillingView from '../views/BillingView.vue';
 
 const routes = [
   { path: '/', component: LandingView },
   { path: '/login', component: LoginView },
   { path: '/register', component: RegisterView },
   { path: '/dashboard', component: DashboardView },
+  { path: '/billing', component: BillingView, alias: '/wallet' },
 ];
 
 const router = createRouter({
