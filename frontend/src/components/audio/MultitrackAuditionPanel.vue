@@ -21,15 +21,34 @@ const emit = defineEmits(['close'])
 
 const player = useMultitrackPlayer()
 
-// Auto-pause bila panel ditutup (v-show = false)
+// Auto-pause bila panel ditutup (v-show = false) & auto-reload jika dibuka kembali dan ada perbaikan baru
 watch(() => props.isOpen, (open) => {
   if (!open && player.isPlaying.value) {
     player.pause()
+  } else if (open) {
+    const hasPendingRepaired = player.tracks.value.some(t => !t.hasRepairedAudio)
+    if (props.session?.status === 'REPAIRED' && hasPendingRepaired && !isFetchingSources.value && !player.isLoading.value) {
+      loadAudioSources()
+    }
   }
 })
 
+// Watcher: jika status sesi berubah menjadi REPAIRED atau data sesi di-update dari luar (repair auto/custom)
+watch(
+  [() => props.session?.status, () => props.session?.updatedAt],
+  ([newStatus, newUpdated], [oldStatus, oldUpdated]) => {
+    if (newStatus === 'REPAIRED' && (oldStatus !== 'REPAIRED' || newUpdated !== oldUpdated)) {
+      loadAudioSources()
+    }
+  }
+)
+
 const isFetchingSources = ref(false)
 const fetchError = ref(null)
+
+const hasAnyRepairedAudio = computed(() => {
+  return player.tracks.value.some(t => t.hasRepairedAudio)
+})
 
 // Format waktu mm:ss.ms
 function formatTime(sec) {
@@ -44,7 +63,9 @@ async function loadAudioSources() {
   isFetchingSources.value = true
   fetchError.value = null
   try {
-    const res = await axios.get(`/api/v1/sessions/${props.session.id}/audio-sources`)
+    const res = await axios.get(`/api/v1/sessions/${props.session.id}/audio-sources`, {
+      params: { _t: Date.now() }
+    })
     const tracksData = res.data.tracks || []
     if (tracksData.length === 0) {
       throw new Error('Tidak ada stem audio yang tersedia pada sesi ini.')
@@ -119,6 +140,23 @@ onUnmounted(() => {
       </div>
 
       <div class="flex items-center gap-2 self-start sm:self-auto font-mono-accent text-xs">
+        <button
+          type="button"
+          @click="loadAudioSources"
+          :disabled="isFetchingSources || player.isLoading.value"
+          title="Sinkronkan ulang audio dengan hasil perbaikan terbaru"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium cursor-pointer shadow-2xs transition-all disabled:opacity-50">
+          <svg 
+            class="w-3.5 h-3.5 text-slate-500" 
+            :class="{ 'animate-spin': isFetchingSources || player.isLoading.value }" 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor" 
+            stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Sinkronkan Audio</span>
+        </button>
         <span class="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-semibold">
           {{ player.tracks.value.length }} Stems Dimuat
         </span>
@@ -226,8 +264,8 @@ onUnmounted(() => {
                     class="w-2 h-2 rounded-full bg-[#0052FF] shadow-[0_0_6px_rgba(0,82,255,0.6)]" 
                   />
                 </div>
-                <span class="text-[10px] text-blue-700/80 font-normal leading-tight">
-                  Penyelarasan fasa, DC, & headroom
+                <span class="text-[10px] font-normal leading-tight" :class="hasAnyRepairedAudio ? 'text-blue-700/80' : 'text-amber-700/80'">
+                  {{ hasAnyRepairedAudio ? 'Penyelarasan fasa, DC, & headroom aktif' : 'Belum diperbaiki (Mode B = Audio mentah)' }}
                 </span>
               </button>
             </div>
@@ -387,6 +425,13 @@ onUnmounted(() => {
                   </span>
                   <span v-else class="font-mono-accent text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold border border-slate-200 shrink-0">
                     MONO
+                  </span>
+                  <!-- DSP Status Badge -->
+                  <span v-if="t.hasRepairedAudio" class="font-mono-accent text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 shrink-0" title="Audio hasil perbaikan DSP telah dimuat ke buffer player">
+                    DSP SIAP
+                  </span>
+                  <span v-else class="font-mono-accent text-[9px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200 shrink-0" title="Belum diperbaiki atau buffer belum disinkronkan. Mode B memutar audio mentah.">
+                    DSP PENDING
                   </span>
                 </div>
                 <div class="text-[11px] text-slate-400 font-mono-accent">

@@ -146,16 +146,20 @@ export function useMultitrackPlayer() {
         totalLoadedSteps++
         loadingProgress.value = Math.round((totalLoadedSteps / totalSteps) * 100)
 
+        let hasRepairedAudio = false
         let repairedBuffer = null
         if (t.repairedAudioUrl) {
           try {
             repairedBuffer = await fetchAndDecode(ctx, t.repairedAudioUrl)
+            hasRepairedAudio = Boolean(repairedBuffer)
           } catch (err) {
             console.warn(`Gagal memuat repaired buffer untuk stem ${t.name}, fallback ke raw:`, err)
             repairedBuffer = rawBuffer
+            hasRepairedAudio = false
           }
         } else {
           repairedBuffer = rawBuffer
+          hasRepairedAudio = false
         }
         totalLoadedSteps++
         loadingProgress.value = Math.round((totalLoadedSteps / totalSteps) * 100)
@@ -177,6 +181,7 @@ export function useMultitrackPlayer() {
           repairedAudioUrl: t.repairedAudioUrl,
           rawBuffer,
           repairedBuffer,
+          hasRepairedAudio,
           duration: trackDuration,
           volume: 1.0,
           pan: 0.0,
