@@ -327,5 +327,41 @@ describe('Phase T3: Multitrack Ingestion & Alignment Verification (UC-10, UC-11)
       assert.equal(detailRes.body.session.id, directSessionId);
       assert.equal(detailRes.body.session.tracks.length, 2);
     });
+
+    it('HP-06: harus dapat mengubah judul sesi (Rename Session)', async () => {
+      // 1. Valid rename
+      const res = await request(app)
+        .patch(`/api/v1/sessions/${directSessionId}/title`)
+        .set('Authorization', `Bearer ${userJwtToken}`)
+        .send({ title: 'New Mixing Session Mastered' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.session.title, 'New Mixing Session Mastered');
+
+      // 2. Reject empty title
+      const emptyRes = await request(app)
+        .patch(`/api/v1/sessions/${directSessionId}/title`)
+        .set('Authorization', `Bearer ${userJwtToken}`)
+        .send({ title: '   ' });
+
+      assert.equal(emptyRes.status, 400);
+    });
+
+    it('HP-07: harus dapat menghapus sesi multitrack beserta seluruh relasinya (Delete Session)', async () => {
+      // 1. Delete session
+      const res = await request(app)
+        .delete(`/api/v1/sessions/${directSessionId}`)
+        .set('Authorization', `Bearer ${userJwtToken}`);
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.message, 'Sesi berhasil dihapus');
+
+      // 2. Verifikasi sesi tidak ditemukan lagi
+      const checkRes = await request(app)
+        .get(`/api/v1/sessions/${directSessionId}`)
+        .set('Authorization', `Bearer ${userJwtToken}`);
+
+      assert.equal(checkRes.status, 404);
+    });
   });
 });
