@@ -8,6 +8,7 @@ import UploadSessionModal from './UploadSessionModal.vue'
 import TrackClassificationCard from '../components/TrackClassificationCard.vue'
 import HealthScoreGauge from '../components/HealthScoreGauge.vue'
 import DiagnosticTrackCard from '../components/DiagnosticTrackCard.vue'
+import MultitrackAuditionModal from '../components/audio/MultitrackAuditionModal.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -47,6 +48,9 @@ const repairingSessionId = ref(null)
 const showCustomRepairModal = ref(false)
 const activeRepairSession = ref(null)
 const customRepairSettings = ref({})
+
+const showAuditionModal = ref(false)
+const activeAuditionSession = ref(null)
 
 const sessions = ref([])
 const showUploadModal = ref(false)
@@ -286,6 +290,16 @@ async function handleRepairCustom() {
   } finally {
     repairingSessionId.value = null
   }
+}
+
+function openAuditionModal(session) {
+  activeAuditionSession.value = session
+  showAuditionModal.value = true
+}
+
+function closeAuditionModal() {
+  showAuditionModal.value = false
+  activeAuditionSession.value = null
 }
 
 function countTrackChannels(session) {
@@ -657,6 +671,18 @@ onMounted(async () => {
                   </button>
 
                   <button 
+                    v-if="s.status === 'REPAIRED'"
+                    @click="openAuditionModal(s)"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
+                    title="Buka Studio Audisi Komparasi A/B">
+                    <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Audisi A/B</span>
+                  </button>
+
+                  <button 
                     @click="toggleSession(s.id)"
                     class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
                     <span>{{ isSessionExpanded(s.id) ? 'Tutup Sesi' : 'Buka Sesi' }}</span>
@@ -983,6 +1009,15 @@ onMounted(async () => {
                           class="px-3 py-2 rounded-lg bg-white hover:bg-emerald-100/50 text-emerald-800 border border-emerald-300 text-xs font-semibold shadow-2xs transition-all cursor-pointer">
                           Sesuaikan Ulang
                         </button>
+                        <button 
+                          @click="openAuditionModal(s)"
+                          class="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                          <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Dengar Perbandingan A/B</span>
+                        </button>
                       </div>
                     </div>
 
@@ -1192,5 +1227,12 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- Modal Multitrack Audisi A/B -->
+    <MultitrackAuditionModal 
+      v-if="showAuditionModal && activeAuditionSession"
+      :session="activeAuditionSession"
+      @close="closeAuditionModal"
+    />
   </div>
 </template>
