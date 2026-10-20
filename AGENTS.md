@@ -4,7 +4,7 @@
 
 ---
 
-## 🧰 Tech Stack
+## Tech Stack
 
 | Layer | Technologies & Runtimes |
 |---|---|
@@ -100,7 +100,7 @@ python scripts/generate_sample_stems.py
 
 ---
 
-## 🏛️ Architecture & Directory Layout
+## Architecture & Directory Layout
 
 ```text
 ├── backend/                  # Node.js Express API & Business Logic
@@ -137,7 +137,7 @@ python scripts/generate_sample_stems.py
 
 ---
 
-## 📐 Coding Conventions & Guidelines
+## Coding Conventions & Guidelines
 
 ### Backend & API
 - **ES Modules**: Always use native ES Module `import`/`export`.
@@ -166,7 +166,7 @@ python scripts/generate_sample_stems.py
 
 ---
 
-## 🔒 Rules & Constraints
+## Rules & Constraints
 
 1. **Never edit Prisma migrations directly**: Always generate migrations via `npx prisma migrate dev`.
 2. **Never commit secrets**: Keep all credentials, tokens, and keys in `.env` (gitignored). Update `.env.example` when adding new configuration variables.

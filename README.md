@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎛️ Polaris Audio
+# Polaris Audio
 
 **Intelligent Multitrack Mixing Preparation & Deterministic DSP Diagnostics Workstation**
 
@@ -27,9 +27,9 @@
 
 ---
 
-## 📌 What is Polaris Audio?
+## What is Polaris Audio?
 
-**Polaris Audio** is a web-based, professional studio workstation built for sound engineers, music producers, and post-production specialists. It solves one of the most tedious, repetitive bottlenecks in commercial audio production: **Session Preparation (Session Prep)**.
+**Polaris Audio** is a web-based, studio workstation built for sound engineers, music producers, regardless of their level of expertise, trying to bridge amateurs to professional. It solves one of the most tedious, repetitive bottlenecks in commercial audio production: **Session Preparation (Session Prep)**.
 
 Before creative mixing can begin, audio engineers traditionally spend hours manually diagnosing technical flaws across dozens of multitrack audio stems—identifying inverted microphone polarities, comb filtering phase smearing, artificial "fake stereo" widening, DC offsets, sub-audible low frequency rumble, and inter-sample clipping.
 
@@ -43,9 +43,9 @@ Polaris Audio automates this entire diagnostic and remediation pipeline end-to-e
 
 ---
 
-## ✨ Key Features & Capabilities
+## Key Features & Capabilities
 
-### 🔍 Deterministic Audio Diagnostics Engine
+### Deterministic Audio Diagnostics Engine
 - **ITU-R BS.1770-4 True-Peak Metering**: 4× oversampled inter-sample clipping detection to reveal hidden digital-to-analog converter (DAC) distortion exceeding `0.0 dBFS`.
 - **Phase Inversion & Polarity Detection**: Pearson cross-correlation to detect destructive 180° out-of-phase signals between coincident microphone pairs.
 - **Comb Filtering & Haas Effect Analysis**: Microsecond-delay cross-correlation identifying phase smearing across acoustic recordings (e.g., dual-mic drum overheads).
@@ -54,7 +54,7 @@ Polaris Audio automates this entire diagnostic and remediation pipeline end-to-e
 - **DC Offset Removal**: Flags asymmetrical signal biasing that causes early clipping and analog compressor distortion.
 - **Mix Health Score (0–100)**: Quantitative health rating that categorizes issues into **Clean** (green), **Warning** (amber), and **Critical** (red).
 
-### 🛠️ Automated & Granular DSP Audio Repair
+### Automated & Granular DSP Audio Repair
 - **1-Click Auto-Fix**: Instantly remedies all detected anomalies across the session in a single transaction.
 - **Granular Custom Repairs**: Fine-grained per-track selection of DSP modules:
   - Polarity Flipping ($180^\circ$ phase inversion)
@@ -64,13 +64,13 @@ Polaris Audio automates this entire diagnostic and remediation pipeline end-to-e
   - Butterworth High-Pass Sub-Rumble Filter ($< 25\text{ Hz}$)
   - Headroom Staging (normalized to $-3.0\text{ dBFS}$ Peak)
 
-### 🎧 Multitrack A/B Auditioning Studio Player
+### Multitrack A/B Auditioning Studio Player
 - **Zero-Latency Micro-Crossfade**: Seamless 5 ms gain ramping between **Mode A (Raw Audio)** and **Mode B (Repaired Audio)** without audible clicks, pops, or stream pauses.
 - **Hardware-Style Goniometer (Phase Scope)**: Real-time 45° rotated Lissajous oscilloscope visualizer with dynamic Pearson phase correlation meter (`-1.0` to `+1.0`) and phosphor persistence.
 - **Mono Check Summing ($L + R$)**: Instant mono summing matrix to audit phase cancellation in real time.
 - **Full Multitrack Channel Strip**: Per-stem volume faders, stereo panning, solo/mute tally buttons, and dual-channel stereo LED peak meters.
 
-### 💳 Virtual Token Economy & Studio Billing
+### Virtual Token Economy & Studio Billing
 - **Prepaid Token Model**: Transparent usage-based billing with zero recurring subscription locks.
 - **Welcome Bonus**: 5 free tokens automatically granted upon registration.
 - **Daily Faucet**: Daily claiming mechanism for free diagnostic sessions.
@@ -79,7 +79,7 @@ Polaris Audio automates this entire diagnostic and remediation pipeline end-to-e
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 Polaris Audio uses a high-throughput, microservice-inspired decoupling between the user-facing web dashboard, asynchronous background compute workers, and distributed object storage.
 
@@ -116,7 +116,7 @@ Polaris Audio uses a high-throughput, microservice-inspired decoupling between t
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Follow these instructions to run the entire Polaris Audio stack locally on your machine.
 
@@ -257,7 +257,7 @@ You can directly upload these files in the Polaris Audio dashboard to test the f
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## Testing & Quality Assurance
 
 Polaris Audio enforces a strict automated quality gate across all layers of the stack.
 
