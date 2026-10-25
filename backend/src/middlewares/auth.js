@@ -20,6 +20,7 @@ export const authenticate = async (req, res, next) => {
     }
 
     req.user = user;
+    req.user.isGuest = Boolean(decoded.isGuest || user.email === 'guest@polaris.audio');
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

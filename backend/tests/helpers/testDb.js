@@ -42,19 +42,14 @@ export async function createTestUser({
  */
 export async function cleanupTestData() {
   try {
-    const testUsers = await prisma.user.findMany({
+    await prisma.user.deleteMany({
       where: {
-        email: { endsWith: TEST_EMAIL_DOMAIN }
-      },
-      select: { id: true }
+        OR: [
+          { email: { endsWith: TEST_EMAIL_DOMAIN } },
+          { email: 'guest@polaris.audio' }
+        ]
+      }
     });
-
-    if (testUsers.length > 0) {
-      const userIds = testUsers.map((u) => u.id);
-      await prisma.user.deleteMany({
-        where: { id: { in: userIds } }
-      });
-    }
   } catch (err) {
     console.warn('[cleanupTestData warn]:', err.message);
   }

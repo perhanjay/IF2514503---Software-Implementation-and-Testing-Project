@@ -15,7 +15,7 @@ export class WalletController {
   }
 
   /**
-   * UC-07: Pembelian Paket Token (Simulasi Payment Gateway)
+   * UC-07: Pembelian Paket Token (Simulasi Payment Gateway / Internal Admin)
    */
   static async topup(req, res) {
     try {
@@ -24,6 +24,13 @@ export class WalletController {
 
       if (!tokenAmount || tokenAmount <= 0) {
         return res.status(400).json({ error: 'Jumlah token tidak valid' });
+      }
+
+      // Proteksi Row 80: Endpoint top-up langsung dilarang untuk user biasa
+      if (req.user?.role !== 'ADMIN') {
+        return res.status(403).json({
+          error: 'Akses ditolak: Endpoint top-up langsung hanya dapat diakses oleh administrator internal. Silakan lakukan pembayaran resmi via Midtrans.'
+        });
       }
 
       // Simulasi checkout & payment approval berhasil
@@ -51,6 +58,11 @@ export class WalletController {
    */
   static async claimDaily(req, res) {
     try {
+      // Proteksi Row 78: Pengguna tamu dilarang klaim harian
+      if (req.user?.isGuest) {
+        return res.status(403).json({ error: 'Akun tamu tidak dapat mengklaim jatah token harian' });
+      }
+
       const result = await WalletService.claimDailyTokens(req.user.id);
       return res.status(200).json({
         message: 'Selamat! Jatah 2 token gratis harian telah ditambahkan ke dompet Anda',
@@ -58,7 +70,11 @@ export class WalletController {
         transaction: result.transaction
       });
     } catch (err) {
-      return res.status(400).json({ error: err.message });
+      console.error('[Claim Daily Error]', err);
+      const isAlreadyClaimed = err.message?.includes('sudah mengklaim');
+      return res.status(isAlreadyClaimed ? 400 : 500).json({
+        error: err.message || 'Gagal mengklaim token harian'
+      });
     }
   }
 }

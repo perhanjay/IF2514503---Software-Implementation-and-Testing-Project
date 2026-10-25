@@ -121,16 +121,16 @@ export class PaymentController {
         return res.status(404).json({ error: 'Order tidak ditemukan' });
       }
 
-      // Validasi Signature Key jika server key riil tersedia
-      const serverKey = process.env.MIDTRANS_SERVER_KEY || '';
-      if (serverKey && !serverKey.startsWith('SB-Mid-server-Demo') && signature_key) {
+      // Validasi Signature Key jika signature_key disertakan (Row 110)
+      const serverKey = process.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-DemoPolarisAudioKey123';
+      if (signature_key) {
         const expectedSignature = crypto
           .createHash('sha512')
           .update(`${order_id}${status_code}${gross_amount}${serverKey}`)
           .digest('hex');
 
         if (signature_key !== expectedSignature) {
-          return res.status(403).json({ error: 'Invalid signature key' });
+          return res.status(401).json({ error: 'Signature key tidak valid (Invalid signature key)' });
         }
       }
 
@@ -208,6 +208,11 @@ export class PaymentController {
 
       if (!order) {
         return res.status(404).json({ error: 'Order tidak ditemukan' });
+      }
+
+      // Proteksi IDOR (Row 96): Pengguna hanya boleh melihat order miliknya sendiri
+      if (order.userId !== req.user.id && req.user.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Akses ditolak: Anda tidak memiliki izin untuk melihat pesanan ini' });
       }
 
       return res.json(order);

@@ -48,11 +48,14 @@ export class SessionController {
   static async verifySession(req, res) {
     try {
       const { id } = req.params;
-      const result = await SessionService.verifySession(id);
+      const result = await SessionService.verifySession(id, req.user.id);
       return res.json(result);
     } catch (err) {
       console.error('[Verify Session Error]', err);
-      return res.status(400).json({ error: err.message || 'Gagal memverifikasi sesi' });
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 400 : 400));
+      return res.status(status).json({ error: err.message || 'Gagal memverifikasi sesi' });
     }
   }
 
@@ -90,14 +93,18 @@ export class SessionController {
   static async classifySession(req, res) {
     try {
       const { id } = req.params;
-      const result = await SessionService.classifySession(id);
+      const result = await SessionService.classifySession(id, req.user.id);
       return res.json({
         message: 'Klasifikasi instrumen AI dan deteksi pasangan mikrofon selesai',
         ...result
       });
     } catch (err) {
       console.error('[Classify Session Error]', err);
-      return res.status(500).json({ error: err.message || 'Gagal menjalankan klasifikasi AI' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const isBadRequest = err.message?.includes('belum memiliki');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
+      return res.status(status).json({ error: err.message || 'Gagal menjalankan klasifikasi AI' });
     }
   }
 
@@ -106,20 +113,23 @@ export class SessionController {
    */
   static async updateTrackLabel(req, res) {
     try {
-      const { trackId } = req.params;
+      const { id, trackId } = req.params;
       const { label } = req.body;
       if (!label) {
         return res.status(400).json({ error: 'Label instrumen baru wajib ditentukan' });
       }
 
-      const updatedTrack = await SessionService.updateTrackLabel(trackId, label);
+      const updatedTrack = await SessionService.updateTrackLabel(trackId, label, req.user.id, id);
       return res.json({
         message: 'Label instrumen berhasil diperbarui',
         track: updatedTrack
       });
     } catch (err) {
       console.error('[Update Label Error]', err);
-      return res.status(500).json({ error: 'Gagal memperbarui label instrumen' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 500));
+      return res.status(status).json({ error: err.message || 'Gagal memperbarui label instrumen' });
     }
   }
 
@@ -134,14 +144,18 @@ export class SessionController {
         return res.status(400).json({ error: 'ID kedua trek wajib ditentukan untuk berpasangan' });
       }
 
-      const pair = await SessionService.createTrackPair(id, trackAId, trackBId, pairType || 'MIC_PAIR');
+      const pair = await SessionService.createTrackPair(id, trackAId, trackBId, pairType || 'MIC_PAIR', req.user.id);
       return res.status(201).json({
         message: 'Pasangan trek mikrofon berhasil dibuat',
         pair
       });
     } catch (err) {
       console.error('[Create Pair Error]', err);
-      return res.status(500).json({ error: 'Gagal membuat pasangan trek' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const isBadRequest = err.message?.includes('bukan bagian dari sesi');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
+      return res.status(status).json({ error: err.message || 'Gagal membuat pasangan trek' });
     }
   }
 
@@ -150,12 +164,15 @@ export class SessionController {
    */
   static async deletePair(req, res) {
     try {
-      const { pairId } = req.params;
-      await SessionService.deleteTrackPair(pairId);
+      const { id, pairId } = req.params;
+      await SessionService.deleteTrackPair(pairId, req.user.id, id);
       return res.json({ message: 'Pasangan trek berhasil dilepas (unpaired)' });
     } catch (err) {
       console.error('[Delete Pair Error]', err);
-      return res.status(500).json({ error: 'Gagal melepas pasangan trek' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 500));
+      return res.status(status).json({ error: err.message || 'Gagal melepas pasangan trek' });
     }
   }
 
@@ -165,14 +182,17 @@ export class SessionController {
   static async finalizeClassification(req, res) {
     try {
       const { id } = req.params;
-      const session = await SessionService.finalizeClassification(id);
+      const resultSession = await SessionService.finalizeClassification(id, req.user.id);
       return res.json({
         message: 'Konfigurasi trek dan pasangan berhasil dikunci. Siap untuk analisis DSP.',
-        session
+        session: resultSession
       });
     } catch (err) {
       console.error('[Finalize Error]', err);
-      return res.status(500).json({ error: 'Gagal mengonfirmasi klasifikasi' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 500));
+      return res.status(status).json({ error: err.message || 'Gagal mengonfirmasi klasifikasi' });
     }
   }
 
@@ -182,14 +202,18 @@ export class SessionController {
   static async diagnoseSession(req, res) {
     try {
       const { id } = req.params;
-      const result = await SessionService.diagnoseSession(id);
+      const result = await SessionService.diagnoseSession(id, req.user.id);
       return res.json({
         message: 'Pemindaian diagnostik DSP dan audit kesehatan sesi selesai',
         ...result
       });
     } catch (err) {
       console.error('[Diagnose Session Error]', err);
-      return res.status(500).json({ error: err.message || 'Gagal menjalankan diagnostik DSP' });
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const isBadRequest = err.message?.includes('belum memiliki');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
+      return res.status(status).json({ error: err.message || 'Gagal menjalankan diagnostik DSP' });
     }
   }
 
@@ -199,11 +223,14 @@ export class SessionController {
   static async getDiagnostics(req, res) {
     try {
       const { id } = req.params;
-      const result = await SessionService.getSessionDiagnostics(id);
+      const result = await SessionService.getSessionDiagnostics(id, req.user.id);
       return res.json(result);
     } catch (err) {
       console.error('[Get Diagnostics Error]', err);
-      return res.status(500).json({ error: err.message || 'Gagal mengambil data diagnostik sesi' });
+      const isNotFound = err.message === 'Sesi tidak ditemukan' || err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 500));
+      return res.status(status).json({ error: err.message || 'Gagal mengambil data diagnostik sesi' });
     }
   }
 
@@ -261,7 +288,9 @@ export class SessionController {
       });
     } catch (err) {
       console.error('[Repair Auto Error]', err);
-      const status = err.statusCode || (err.message.includes('tidak ditemukan') ? 404 : 400);
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 400));
       return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan otomatis' });
     }
   }
@@ -280,7 +309,9 @@ export class SessionController {
       });
     } catch (err) {
       console.error('[Repair Custom Error]', err);
-      const status = err.statusCode || (err.message.includes('tidak ditemukan') ? 404 : 400);
+      const isNotFound = err.message?.includes('tidak ditemukan');
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 400));
       return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan kustom' });
     }
   }
@@ -296,7 +327,7 @@ export class SessionController {
     } catch (err) {
       console.error('[Get Audio Sources Error]', err);
       const isNotFound = err.message === 'Sesi tidak ditemukan';
-      const isForbidden = err.message.includes('Akses ditolak');
+      const isForbidden = err.message?.includes('Akses ditolak');
       const status = isNotFound ? 404 : (isForbidden ? 403 : 500);
       return res.status(status).json({ error: err.message || 'Gagal mengambil URL audio sesi' });
     }

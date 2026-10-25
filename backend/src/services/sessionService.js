@@ -225,13 +225,18 @@ export class SessionService {
   /**
    * UC-11: Memverifikasi Integritas & Sinkronisasi Sesi
    */
-  static async verifySession(sessionId) {
+  static async verifySession(sessionId, userId = null) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { tracks: true }
     });
 
     if (!session) throw new Error('Sesi tidak ditemukan');
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
     if (!session.tracks.length) throw new Error('Sesi belum memiliki berkas track audio');
 
     const tracks = session.tracks;
@@ -341,14 +346,27 @@ export class SessionService {
   /**
    * UC-12: Memicu proses klasifikasi instrumen AI & deteksi pasangan multi-mikrofon
    */
-  static async classifySession(sessionId) {
+  static async classifySession(sessionId, userId = null) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { tracks: true, trackPairs: true }
     });
 
-    if (!session) throw new Error('Sesi tidak ditemukan');
-    if (!session.tracks.length) throw new Error('Sesi belum memiliki berkas trek audio');
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (!session.tracks.length) {
+      const err = new Error('Sesi belum memiliki berkas trek audio');
+      err.statusCode = 400;
+      throw err;
+    }
 
     // 1. Set status PROCESSING
     await prisma.session.update({
@@ -430,7 +448,26 @@ export class SessionService {
   /**
    * UC-12: Mengoreksi label instrumen trek secara manual (FR-2.3)
    */
-  static async updateTrackLabel(trackId, newLabel) {
+  static async updateTrackLabel(trackId, newLabel, userId = null, sessionId = null) {
+    const track = await prisma.track.findUnique({
+      where: { id: trackId },
+      include: { session: true }
+    });
+    if (!track) {
+      const err = new Error('Track tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (sessionId && track.sessionId !== sessionId) {
+      const err = new Error('Track tidak ditemukan pada sesi ini');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && track.session?.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
     return await prisma.track.update({
       where: { id: trackId },
       data: { instrumentLabel: newLabel }
@@ -440,7 +477,28 @@ export class SessionService {
   /**
    * UC-12: Menghubungkan pasangan multi-mikrofon baru secara manual
    */
-  static async createTrackPair(sessionId, trackAId, trackBId, pairType = 'MIC_PAIR') {
+  static async createTrackPair(sessionId, trackAId, trackBId, pairType = 'MIC_PAIR', userId = null) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { tracks: true }
+    });
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+    const sessionTrackIds = new Set(session.tracks.map(t => t.id));
+    if (!sessionTrackIds.has(trackAId) || !sessionTrackIds.has(trackBId)) {
+      const err = new Error('Trek yang dipilih bukan bagian dari sesi ini');
+      err.statusCode = 400;
+      throw err;
+    }
+
     return await prisma.trackPair.create({
       data: {
         sessionId,
@@ -459,7 +517,26 @@ export class SessionService {
   /**
    * UC-12: Membatalkan/melepas pasangan trek (Unpair)
    */
-  static async deleteTrackPair(pairId) {
+  static async deleteTrackPair(pairId, userId = null, sessionId = null) {
+    const pair = await prisma.trackPair.findUnique({
+      where: { id: pairId },
+      include: { session: true }
+    });
+    if (!pair) {
+      const err = new Error('Pasangan trek tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (sessionId && pair.sessionId !== sessionId) {
+      const err = new Error('Pasangan trek tidak ditemukan pada sesi ini');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && pair.session?.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
     return await prisma.trackPair.delete({
       where: { id: pairId }
     });
@@ -468,7 +545,20 @@ export class SessionService {
   /**
    * UC-12: Mengonfirmasi konfigurasi klasifikasi & pairing sebelum masuk ke Diagnostik DSP (UC-13)
    */
-  static async finalizeClassification(sessionId) {
+  static async finalizeClassification(sessionId, userId = null) {
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId }
+    });
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
     return await prisma.session.update({
       where: { id: sessionId },
       data: { status: 'READY' },
@@ -486,7 +576,7 @@ export class SessionService {
   /**
    * UC-13: Menjalankan Core DSP Diagnostic Engine & Menghitung Mix Health Score (FR-3.1 s.d. FR-4.3)
    */
-  static async diagnoseSession(sessionId) {
+  static async diagnoseSession(sessionId, userId = null) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -495,8 +585,21 @@ export class SessionService {
       }
     });
 
-    if (!session) throw new Error('Sesi tidak ditemukan');
-    if (!session.tracks.length) throw new Error('Sesi belum memiliki berkas trek audio');
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+    if (!session.tracks.length) {
+      const err = new Error('Sesi belum memiliki berkas trek audio');
+      err.statusCode = 400;
+      throw err;
+    }
 
     // 1. Set status PROCESSING
     await prisma.session.update({
@@ -604,7 +707,7 @@ export class SessionService {
   /**
    * UC-13: Mengambil hasil diagnostik sesi lengkap
    */
-  static async getSessionDiagnostics(sessionId) {
+  static async getSessionDiagnostics(sessionId, userId = null) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -617,7 +720,16 @@ export class SessionService {
       }
     });
 
-    if (!session) throw new Error('Sesi tidak ditemukan');
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (userId && session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
 
     return {
       session,
@@ -642,8 +754,16 @@ export class SessionService {
       }
     });
 
-    if (!session) throw new Error('Sesi tidak ditemukan');
-    if (session.userId !== userId) throw new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
     if (!session.tracks || session.tracks.length === 0) {
       throw new Error('Sesi belum memiliki berkas trek audio untuk diperbaiki');
     }

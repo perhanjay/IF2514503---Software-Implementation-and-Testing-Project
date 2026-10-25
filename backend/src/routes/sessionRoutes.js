@@ -21,6 +21,7 @@ router.post('/:id/verify-integrity', SessionController.verifySession);
 
 // UC-12: AI Instrument Classification & Multi-Mic Pairing
 router.post('/:id/classify', SessionController.classifySession);
+router.post('/:id/pairs/ai', SessionController.classifySession);
 router.patch('/:id/tracks/:trackId/label', SessionController.updateTrackLabel);
 router.post('/:id/pairs', SessionController.createPair);
 router.delete('/:id/pairs/:pairId', SessionController.deletePair);
