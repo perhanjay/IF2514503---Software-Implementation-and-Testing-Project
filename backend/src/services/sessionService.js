@@ -13,6 +13,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '../../../');
 
+export const isValidUuid = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 function runPythonWorker(payload, mode = '--classify-stdin') {
   return new Promise((resolve, reject) => {
     const py = spawn('python3', ['-m', 'worker.src.worker', mode], {
@@ -105,6 +107,123 @@ export class SessionService {
    * UC-10 Direct Upload (Multipart Form untuk kemudahan pengujian browser & drag-drop langsung)
    */
   static async uploadDirect(userId, title, files) {
+    if (!files || files.length === 0) {
+      const err = new Error('Pilih minimal satu berkas audio (WAV/FLAC/ZIP)');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (files.length > 50) {
+      const err = new Error('Maksimal 50 berkas audio per sesi');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const AUDIO_EXT_REGEX = /\.(wav|flac|aiff|mp3)$/i;
+    const ZIP_EXT_REGEX = /\.zip$/i;
+
+    const filesToIngest = [];
+
+    for (const file of files) {
+      const isZip = file.mimetype === 'application/zip' ||
+                    file.mimetype === 'application/x-zip-compressed' ||
+                    ZIP_EXT_REGEX.test(file.originalname || '');
+
+      const isAudio = AUDIO_EXT_REGEX.test(file.originalname || '') ||
+                      (file.mimetype && file.mimetype.startsWith('audio/'));
+
+      if (!isZip && !isAudio) {
+        const err = new Error('Format berkas tidak didukung');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      if (isZip) {
+        let zip;
+        let zipEntries;
+        try {
+          zip = new AdmZip(file.buffer);
+          zipEntries = zip.getEntries();
+        } catch (zErr) {
+          const err = new Error('Arsip ZIP tidak memuat berkas audio yang didukung');
+          err.statusCode = 400;
+          throw err;
+        }
+
+        const audioEntries = zipEntries.filter(
+          entry => !entry.isDirectory && AUDIO_EXT_REGEX.test(entry.entryName)
+        );
+
+        if (audioEntries.length === 0) {
+          const err = new Error('Arsip ZIP tidak memuat berkas audio yang didukung');
+          err.statusCode = 400;
+          throw err;
+        }
+
+        for (const entry of audioEntries) {
+          let audioBuffer;
+          try {
+            audioBuffer = entry.getData();
+          } catch (dErr) {
+            const err = new Error('Berkas audio rusak atau korup');
+            err.statusCode = 400;
+            throw err;
+          }
+
+          let meta;
+          try {
+            meta = await parseBuffer(audioBuffer);
+          } catch (pErr) {
+            const err = new Error('Berkas audio rusak atau korup');
+            err.statusCode = 400;
+            throw err;
+          }
+
+          if (!meta || !meta.format || meta.format.duration === undefined || meta.format.duration === null || isNaN(meta.format.duration)) {
+            const err = new Error('Berkas audio rusak atau korup');
+            err.statusCode = 400;
+            throw err;
+          }
+
+          filesToIngest.push({
+            buffer: audioBuffer,
+            fileName: entry.name,
+            contentType: 'audio/wav',
+            meta
+          });
+        }
+      } else {
+        let meta;
+        try {
+          meta = await parseBuffer(file.buffer);
+        } catch (pErr) {
+          const err = new Error('Berkas audio rusak atau korup');
+          err.statusCode = 400;
+          throw err;
+        }
+
+        if (!meta || !meta.format || meta.format.duration === undefined || meta.format.duration === null || isNaN(meta.format.duration)) {
+          const err = new Error('Berkas audio rusak atau korup');
+          err.statusCode = 400;
+          throw err;
+        }
+
+        filesToIngest.push({
+          buffer: file.buffer,
+          fileName: file.originalname,
+          contentType: file.mimetype || 'audio/wav',
+          meta
+        });
+      }
+    }
+
+    if (filesToIngest.length > 50) {
+      const err = new Error('Maksimal 50 berkas audio per sesi');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Seluruh berkas valid: buat record sesi
     const session = await prisma.session.create({
       data: {
         userId,
@@ -116,91 +235,31 @@ export class SessionService {
 
     const tracksCreated = [];
 
-    for (const file of files) {
-      // Jika file berupa arsip ZIP, ekstrak file audio di dalamnya
-      if (file.mimetype === 'application/zip' || file.originalname.endsWith('.zip')) {
-        const zip = new AdmZip(file.buffer);
-        const zipEntries = zip.getEntries();
+    for (const item of filesToIngest) {
+      const fileKey = `sessions/${session.id}/raw/${Date.now()}-${item.fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      await s3Client.send(new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: fileKey,
+        Body: item.buffer,
+        ContentType: item.contentType
+      }));
 
-        for (const entry of zipEntries) {
-          if (!entry.isDirectory && entry.entryName.match(/\.(wav|flac|aiff|mp3)$/i)) {
-            const audioBuffer = entry.getData();
-            const extractedFileName = entry.name;
-            const fileKey = `sessions/${session.id}/raw/${Date.now()}-${extractedFileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const duration = item.meta.format.duration || null;
+      const sampleRate = item.meta.format.sampleRate || null;
+      const bitDepth = item.meta.format.bitsPerSample || null;
+      const isStereo = item.meta.format.numberOfChannels === 2;
 
-            await s3Client.send(new PutObjectCommand({
-              Bucket: BUCKET_NAME,
-              Key: fileKey,
-              Body: audioBuffer,
-              ContentType: 'audio/wav'
-            }));
-
-            // Metadata parsing
-            let duration = null;
-            let sampleRate = null;
-            let bitDepth = null;
-            let isStereo = false;
-
-            try {
-              const meta = await parseBuffer(audioBuffer);
-              duration = meta.format.duration || null;
-              sampleRate = meta.format.sampleRate || null;
-              bitDepth = meta.format.bitsPerSample || null;
-              isStereo = meta.format.numberOfChannels === 2;
-            } catch (mErr) {
-              console.warn('[Metadata Parse Warn]:', mErr.message);
-            }
-
-            const track = await prisma.track.create({
-              data: {
-                sessionId: session.id,
-                fileName: extractedFileName,
-                originalStorageKey: fileKey,
-                durationSec: duration,
-                isStereo,
-                status: 'ANALYZED'
-              }
-            });
-            tracksCreated.push(track);
-          }
+      const track = await prisma.track.create({
+        data: {
+          sessionId: session.id,
+          fileName: item.fileName,
+          originalStorageKey: fileKey,
+          durationSec: duration,
+          isStereo,
+          status: 'ANALYZED'
         }
-      } else {
-        // Berkas individual (WAV/FLAC)
-        const fileKey = `sessions/${session.id}/raw/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        await s3Client.send(new PutObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: fileKey,
-          Body: file.buffer,
-          ContentType: file.mimetype || 'audio/wav'
-        }));
-
-        let duration = null;
-        let sampleRate = null;
-        let bitDepth = null;
-        let isStereo = false;
-
-        try {
-          const meta = await parseBuffer(file.buffer);
-          duration = meta.format.duration || null;
-          sampleRate = meta.format.sampleRate || null;
-          bitDepth = meta.format.bitsPerSample || null;
-          isStereo = meta.format.numberOfChannels === 2;
-        } catch (mErr) {
-          console.warn('[Metadata Parse Warn]:', mErr.message);
-        }
-
-        const track = await prisma.track.create({
-          data: {
-            sessionId: session.id,
-            fileName: file.originalname,
-            originalStorageKey: fileKey,
-            durationSec: duration,
-            isStereo,
-            status: 'ANALYZED'
-          }
-        });
-        tracksCreated.push(track);
-      }
+      });
+      tracksCreated.push(track);
     }
 
     // Update Session status & metadata dari trek pertama
@@ -347,6 +406,11 @@ export class SessionService {
    * UC-12: Memicu proses klasifikasi instrumen AI & deteksi pasangan multi-mikrofon
    */
   static async classifySession(sessionId, userId = null) {
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { tracks: true, trackPairs: true }
@@ -478,6 +542,28 @@ export class SessionService {
    * UC-12: Menghubungkan pasangan multi-mikrofon baru secara manual
    */
   static async createTrackPair(sessionId, trackAId, trackBId, pairType = 'MIC_PAIR', userId = null) {
+    if (!trackAId || !trackBId) {
+      const err = new Error('ID kedua trek wajib ditentukan untuk berpasangan');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (trackAId === trackBId) {
+      const err = new Error('Trek tidak dapat dipasangkan dengan dirinya sendiri');
+      err.statusCode = 400;
+      throw err;
+    }
+    const VALID_PAIR_TYPES = ['MIC_PAIR', 'STEREO_SPLIT', 'BASS_DI_MIC', 'DRUM_TOP_BOTTOM'];
+    if (pairType && !VALID_PAIR_TYPES.includes(pairType)) {
+      const err = new Error('Tipe pasangan instrumen tidak valid');
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: { tracks: true }
@@ -518,6 +604,16 @@ export class SessionService {
    * UC-12: Membatalkan/melepas pasangan trek (Unpair)
    */
   static async deleteTrackPair(pairId, userId = null, sessionId = null) {
+    if (!isValidUuid(pairId)) {
+      const err = new Error('Pasangan trek tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (sessionId && !isValidUuid(sessionId)) {
+      const err = new Error('Pasangan trek tidak ditemukan pada sesi ini');
+      err.statusCode = 404;
+      throw err;
+    }
     const pair = await prisma.trackPair.findUnique({
       where: { id: pairId },
       include: { session: true }
@@ -577,6 +673,11 @@ export class SessionService {
    * UC-13: Menjalankan Core DSP Diagnostic Engine & Menghitung Mix Health Score (FR-3.1 s.d. FR-4.3)
    */
   static async diagnoseSession(sessionId, userId = null) {
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -744,6 +845,25 @@ export class SessionService {
    * Dilengkapi proteksi validasi token, mutasi DEDUCTION, dan Auto-Refund instan (NFR-09) jika worker gagal.
    */
   static async repairSession(sessionId, userId, mode = 'AUTO', customSettings = null) {
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (mode === 'CUSTOM') {
+      if (
+        !customSettings ||
+        typeof customSettings !== 'object' ||
+        Array.isArray(customSettings) ||
+        Object.keys(customSettings).length === 0
+      ) {
+        const err = new Error('Konfigurasi perbaikan kustom (customSettings) wajib disertakan');
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {

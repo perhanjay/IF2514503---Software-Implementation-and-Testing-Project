@@ -1,4 +1,4 @@
-import { SessionService } from '../services/sessionService.js';
+import { SessionService, isValidUuid } from '../services/sessionService.js';
 
 export class SessionController {
   /**
@@ -38,7 +38,19 @@ export class SessionController {
       });
     } catch (err) {
       console.error('[Upload Direct Error]', err);
-      return res.status(500).json({ error: 'Gagal mengunggah berkas sesi' });
+      const isZipParseError = err.message?.includes('ADM-ZIP') || err.message?.includes('Invalid or unsupported zip format');
+      const isClientError = err.statusCode === 400 ||
+        err.message?.includes('tidak didukung') ||
+        err.message?.includes('rusak atau korup') ||
+        err.message?.includes('tidak memuat berkas audio') ||
+        err.message?.includes('Maksimal 50') ||
+        err.message?.includes('minimal satu berkas') ||
+        isZipParseError;
+      const status = isClientError ? 400 : (err.statusCode || 500);
+      const errorMessage = isZipParseError
+        ? 'Arsip ZIP tidak memuat berkas audio yang didukung'
+        : (err.message || 'Gagal mengunggah berkas sesi');
+      return res.status(status).json({ error: errorMessage });
     }
   }
 
@@ -93,6 +105,9 @@ export class SessionController {
   static async classifySession(req, res) {
     try {
       const { id } = req.params;
+      if (!isValidUuid(id)) {
+        return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+      }
       const result = await SessionService.classifySession(id, req.user.id);
       return res.json({
         message: 'Klasifikasi instrumen AI dan deteksi pasangan mikrofon selesai',
@@ -139,9 +154,27 @@ export class SessionController {
   static async createPair(req, res) {
     try {
       const { id } = req.params;
-      const { trackAId, trackBId, pairType } = req.body;
+      const { trackAId, trackBId, pairType } = req.body || {};
+
       if (!trackAId || !trackBId) {
         return res.status(400).json({ error: 'ID kedua trek wajib ditentukan untuk berpasangan' });
+      }
+
+      if (trackAId === trackBId) {
+        return res.status(400).json({ error: 'Trek tidak dapat dipasangkan dengan dirinya sendiri' });
+      }
+
+      const VALID_PAIR_TYPES = ['MIC_PAIR', 'STEREO_SPLIT', 'BASS_DI_MIC', 'DRUM_TOP_BOTTOM'];
+      if (pairType && !VALID_PAIR_TYPES.includes(pairType)) {
+        return res.status(400).json({ error: 'Tipe pasangan instrumen tidak valid' });
+      }
+
+      if (!isValidUuid(id)) {
+        return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+      }
+
+      if (!isValidUuid(trackAId) || !isValidUuid(trackBId)) {
+        return res.status(400).json({ error: 'Trek yang dipilih bukan bagian dari sesi ini' });
       }
 
       const pair = await SessionService.createTrackPair(id, trackAId, trackBId, pairType || 'MIC_PAIR', req.user.id);
@@ -153,7 +186,10 @@ export class SessionController {
       console.error('[Create Pair Error]', err);
       const isNotFound = err.message?.includes('tidak ditemukan');
       const isForbidden = err.message?.includes('Akses ditolak');
-      const isBadRequest = err.message?.includes('bukan bagian dari sesi');
+      const isBadRequest = err.message?.includes('bukan bagian dari sesi') ||
+                           err.message?.includes('dirinya sendiri') ||
+                           err.message?.includes('tidak valid') ||
+                           err.message?.includes('wajib ditentukan');
       const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
       return res.status(status).json({ error: err.message || 'Gagal membuat pasangan trek' });
     }
@@ -165,6 +201,12 @@ export class SessionController {
   static async deletePair(req, res) {
     try {
       const { id, pairId } = req.params;
+      if (!isValidUuid(id)) {
+        return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+      }
+      if (!isValidUuid(pairId)) {
+        return res.status(404).json({ error: 'Pasangan trek tidak ditemukan' });
+      }
       await SessionService.deleteTrackPair(pairId, req.user.id, id);
       return res.json({ message: 'Pasangan trek berhasil dilepas (unpaired)' });
     } catch (err) {
@@ -202,6 +244,9 @@ export class SessionController {
   static async diagnoseSession(req, res) {
     try {
       const { id } = req.params;
+      if (!isValidUuid(id)) {
+        return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+      }
       const result = await SessionService.diagnoseSession(id, req.user.id);
       return res.json({
         message: 'Pemindaian diagnostik DSP dan audit kesehatan sesi selesai',
@@ -301,7 +346,23 @@ export class SessionController {
   static async repairCustom(req, res) {
     try {
       const { id } = req.params;
-      const { customSettings } = req.body;
+      const { customSettings } = req.body || {};
+
+      if (!isValidUuid(id)) {
+        return res.status(404).json({ error: 'Sesi tidak ditemukan' });
+      }
+
+      if (
+        !customSettings ||
+        typeof customSettings !== 'object' ||
+        Array.isArray(customSettings) ||
+        Object.keys(customSettings).length === 0
+      ) {
+        return res.status(400).json({
+          error: 'Konfigurasi perbaikan kustom (customSettings) wajib disertakan'
+        });
+      }
+
       const result = await SessionService.repairSession(id, req.user.id, 'CUSTOM', customSettings);
       return res.json({
         message: 'Perbaikan kustom DSP sesi berhasil diterapkan',

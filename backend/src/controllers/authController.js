@@ -15,7 +15,28 @@ export class AuthController {
         return res.status(400).json({ error: 'Nama, email, dan kata sandi wajib diisi' });
       }
 
-      if (password.length < 8 || !/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password)) {
+      if (typeof name !== 'string') {
+        return res.status(400).json({ error: 'Nama harus berupa teks' });
+      }
+
+      if (typeof email !== 'string') {
+        return res.status(400).json({ error: 'Format email tidak valid' });
+      }
+
+      if (name.length > 255) {
+        return res.status(400).json({ error: 'Nama tidak boleh melebihi 255 karakter' });
+      }
+
+      if (/[<>]/.test(name) || /<[a-z/][\s\S]*>/i.test(name)) {
+        return res.status(400).json({ error: 'Nama tidak boleh mengandung karakter HTML atau skrip berbahaya' });
+      }
+
+      const EMAIL_REGEX = /^[\w.-]+@([\w-]+\.)+[a-zA-Z0-9-]{2,}$/;
+      if (!EMAIL_REGEX.test(email)) {
+        return res.status(400).json({ error: 'Format email tidak valid' });
+      }
+
+      if (typeof password !== 'string' || password.length < 8 || !/(?=.*[a-zA-Z])(?=.*[0-9])/.test(password)) {
         return res.status(400).json({
           error: 'Kata sandi minimal 8 karakter dan harus mengandung kombinasi huruf serta angka'
         });
@@ -142,8 +163,24 @@ export class AuthController {
   static async updateProfile(req, res) {
     try {
       const { name } = req.body;
-      if (!name || name.trim() === '') {
+      if (name === undefined || name === null) {
         return res.status(400).json({ error: 'Nama lengkap wajib diisi' });
+      }
+
+      if (typeof name !== 'string') {
+        return res.status(400).json({ error: 'Nama lengkap harus berupa teks' });
+      }
+
+      if (!name.trim()) {
+        return res.status(400).json({ error: 'Nama lengkap wajib diisi' });
+      }
+
+      if (name.length > 255) {
+        return res.status(400).json({ error: 'Nama tidak boleh melebihi 255 karakter' });
+      }
+
+      if (/[<>]/.test(name) || /<[a-z/][\s\S]*>/i.test(name)) {
+        return res.status(400).json({ error: 'Nama tidak boleh mengandung karakter HTML atau skrip berbahaya' });
       }
 
       const updated = await prisma.user.update({

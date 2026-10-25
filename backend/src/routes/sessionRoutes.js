@@ -9,6 +9,21 @@ const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024 } // 500MB per file
 });
 
+const uploadFilesMiddleware = (req, res, next) => {
+  upload.array('files', 50)(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT') {
+        return res.status(400).json({ error: 'Maksimal 50 berkas audio per sesi' });
+      }
+      return res.status(400).json({ error: err.message || 'Gagal memproses unggahan berkas' });
+    }
+    if (req.files && req.files.length > 50) {
+      return res.status(400).json({ error: 'Maksimal 50 berkas audio per sesi' });
+    }
+    next();
+  });
+};
+
 router.use(authenticate);
 
 router.get('/', SessionController.listSessions);
@@ -16,7 +31,7 @@ router.get('/:id', SessionController.getDetails);
 router.patch('/:id/title', SessionController.updateTitle);
 router.delete('/:id', SessionController.deleteSession);
 router.post('/upload-init', SessionController.initUpload);
-router.post('/upload-direct', upload.array('files', 30), SessionController.uploadDirect);
+router.post('/upload-direct', uploadFilesMiddleware, SessionController.uploadDirect);
 router.post('/:id/verify-integrity', SessionController.verifySession);
 
 // UC-12: AI Instrument Classification & Multi-Mic Pairing

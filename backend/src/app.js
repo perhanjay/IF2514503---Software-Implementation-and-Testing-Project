@@ -63,4 +63,18 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Global Error Handler to prevent HTTP 500 HTML leaks
+app.use((err, req, res, next) => {
+  if (err.name === 'MulterError') {
+    if (err.code === 'LIMIT_UNEXPECTED_FILE' || err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ error: 'Maksimal 50 berkas audio per sesi' });
+    }
+    return res.status(400).json({ error: err.message || 'Gagal memproses unggahan berkas' });
+  }
+
+  const status = err.statusCode || (typeof err.status === 'number' ? err.status : 500);
+  const message = err.message || 'Terjadi kesalahan pada server';
+  return res.status(status).json({ error: message });
+});
+
 export default app;
