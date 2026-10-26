@@ -77,17 +77,20 @@ export class WalletService {
   }
 
   /**
-   * Klaim Token Harian (Daily Grant UC-09)
+   * Klaim Token Harian (Daily Grant UC-09 / Row 113)
    */
   static async claimDailyTokens(userId) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const alreadyClaimed = await prisma.tokenTransaction.findFirst({
       where: {
         userId,
-        description: 'DAILY_FREE_CLAIM',
-        createdAt: { gte: today }
+        OR: [
+          { description: '[Klaim Harian] Jatah Token Gratis' },
+          { description: 'DAILY_FREE_CLAIM' },
+          { description: { contains: 'Klaim Harian' } }
+        ],
+        createdAt: { gte: cutoff }
       }
     });
 
@@ -95,6 +98,11 @@ export class WalletService {
       throw new Error('Anda sudah mengklaim jatah token gratis untuk hari ini');
     }
 
-    return await this.creditToken(userId, 2, 'WELCOME_GRANT', 'DAILY_FREE_CLAIM');
+    return await this.creditToken(
+      userId,
+      2,
+      'WELCOME_GRANT',
+      '[Klaim Harian] Jatah Token Gratis'
+    );
   }
 }

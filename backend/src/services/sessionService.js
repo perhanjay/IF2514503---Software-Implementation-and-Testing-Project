@@ -432,6 +432,18 @@ export class SessionService {
       throw err;
     }
 
+    // Status Transisi Sesi: Tolak jika sedang diproses atau kedaluwarsa
+    if (session.status === 'PROCESSING') {
+      const err = new Error('Sesi sedang dalam proses analisis atau perbaikan audio lain');
+      err.statusCode = 409;
+      throw err;
+    }
+    if (session.status === 'EXPIRED') {
+      const err = new Error('Sesi telah kedaluwarsa dan tidak dapat diproses lagi');
+      err.statusCode = 400;
+      throw err;
+    }
+
     // 1. Set status PROCESSING
     await prisma.session.update({
       where: { id: sessionId },
@@ -702,6 +714,18 @@ export class SessionService {
       throw err;
     }
 
+    // Status Transisi Sesi: Tolak jika sedang diproses atau kedaluwarsa
+    if (session.status === 'PROCESSING') {
+      const err = new Error('Sesi sedang dalam proses analisis atau perbaikan audio lain');
+      err.statusCode = 409;
+      throw err;
+    }
+    if (session.status === 'EXPIRED') {
+      const err = new Error('Sesi telah kedaluwarsa dan tidak dapat diproses lagi');
+      err.statusCode = 400;
+      throw err;
+    }
+
     // 1. Set status PROCESSING
     await prisma.session.update({
       where: { id: sessionId },
@@ -885,29 +909,75 @@ export class SessionService {
       throw err;
     }
     if (!session.tracks || session.tracks.length === 0) {
-      throw new Error('Sesi belum memiliki berkas trek audio untuk diperbaiki');
-    }
-
-    // 1. Validasi saldo token (FR-7.2)
-    const tokensNeeded = session.estimatedTokens || 1;
-    const wallet = await WalletService.getWalletDetails(userId);
-    if (!wallet || wallet.balance < tokensNeeded) {
-      const currentBalance = wallet ? wallet.balance : 0;
-      const err = new Error(`Saldo token tidak mencukupi untuk melakukan perbaikan audio. Saldo Anda: ${currentBalance} Token, dibutuhkan: ${tokensNeeded} Token.`);
-      err.statusCode = 402;
+      const err = new Error('Sesi belum memiliki berkas trek audio untuk diperbaiki');
+      err.statusCode = 400;
       throw err;
     }
 
-    // 2. Pemotongan Saldo Token secara Atomik (FR-7.5, FR-7.6)
-    await WalletService.debitToken(
-      userId,
-      tokensNeeded,
-      'DEDUCTION',
-      `Perbaikan Audio DSP Sesi (${mode === 'CUSTOM' ? 'Granular Custom' : '1-Click Auto-Fix'}): ${session.title}`,
-      session.id
-    );
+    // Status Transisi Sesi: Tolak jika sedang diproses atau kedaluwarsa (TC-BIZ-16)
+    if (session.status === 'PROCESSING') {
+      const err = new Error('Sesi sedang dalam proses analisis atau perbaikan audio lain');
+      err.statusCode = 409;
+      throw err;
+    }
+    if (session.status === 'EXPIRED') {
+      const err = new Error('Sesi telah kedaluwarsa dan tidak dapat diproses lagi');
+      err.statusCode = 400;
+      throw err;
+    }
 
-    let tokenDeducted = true;
+    // Idempotensi Perbaikan Audio: Jika sesi sudah berstatus REPAIRED (TC-BIZ-13, TC-BIZ-14)
+    const isAlreadyRepaired = session.status === 'REPAIRED';
+
+    // Jika sudah REPAIRED dan mode AUTO, kembalikan hasil yang sudah ada tanpa memotong token lagi
+    if (isAlreadyRepaired && mode === 'AUTO') {
+      return {
+        session,
+        sessionHealth: { health_score: session.healthScore || 98.0 },
+        tracksRepaired: session.tracks.map(t => ({
+          trackId: t.id,
+          fileName: t.fileName,
+          repairedStorageKey: t.repairedStorageKey,
+          status: t.status,
+          newHealthStatus: 'Clean'
+        })),
+        isIdempotent: true
+      };
+    }
+
+    const tokensNeeded = isAlreadyRepaired ? 0 : (session.estimatedTokens || 1);
+
+    if (!isAlreadyRepaired) {
+      // 1. Validasi saldo token (FR-7.2)
+      const wallet = await WalletService.getWalletDetails(userId);
+      if (!wallet || wallet.balance < tokensNeeded) {
+        const currentBalance = wallet ? wallet.balance : 0;
+        const err = new Error(`Saldo token tidak mencukupi untuk melakukan perbaikan audio. Saldo Anda: ${currentBalance} Token, dibutuhkan: ${tokensNeeded} Token.`);
+        err.statusCode = 402;
+        throw err;
+      }
+
+      // 2. Penegakan Prasyarat Perbaikan Audio (Wajib Diagnostik Dulu) (Row 246 / UC-14)
+      const hasDiagnostics = session.healthScore !== null &&
+        session.tracks.some(t => t.diagnosticResult !== null && t.diagnosticResult !== undefined);
+
+      if (!hasDiagnostics) {
+        const err = new Error('Sesi harus melalui tahap diagnostik audio terlebih dahulu sebelum dapat diperbaiki');
+        err.statusCode = 400;
+        throw err;
+      }
+
+      // 3. Pemotongan Saldo Token secara Atomik (FR-7.5, FR-7.6)
+      await WalletService.debitToken(
+        userId,
+        tokensNeeded,
+        'DEDUCTION',
+        `Perbaikan Audio DSP Sesi (${mode === 'CUSTOM' ? 'Granular Custom' : '1-Click Auto-Fix'}): ${session.title}`,
+        session.id
+      );
+    }
+
+    let tokenDeducted = !isAlreadyRepaired;
 
     try {
       // 3. Simpan konfigurasi perbaikan ke tabel repair_configs
@@ -1017,10 +1087,10 @@ export class SessionService {
         }
       }
 
-      // Kembalikan status sesi ke READY
+      // Kembalikan status sesi ke status semula (REPAIRED jika sudah pernah diperbaiki, atau READY)
       await prisma.session.update({
         where: { id: session.id },
-        data: { status: 'READY' }
+        data: { status: isAlreadyRepaired ? 'REPAIRED' : 'READY' }
       });
 
       throw err;

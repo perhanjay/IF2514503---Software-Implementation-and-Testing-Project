@@ -335,7 +335,11 @@ export class SessionController {
       console.error('[Repair Auto Error]', err);
       const isNotFound = err.message?.includes('tidak ditemukan');
       const isForbidden = err.message?.includes('Akses ditolak');
-      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 400));
+      const isBadRequest = err.message?.includes('belum memiliki') ||
+                           err.message?.includes('tidak valid') ||
+                           err.message?.includes('terlebih dahulu') ||
+                           err.message?.includes('kedaluwarsa');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
       return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan otomatis' });
     }
   }
@@ -372,7 +376,11 @@ export class SessionController {
       console.error('[Repair Custom Error]', err);
       const isNotFound = err.message?.includes('tidak ditemukan');
       const isForbidden = err.message?.includes('Akses ditolak');
-      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : 400));
+      const isBadRequest = err.message?.includes('belum memiliki') ||
+                           err.message?.includes('tidak valid') ||
+                           err.message?.includes('terlebih dahulu') ||
+                           err.message?.includes('kedaluwarsa');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
       return res.status(status).json({ error: err.message || 'Gagal mengeksekusi perbaikan kustom' });
     }
   }

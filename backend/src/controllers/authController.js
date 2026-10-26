@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma.js';
 import { WalletService } from '../services/walletService.js';
+import LoginRateLimiter from '../services/loginRateLimiter.js';
+import TokenRevocationService from '../services/tokenRevocationService.js';
 
 export class AuthController {
   /**
@@ -82,7 +84,7 @@ export class AuthController {
       });
 
       const token = jwt.sign(
-        { userId: result.user.id, role: result.user.role },
+        { userId: result.user.id, role: result.user.role, authTime: Date.now() },
         process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl',
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
@@ -117,23 +119,35 @@ export class AuthController {
         return res.status(400).json({ error: 'Email dan kata sandi wajib diisi' });
       }
 
+      // Proteksi Brute-Force pada Login (Row 24 / UC-02)
+      if (await LoginRateLimiter.isLocked(email)) {
+        return res.status(429).json({
+          error: 'Terlalu banyak percobaan login gagal. Akun dikunci sementara selama 15 menit.'
+        });
+      }
+
       const user = await prisma.user.findUnique({
         where: { email },
         include: { wallet: true }
       });
 
       if (!user) {
+        await LoginRateLimiter.recordFailedAttempt(email);
         return res.status(401).json({ error: 'Email atau kata sandi tidak valid. Silakan periksa kembali' });
       }
 
       const isMatch = await bcrypt.compare(password, user.passwordHash);
       if (!isMatch) {
+        await LoginRateLimiter.recordFailedAttempt(email);
         return res.status(401).json({ error: 'Email atau kata sandi tidak valid. Silakan periksa kembali' });
       }
 
+      // Reset counter percobaan gagal saat login berhasil
+      await LoginRateLimiter.resetAttempts(email);
+
       const expiresIn = rememberMe ? '30d' : (process.env.JWT_EXPIRES_IN || '7d');
       const token = jwt.sign(
-        { userId: user.id, role: user.role },
+        { userId: user.id, role: user.role, authTime: Date.now() },
         process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl',
         { expiresIn }
       );
@@ -234,6 +248,9 @@ export class AuthController {
         data: { passwordHash: newHash }
       });
 
+      // Revokasi Seluruh Token JWT Pengguna Sebelumnya (Row 54 / UC-05)
+      await TokenRevocationService.revokeUserTokens(req.user.id);
+
       return res.json({ message: 'Kata sandi berhasil diperbarui' });
     } catch (err) {
       console.error('[Change Password Error]', err);
@@ -284,7 +301,7 @@ export class AuthController {
       }
 
       const token = jwt.sign(
-        { userId: guestUser.id, role: guestUser.role, isGuest: true },
+        { userId: guestUser.id, role: guestUser.role, isGuest: true, authTime: Date.now() },
         process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl',
         { expiresIn: '30d' }
       );

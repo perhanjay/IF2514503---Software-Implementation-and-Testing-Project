@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma.js';
+import TokenRevocationService from '../services/tokenRevocationService.js';
 
 export const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -17,6 +18,19 @@ export const authenticate = async (req, res, next) => {
 
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized: Pengguna tidak ditemukan' });
+    }
+
+    // Revokasi Token JWT Saat Kata Sandi Diperbarui (Row 54 / UC-05)
+    const isRevoked = await TokenRevocationService.isTokenRevoked(
+      user.id,
+      decoded.iat,
+      decoded.authTime
+    );
+
+    if (isRevoked) {
+      return res.status(401).json({
+        error: 'Sesi telah kedaluwarsa atau kata sandi telah diperbarui. Silakan login kembali'
+      });
     }
 
     req.user = user;

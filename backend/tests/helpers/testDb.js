@@ -1,5 +1,7 @@
 import prisma from '../../src/config/prisma.js';
 import bcrypt from 'bcryptjs';
+import LoginRateLimiter from '../../src/services/loginRateLimiter.js';
+import TokenRevocationService from '../../src/services/tokenRevocationService.js';
 
 export const TEST_EMAIL_DOMAIN = '@polaris-test.local';
 
@@ -42,6 +44,8 @@ export async function createTestUser({
  */
 export async function cleanupTestData() {
   try {
+    await LoginRateLimiter.clearAll();
+    await TokenRevocationService.clearAll();
     await prisma.user.deleteMany({
       where: {
         OR: [
