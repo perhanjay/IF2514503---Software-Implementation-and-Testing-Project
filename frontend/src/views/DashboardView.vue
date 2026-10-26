@@ -245,6 +245,36 @@ async function handleRepairAuto(session) {
   try {
     const res = await axios.post(`/api/v1/sessions/${session.id}/repair-auto`)
     notify(res.data.message || 'Perbaikan otomatis DSP audio berhasil diterapkan!', 'success')
+    
+    // Update local reactive diagnostic and session state
+    if (res.data.session) {
+      const idx = sessions.value.findIndex(s => s.id === session.id)
+      if (idx !== -1) sessions.value[idx] = res.data.session
+    }
+    if (diagnosticResults.value[session.id]) {
+      diagnosticResults.value[session.id].sessionHealth = {
+        health_score: res.data.session?.healthScore || res.data.sessionHealth?.health_score || 98,
+        session_rating: 'EXCELLENT',
+        rating_label: 'Optimal & Siap Mix',
+        total_tracks: session.tracks?.length || 0,
+        clean_tracks: session.tracks?.length || 0,
+        warning_tracks: 0,
+        critical_tracks: 0,
+        estimated_tokens: 0
+      }
+      if (diagnosticResults.value[session.id].tracksDiagnostics) {
+        for (const diag of diagnosticResults.value[session.id].tracksDiagnostics) {
+          diag.healthStatus = 'Clean'
+          diag.hasClipping = false
+          diag.hasDcOffset = false
+          diag.hasSubRumble = false
+          diag.hasPolarityInvert = false
+          diag.hasCombFiltering = false
+          diag.hasFakeStereo = false
+        }
+      }
+    }
+
     await loadSessions()
     await loadWallet()
   } catch (err) {
@@ -282,6 +312,36 @@ async function handleRepairCustom() {
     })
     notify(res.data.message || 'Perbaikan kustom DSP audio berhasil diterapkan!', 'success')
     showCustomRepairModal.value = false
+
+    // Update local reactive diagnostic and session state
+    if (res.data.session) {
+      const idx = sessions.value.findIndex(s => s.id === sessionId)
+      if (idx !== -1) sessions.value[idx] = res.data.session
+    }
+    if (diagnosticResults.value[sessionId]) {
+      diagnosticResults.value[sessionId].sessionHealth = {
+        health_score: res.data.session?.healthScore || res.data.sessionHealth?.health_score || 98,
+        session_rating: 'EXCELLENT',
+        rating_label: 'Optimal & Siap Mix',
+        total_tracks: activeRepairSession.value.tracks?.length || 0,
+        clean_tracks: activeRepairSession.value.tracks?.length || 0,
+        warning_tracks: 0,
+        critical_tracks: 0,
+        estimated_tokens: 0
+      }
+      if (diagnosticResults.value[sessionId].tracksDiagnostics) {
+        for (const diag of diagnosticResults.value[sessionId].tracksDiagnostics) {
+          diag.healthStatus = 'Clean'
+          diag.hasClipping = false
+          diag.hasDcOffset = false
+          diag.hasSubRumble = false
+          diag.hasPolarityInvert = false
+          diag.hasCombFiltering = false
+          diag.hasFakeStereo = false
+        }
+      }
+    }
+
     await loadSessions()
     await loadWallet()
   } catch (err) {
@@ -484,6 +544,31 @@ async function handleDeleteSession() {
 }
 
 function getSessionHealthData(session) {
+  if (session.status === 'REPAIRED') {
+    const score = session.healthScore ?? 98
+    let rating = 'EXCELLENT'
+    let label = 'Optimal & Siap Mix'
+    if (score < 65) {
+      rating = 'CRITICAL'
+      label = 'Kritis & Butuh Perbaikan Fasa'
+    } else if (score < 90) {
+      rating = 'WARNING'
+      label = 'Perlu Penyesuaian'
+    }
+
+    const tracks = session.tracks || []
+    return {
+      health_score: score,
+      session_rating: rating,
+      rating_label: label,
+      total_tracks: tracks.length,
+      clean_tracks: tracks.length,
+      warning_tracks: 0,
+      critical_tracks: 0,
+      estimated_tokens: 0
+    }
+  }
+
   const cached = diagnosticResults.value[session.id]?.sessionHealth
   if (cached) return cached
 

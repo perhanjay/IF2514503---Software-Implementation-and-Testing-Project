@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   track: {
@@ -40,9 +40,26 @@ const instrumentCategories = [
   { label: 'Other', value: 'Other' }
 ]
 
+function openEdit() {
+  selectedLabel.value = props.track.instrumentLabel || props.track.detectedLabel || 'Other'
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  selectedLabel.value = props.track.instrumentLabel || props.track.detectedLabel || 'Other'
+  isEditing.value = false
+}
+
+watch(() => props.track.instrumentLabel, (newVal) => {
+  if (!isEditing.value) {
+    selectedLabel.value = newVal || props.track.detectedLabel || 'Other'
+  }
+})
+
 const confidenceScore = computed(() => {
-  if (props.track.waveformPeaksJson?.confidence) {
-    return Math.round(props.track.waveformPeaksJson.confidence * 100)
+  const conf = props.track.waveformPeaksJson?.confidence ?? props.track.confidenceScore ?? props.track.confidence
+  if (conf !== undefined && conf !== null) {
+    return conf <= 1 ? Math.round(conf * 100) : Math.round(conf)
   }
   // Fallback or estimated
   return props.track.detectedLabel ? 92 : 50
@@ -85,7 +102,7 @@ function saveLabel() {
               </span>
 
               <button 
-                @click="isEditing = true"
+                @click="openEdit"
                 class="text-[11px] text-slate-400 hover:text-[#0052FF] underline cursor-pointer">
                 Ubah
               </button>
@@ -106,7 +123,7 @@ function saveLabel() {
                   Simpan
                 </button>
                 <button 
-                  @click="isEditing = false"
+                  @click="cancelEdit"
                   class="px-2 py-1 text-xs bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer">
                   Batal
                 </button>

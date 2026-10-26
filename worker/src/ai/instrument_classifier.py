@@ -157,6 +157,7 @@ def classify_track(audio_data, sample_rate, file_name=""):
         "confidence_score": confidence,
         "needs_review": needs_review,
         "spectral_summary": {
+            "confidence": confidence,
             "spectral_centroid_hz": round(features.get("spectral_centroid_hz", 0), 1),
             "spectral_rolloff_hz": round(features.get("spectral_rolloff_hz", 0), 1),
             "crest_factor_db": round(features.get("crest_factor_db", 0), 1),

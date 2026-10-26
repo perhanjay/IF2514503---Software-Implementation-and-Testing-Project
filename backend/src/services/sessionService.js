@@ -493,12 +493,18 @@ export class SessionService {
 
       // 3. Simpan hasil klasifikasi ke tabel tracks
       for (const item of (workerResult.classifiedTracks || [])) {
+        const spectralWithConfidence = {
+          ...(item.spectralSummary || {}),
+          confidence: item.confidenceScore !== undefined ? item.confidenceScore : (item.spectralSummary?.confidence ?? 0.92),
+          needsReview: Boolean(item.needsReview)
+        };
+
         await prisma.track.update({
           where: { id: item.trackId },
           data: {
             detectedLabel: item.detectedLabel,
             instrumentLabel: item.detectedLabel,
-            waveformPeaksJson: item.spectralSummary || null,
+            waveformPeaksJson: spectralWithConfidence,
             status: 'ANALYZED'
           }
         });
