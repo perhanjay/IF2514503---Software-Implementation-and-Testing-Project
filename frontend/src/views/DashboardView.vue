@@ -291,6 +291,94 @@ async function handleRepairCustom() {
   }
 }
 
+// UC-17 & UC-18: Download ZIP & Report PDF Handlers
+const downloadingZipId = ref(null)
+const downloadingPdfId = ref(null)
+
+async function handleDownloadZip(session) {
+  if (!session) return
+  downloadingZipId.value = session.id
+  try {
+    const res = await axios.get(`/api/v1/sessions/${session.id}/download`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([res.data], { type: 'application/zip' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    let filename = `Polaris_Session_${(session.title || 'Session').replace(/[^a-zA-Z0-9_\-\.]/g, '_')}_Repaired.zip`
+    const disposition = res.headers['content-disposition']
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/)
+      if (match && match[1]) filename = match[1]
+    }
+    
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    notify('Berkas arsip stem perbaikan (ZIP) berhasil diunduh.', 'success')
+  } catch (err) {
+    let errorMsg = 'Gagal mengunduh berkas ZIP hasil perbaikan'
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text()
+        const parsed = JSON.parse(text)
+        if (parsed.error) errorMsg = parsed.error
+      } catch {}
+    } else if (err.response?.data?.error) {
+      errorMsg = err.response.data.error
+    }
+    notify(errorMsg, 'error')
+  } finally {
+    downloadingZipId.value = null
+  }
+}
+
+async function handleDownloadReport(session) {
+  if (!session) return
+  downloadingPdfId.value = session.id
+  try {
+    const res = await axios.get(`/api/v1/sessions/${session.id}/report`, {
+      responseType: 'blob'
+    })
+    const blob = new Blob([res.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    let filename = `Polaris_Audit_${(session.title || 'Session').replace(/[^a-zA-Z0-9_\-\.]/g, '_')}.pdf`
+    const disposition = res.headers['content-disposition']
+    if (disposition && disposition.includes('filename=')) {
+      const match = disposition.match(/filename="?([^";]+)"?/)
+      if (match && match[1]) filename = match[1]
+    }
+    
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+    notify('Dokumen laporan audit PDF resmi berhasil diunduh.', 'success')
+  } catch (err) {
+    let errorMsg = 'Gagal mengunduh laporan audit PDF'
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text()
+        const parsed = JSON.parse(text)
+        if (parsed.error) errorMsg = parsed.error
+      } catch {}
+    } else if (err.response?.data?.error) {
+      errorMsg = err.response.data.error
+    }
+    notify(errorMsg, 'error')
+  } finally {
+    downloadingPdfId.value = null
+  }
+}
+
 const auditionInitialized = ref({})
 
 function isAuditionDetailsOpen(sessionId) {
@@ -680,10 +768,44 @@ onMounted(async () => {
                     <span>{{ diagnosingSessionId === s.id ? 'DSP Menganalisis...' : 'Audit Fasa & DSP' }}</span>
                   </button>
 
+                  <!-- UC-18: Unduh Laporan Audit PDF -->
+                  <button 
+                    v-if="s.healthScore !== null"
+                    @click="handleDownloadReport(s)"
+                    :disabled="downloadingPdfId === s.id"
+                    title="Unduh dokumen laporan audit PDF resmi"
+                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
+                    <svg v-if="downloadingPdfId === s.id" class="animate-spin w-3.5 h-3.5 text-[#0052FF]" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>{{ downloadingPdfId === s.id ? 'Membuat PDF...' : 'Unduh Laporan Audit PDF' }}</span>
+                  </button>
+
+                  <!-- UC-17: Unduh Paket ZIP (Lossless) -->
+                  <button 
+                    v-if="s.status === 'REPAIRED'"
+                    @click="handleDownloadZip(s)"
+                    :disabled="downloadingZipId === s.id"
+                    title="Unduh seluruh audio stem perbaikan dalam arsip ZIP lossless"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
+                    <svg v-if="downloadingZipId === s.id" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <svg v-else class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>{{ downloadingZipId === s.id ? 'Mengemas ZIP...' : 'Unduh Paket ZIP (Lossless)' }}</span>
+                  </button>
+
                   <button 
                     v-if="s.status === 'REPAIRED'"
                     @click="openAuditionSection(s)"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
+                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
                     title="Buka Studio Audisi Komparasi A/B">
                     <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -1047,6 +1169,27 @@ onMounted(async () => {
                       </div>
 
                       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                        <button 
+                          @click="handleDownloadReport(s)"
+                          :disabled="downloadingPdfId === s.id"
+                          class="px-3.5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                          <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          <span>{{ downloadingPdfId === s.id ? 'Membuat...' : 'Unduh Laporan PDF' }}</span>
+                        </button>
+
+                        <button 
+                          v-if="s.status === 'REPAIRED'"
+                          @click="handleDownloadZip(s)"
+                          :disabled="downloadingZipId === s.id"
+                          class="px-3.5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5">
+                          <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          <span>{{ downloadingZipId === s.id ? 'Mengemas...' : 'Unduh ZIP (Lossless)' }}</span>
+                        </button>
+
                         <button 
                           @click="openCustomRepairModal(s)"
                           :disabled="repairingSessionId === s.id"

@@ -401,6 +401,48 @@ export class SessionController {
       return res.status(status).json({ error: err.message || 'Gagal mengambil URL audio sesi' });
     }
   }
+
+  /**
+   * UC-17: Unduh Stem Hasil Perbaikan ZIP Lossless
+   */
+  static async downloadSession(req, res) {
+    try {
+      const { id } = req.params;
+      const { filename, buffer } = await SessionService.downloadSessionRepairedZip(id, req.user.id);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    } catch (err) {
+      console.error('[Download Session Error]', err);
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const isBadRequest = err.message?.includes('belum melalui') || err.message?.includes('belum memiliki');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
+      return res.status(status).json({ error: err.message || 'Gagal mengunduh berkas perbaikan sesi' });
+    }
+  }
+
+  /**
+   * UC-18: Unduh Laporan Diagnostik Sesi PDF
+   */
+  static async downloadReport(req, res) {
+    try {
+      const { id } = req.params;
+      const { filename, buffer } = await SessionService.generateSessionReportPdf(id, req.user.id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    } catch (err) {
+      console.error('[Download Report Error]', err);
+      const isNotFound = err.message === 'Sesi tidak ditemukan';
+      const isForbidden = err.message?.includes('Akses ditolak');
+      const isBadRequest = err.message?.includes('belum memiliki') || err.message?.includes('belum melalui');
+      const status = err.statusCode || (isForbidden ? 403 : (isNotFound ? 404 : (isBadRequest ? 400 : 500)));
+      return res.status(status).json({ error: err.message || 'Gagal mengunduh laporan diagnostik sesi' });
+    }
+  }
 }
 
 

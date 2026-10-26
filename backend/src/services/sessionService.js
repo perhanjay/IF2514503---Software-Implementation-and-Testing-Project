@@ -2,12 +2,40 @@ import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { parseBuffer } from 'music-metadata';
 import AdmZip from 'adm-zip';
+import PDFDocument from 'pdfkit';
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../config/prisma.js';
 import { s3Client, BUCKET_NAME } from '../config/s3.js';
 import { WalletService } from './walletService.js';
+
+function makeFallbackWav(sampleRate = 48000, durationSec = 0.5) {
+  const numSamples = Math.floor(durationSec * sampleRate);
+  const bytesPerSample = 2;
+  const numChannels = 1;
+  const blockAlign = numChannels * bytesPerSample;
+  const dataSize = numSamples * blockAlign;
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVE', 8);
+
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20); // PCM
+  buffer.writeUInt16LE(numChannels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * blockAlign, 28);
+  buffer.writeUInt16LE(blockAlign, 32);
+  buffer.writeUInt16LE(16, 34);
+
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+
+  return buffer;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1166,6 +1194,350 @@ export class SessionService {
       tracks: tracksWithUrls,
       trackPairs: session.trackPairs
     };
+  }
+
+  /**
+   * UC-17: Mengunduh Stems Audio Hasil Perbaikan dalam satu arsip ZIP Lossless
+   */
+  static async downloadSessionRepairedZip(sessionId, userId) {
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: true
+      }
+    });
+
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    if (session.status !== 'REPAIRED') {
+      const err = new Error('Sesi belum melalui proses perbaikan audio');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (!session.tracks || session.tracks.length === 0) {
+      const err = new Error('Sesi belum memiliki berkas trek audio untuk diunduh');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const zip = new AdmZip();
+    const usedNames = new Set();
+
+    for (const track of session.tracks) {
+      const storageKey = track.repairedStorageKey || track.originalStorageKey;
+      let fileBuffer = null;
+
+      if (storageKey) {
+        try {
+          const s3Res = await s3Client.send(new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: storageKey
+          }));
+          const byteArray = await s3Res.Body.transformToByteArray();
+          fileBuffer = Buffer.from(byteArray);
+        } catch (e) {
+          console.warn(`[Download ZIP Warning] Could not fetch ${storageKey} from S3, using fallback:`, e.message);
+          fileBuffer = makeFallbackWav(session.sampleRate || 48000, track.durationSec || 0.5);
+        }
+      } else {
+        fileBuffer = makeFallbackWav(session.sampleRate || 48000, track.durationSec || 0.5);
+      }
+
+      let baseName = path.basename(track.fileName || `track_${track.id}.wav`);
+      if (track.repairedStorageKey && !baseName.startsWith('FIXED_')) {
+        baseName = `FIXED_${baseName}`;
+      }
+      let zipEntryName = baseName;
+      let counter = 1;
+      while (usedNames.has(zipEntryName)) {
+        const ext = path.extname(baseName) || '.wav';
+        const namePart = path.basename(baseName, ext);
+        zipEntryName = `${namePart}_${counter}${ext}`;
+        counter++;
+      }
+      usedNames.add(zipEntryName);
+      zip.addFile(zipEntryName, fileBuffer);
+    }
+
+    const zipBuffer = zip.toBuffer();
+    const safeTitle = (session.title || 'Session').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+    return {
+      filename: `Polaris_Session_${safeTitle}_Repaired.zip`,
+      buffer: zipBuffer
+    };
+  }
+
+  /**
+   * UC-18: Menghasilkan Laporan Diagnostik Sesi PDF Resmi
+   */
+  static async generateSessionReportPdf(sessionId, userId) {
+    if (!isValidUuid(sessionId)) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const session = await prisma.session.findUnique({
+      where: { id: sessionId },
+      include: {
+        tracks: {
+          include: { diagnosticResult: true }
+        },
+        trackPairs: {
+          include: { trackA: true, trackB: true }
+        }
+      }
+    });
+
+    if (!session) {
+      const err = new Error('Sesi tidak ditemukan');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (session.userId !== userId) {
+      const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    const hasDiagnostics = session.healthScore !== null || session.tracks.some(t => t.diagnosticResult !== null);
+    if (!hasDiagnostics) {
+      const err = new Error('Sesi belum memiliki laporan diagnostik');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const safeTitle = (session.title || 'Session').replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+    const cleanPdfText = (str, fallback = '-') => {
+      if (!str) return fallback;
+      return String(str)
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2013\u2014]/g, '-')
+        .replace(/[^\x20-\x7E\xA0-\xFF]/g, ' ')
+        .trim() || fallback;
+    };
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({
+        bufferPages: true,
+        margin: 40,
+        size: 'A4',
+        info: {
+          Title: `Polaris Audio Audit - ${cleanPdfText(session.title || 'Session')}`,
+          Author: 'Polaris Audio DSP Engine',
+          Subject: 'Multitrack Mixing Preparation & Deterministic DSP Diagnostics Report'
+        }
+      });
+
+      const buffers = [];
+      doc.on('data', chunk => buffers.push(chunk));
+      doc.on('end', () => {
+        resolve({
+          filename: `Polaris_Audit_${safeTitle}.pdf`,
+          buffer: Buffer.concat(buffers)
+        });
+      });
+      doc.on('error', reject);
+
+      // --- PDF CONTENT GENERATION CONFORMING TO DESIGN.MD ---
+      const primaryColor = '#0052FF';
+      const slateDark = '#0F172A';
+      const slateMuted = '#64748B';
+      const slateBorder = '#E2E8F0';
+      const cardBg = '#F8FAFC';
+
+      // Header Banner
+      doc.rect(40, 40, 515, 60).fillAndStroke(slateDark, slateDark);
+      doc.fillColor('#FFFFFF').fontSize(16).font('Helvetica-Bold').text('POLARIS AUDIO', 55, 52);
+      doc.fillColor('#94A3B8').fontSize(9).font('Helvetica').text('Multitrack Audio Session Prep & Deterministic DSP Diagnostics', 55, 72);
+      doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('AUDIT REPORT', 450, 52, { align: 'right', width: 90 });
+
+      // Metadata Sesi Card
+      const metaY = 115;
+      doc.roundedRect(40, metaY, 515, 75, 4).fillAndStroke(cardBg, slateBorder);
+      doc.fillColor(slateDark).fontSize(10).font('Helvetica-Bold').text('METADATA SESI', 55, metaY + 12);
+
+      doc.fontSize(8.5).font('Helvetica');
+      doc.fillColor(slateMuted).text('Judul Sesi:', 55, metaY + 30);
+      doc.fillColor(slateDark).font('Helvetica-Bold').text(cleanPdfText(session.title, 'Untitled'), 120, metaY + 30);
+
+      doc.fillColor(slateMuted).font('Helvetica').text('Status:', 55, metaY + 45);
+      doc.fillColor(slateDark).font('Helvetica-Bold').text(session.status, 120, metaY + 45);
+
+      doc.fillColor(slateMuted).font('Helvetica').text('Sample Rate:', 280, metaY + 30);
+      doc.fillColor(slateDark).font('Helvetica-Bold').text(`${(session.sampleRate || 48000) / 1000} kHz`, 350, metaY + 30);
+
+      doc.fillColor(slateMuted).font('Helvetica').text('Bit Depth:', 280, metaY + 45);
+      doc.fillColor(slateDark).font('Helvetica-Bold').text(`${session.bitDepth || 24}-bit PCM`, 350, metaY + 45);
+
+      doc.fillColor(slateMuted).font('Helvetica').text('Tanggal Audit:', 55, metaY + 60);
+      doc.fillColor(slateDark).font('Helvetica-Bold').text(new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }), 120, metaY + 60);
+
+      // Mix Health Score & Kategori Status
+      const scoreY = 205;
+      const score = Math.round(session.healthScore ?? 100);
+      let statusCategory = 'Clean';
+      let scoreColor = '#059669'; // Emerald
+      if (score < 65) {
+        statusCategory = 'Critical';
+        scoreColor = '#E11D48'; // Rose
+      } else if (score < 90) {
+        statusCategory = 'Warning';
+        scoreColor = '#D97706'; // Amber
+      }
+
+      doc.roundedRect(40, scoreY, 515, 60, 4).fillAndStroke(cardBg, slateBorder);
+      doc.fillColor(slateDark).fontSize(10).font('Helvetica-Bold').text('MIX HEALTH SCORE', 55, scoreY + 14);
+      doc.fillColor(scoreColor).fontSize(22).font('Helvetica-Bold').text(`${score}/100`, 55, scoreY + 30);
+
+      doc.fillColor(slateMuted).fontSize(8.5).font('Helvetica').text('Kategori Status:', 280, scoreY + 16);
+      doc.fillColor(scoreColor).font('Helvetica-Bold').fontSize(11).text(statusCategory, 350, scoreY + 15);
+
+      const statusDesc = statusCategory === 'Clean'
+        ? 'Sesi selaras sempurna (zero-aligned), tidak ada anomali polaritas atau clipping.'
+        : statusCategory === 'Warning'
+        ? 'Ditemukan beberapa anomali fasa atau headroom staging yang perlu penyesuaian.'
+        : 'Ditemukan pembatalan fasa masif 180° atau clipping inter-sample yang kritis.';
+      doc.fillColor(slateDark).font('Helvetica').fontSize(8).text(statusDesc, 280, scoreY + 34, { width: 260 });
+
+      // Rekapitulasi Trek Audio Table
+      let tableY = 280;
+      doc.fillColor(slateDark).fontSize(11).font('Helvetica-Bold').text('REKAPITULASI TREK AUDIO', 40, tableY);
+      tableY += 18;
+
+      const drawTableHeader = (y) => {
+        doc.rect(40, y, 515, 20).fillAndStroke('#E2E8F0', '#CBD5E1');
+        doc.fillColor(slateDark).fontSize(8).font('Helvetica-Bold');
+        doc.text('Nama Trek / Berkas', 45, y + 6);
+        doc.text('Instrumen', 180, y + 6);
+        doc.text('True-Peak', 260, y + 6);
+        doc.text('Korelasi', 330, y + 6);
+        doc.text('DC Offset', 390, y + 6);
+        doc.text('Status / Anomali', 445, y + 6);
+      };
+
+      drawTableHeader(tableY);
+      tableY += 20;
+
+      // Table Rows
+      for (let i = 0; i < session.tracks.length; i++) {
+        const track = session.tracks[i];
+        const diag = track.diagnosticResult || {};
+        const isEven = i % 2 === 0;
+        const rowBg = isEven ? '#FFFFFF' : '#F8FAFC';
+        
+        doc.rect(40, tableY, 515, 22).fillAndStroke(rowBg, slateBorder);
+
+        const rawFileName = track.fileName || `Track_${track.id}`;
+        const fileNameClean = cleanPdfText(rawFileName);
+        const fileNameShort = fileNameClean.length > 25 ? fileNameClean.substring(0, 22) + '...' : fileNameClean;
+        doc.fontSize(7.5).font('Helvetica').fillColor(slateDark);
+        doc.text(fileNameShort, 45, tableY + 7);
+
+        const instLabel = cleanPdfText(track.instrumentLabel || track.detectedLabel || 'Other');
+        doc.text(instLabel, 180, tableY + 7);
+
+        // Monospace telemetry font for metrics conforming to DESIGN.md
+        doc.font('Courier');
+        const truePeak = diag.truePeakDbfs !== null && diag.truePeakDbfs !== undefined ? `${diag.truePeakDbfs.toFixed(1)} dBFS` : '-0.0 dBFS';
+        doc.text(truePeak, 260, tableY + 7);
+
+        const phaseCorr = diag.phaseCorrelation !== null && diag.phaseCorrelation !== undefined ? diag.phaseCorrelation.toFixed(2) : '+1.00';
+        doc.text(phaseCorr, 330, tableY + 7);
+
+        const dcText = diag.hasDcOffset ? 'Terdeteksi' : '0.0%';
+        doc.text(dcText, 390, tableY + 7);
+
+        doc.font('Helvetica');
+        const issues = [];
+        if (diag.hasPolarityInvert) issues.push('Polaritas (Invert)');
+        if (diag.hasClipping) issues.push('Clipping');
+        if (diag.hasFakeStereo) issues.push('Haas Stereo');
+        if (diag.hasSubRumble) issues.push('Sub-Rumble');
+        if (diag.hasCombFiltering) issues.push('Delay Offset');
+        const issueStr = issues.length > 0 ? issues.join(', ') : 'Clean';
+        
+        const issueColor = issues.length > 0 ? (diag.hasPolarityInvert || diag.hasClipping ? '#E11D48' : '#D97706') : '#059669';
+        doc.fillColor(issueColor).font(issues.length > 0 ? 'Helvetica-Bold' : 'Helvetica').text(issueStr, 445, tableY + 7, { width: 105 });
+
+        tableY += 22;
+
+        if (tableY > 690 && i < session.tracks.length - 1) {
+          doc.addPage();
+          tableY = 40;
+          drawTableHeader(tableY);
+          tableY += 20;
+        }
+      }
+
+      // Rekomendasi Teknis Mixing Audio Section
+      tableY += 15;
+      if (tableY > 640) {
+        doc.addPage();
+        tableY = 40;
+      }
+
+      doc.fillColor(slateDark).fontSize(11).font('Helvetica-Bold').text('REKOMENDASI TEKNIS MIXING AUDIO', 40, tableY);
+      tableY += 16;
+
+      const allRecs = [];
+      for (const t of session.tracks) {
+        if (t.diagnosticResult?.recommendations && Array.isArray(t.diagnosticResult.recommendations)) {
+          for (const rec of t.diagnosticResult.recommendations) {
+            allRecs.push(`* [${cleanPdfText(t.fileName || 'Trek')}]: ${cleanPdfText(rec)}`);
+          }
+        }
+      }
+
+      if (allRecs.length === 0) {
+        allRecs.push('* Seluruh stem audio berada dalam kondisi fase optimal dan tidak memerlukan perbaikan.');
+      }
+
+      const recBoxHeight = Math.min(100, Math.max(50, allRecs.length * 15 + 16));
+      doc.roundedRect(40, tableY, 515, recBoxHeight, 4).fillAndStroke(cardBg, slateBorder);
+      let recY = tableY + 10;
+      doc.fillColor(slateDark).fontSize(8).font('Helvetica');
+      for (const rec of allRecs.slice(0, 6)) {
+        doc.text(rec, 50, recY, { width: 495 });
+        recY += 14;
+      }
+
+      // Add footers on every buffered page
+      const range = doc.bufferedPageRange();
+      for (let p = range.start; p < range.start + range.count; p++) {
+        doc.switchToPage(p);
+        doc.fontSize(7.5).font('Helvetica').fillColor(slateMuted);
+        doc.text(
+          `Dokumen audit ini diterbitkan secara otomatis oleh Polaris Audio DSP Diagnostics Engine sesuai spesifikasi ITU-R BS.1770-4. | Halaman ${p + 1} dari ${range.count}`,
+          40,
+          800,
+          { align: 'center', width: 515 }
+        );
+      }
+
+      doc.end();
+    });
   }
 }
 

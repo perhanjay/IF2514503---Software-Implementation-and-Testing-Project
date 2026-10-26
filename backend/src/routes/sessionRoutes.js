@@ -53,5 +53,11 @@ router.post('/:id/repair-custom', SessionController.repairCustom);
 // UC-16: A/B Multitrack Auditioning Player Audio Sources
 router.get('/:id/audio-sources', SessionController.getAudioSources);
 
+// UC-17: Unduh Stem Hasil Perbaikan ZIP Lossless
+router.get('/:id/download', SessionController.downloadSession);
+
+// UC-18: Unduh Laporan Diagnostik Sesi PDF
+router.get('/:id/report', SessionController.downloadReport);
+
 export default router;
 

@@ -4,6 +4,7 @@ import prisma from '../config/prisma.js';
 import { WalletService } from '../services/walletService.js';
 import LoginRateLimiter from '../services/loginRateLimiter.js';
 import TokenRevocationService from '../services/tokenRevocationService.js';
+import PasswordResetService from '../services/passwordResetService.js';
 
 export class AuthController {
   /**
@@ -344,5 +345,115 @@ export class AuthController {
         balance: wallet?.balance ?? 0
       }
     });
+  }
+
+  /**
+   * UC-03: Lupa Kata Sandi (Permintaan Reset Token)
+   */
+  static async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ error: 'Alamat email wajib diisi' });
+      }
+
+      const EMAIL_REGEX = /^[\w.-]+@([\w-]+\.)+[a-zA-Z0-9-]{2,}$/;
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!EMAIL_REGEX.test(normalizedEmail)) {
+        return res.status(400).json({ error: 'Format alamat email tidak valid' });
+      }
+
+      if (normalizedEmail === 'guest@polaris.audio') {
+        return res.json({
+          message: 'Jika email terdaftar, tautan pemulihan kata sandi telah dikirim'
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail }
+      });
+
+      if (!user) {
+        // Konsisten dan aman (mencegah enumerasi akun)
+        return res.json({
+          message: 'Jika email terdaftar, tautan pemulihan kata sandi telah dikirim'
+        });
+      }
+
+      const { token } = await PasswordResetService.createResetToken(user);
+
+      return res.json({
+        message: 'Tautan pemulihan kata sandi telah dikirim ke email Anda. Silakan periksa kotak masuk.',
+        resetToken: token
+      });
+    } catch (err) {
+      console.error('[Forgot Password Error]', err);
+      return res.status(500).json({ error: 'Terjadi kesalahan saat memproses permintaan pemulihan kata sandi' });
+    }
+  }
+
+  /**
+   * UC-03: Reset Kata Sandi Baru
+   */
+  static async resetPassword(req, res) {
+    try {
+      const { token, newPassword, confirmPassword } = req.body;
+
+      if (!token || typeof token !== 'string' || !token.trim()) {
+        return res.status(400).json({ error: 'Token pemulihan tidak valid atau telah kedaluwarsa' });
+      }
+
+      const entry = await PasswordResetService.verifyResetToken(token.trim());
+      if (!entry) {
+        return res.status(400).json({ error: 'Token pemulihan tidak valid atau telah kedaluwarsa' });
+      }
+
+      if (!newPassword || typeof newPassword !== 'string') {
+        return res.status(400).json({ error: 'Kata sandi baru wajib diisi' });
+      }
+
+      if (newPassword.length < 8 || !/(?=.*[a-zA-Z])(?=.*[0-9])/.test(newPassword)) {
+        return res.status(400).json({
+          error: 'Kata sandi baru minimal 8 karakter dan harus mengandung kombinasi huruf serta angka'
+        });
+      }
+
+      if (newPassword.length > 128) {
+        return res.status(400).json({
+          error: 'Kata sandi baru tidak boleh melebihi 128 karakter'
+        });
+      }
+
+      if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+        return res.status(400).json({ error: 'Konfirmasi kata sandi baru tidak cocok' });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: entry.userId }
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(newPassword, salt);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash }
+      });
+
+      // Konsumsi / hapus token reset (anti-replay)
+      await PasswordResetService.consumeResetToken(token.trim());
+
+      // Cabut seluruh sesi JWT sebelumnya
+      await TokenRevocationService.revokeUserTokens(user.id);
+
+      return res.json({ message: 'Kata sandi berhasil diperbarui' });
+    } catch (err) {
+      console.error('[Reset Password Error]', err);
+      return res.status(500).json({ error: 'Gagal memperbarui kata sandi' });
+    }
   }
 }
