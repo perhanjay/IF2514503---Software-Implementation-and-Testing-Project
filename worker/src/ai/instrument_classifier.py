@@ -3,6 +3,11 @@ import os
 import re
 from .mel_spectrogram import extract_spectral_features, extract_mel_spectrogram
 
+try:
+    from .huggingface_client import query_huggingface_model
+except (ImportError, ValueError):
+    from huggingface_client import query_huggingface_model
+
 INSTRUMENT_CLASSES = [
     "Drums: Kick",
     "Drums: Snare",
@@ -118,8 +123,42 @@ def compute_acoustic_scores(features):
 def classify_track(audio_data, sample_rate, file_name=""):
     """
     Main Classifier entry point.
-    Combines Acoustic Spectral Analysis with Filename Prior Bayesian Fusion.
+    1. Attempts deep neural classification via Hugging Face Audio Classification API.
+    2. Gracefully falls back to Acoustic Spectral Analysis with Filename Prior Bayesian Fusion.
     """
+    # 1. First attempt inference via Hugging Face Cloud model
+    try:
+        hf_result = query_huggingface_model(audio_data, sample_rate, file_name=file_name)
+    except Exception as err:
+        hf_result = None
+
+    if hf_result and hf_result.get("detected_label") and hf_result["detected_label"] != "Other":
+        features = extract_spectral_features(audio_data, sample_rate)
+        top_class = hf_result["detected_label"]
+        confidence = float(hf_result["confidence_score"])
+        needs_review = bool(confidence < 0.80)
+        source = hf_result.get("inference_source", "huggingface")
+
+        return {
+            "detected_label": top_class,
+            "confidence_score": confidence,
+            "needs_review": needs_review,
+            "inference_source": source,
+            "spectral_summary": {
+                "confidence": confidence,
+                "inference_source": source,
+                "spectral_centroid_hz": round(features.get("spectral_centroid_hz", 0), 1),
+                "spectral_rolloff_hz": round(features.get("spectral_rolloff_hz", 0), 1),
+                "crest_factor_db": round(features.get("crest_factor_db", 0), 1),
+                "sub_energy_pct": round(features.get("sub_energy_ratio", 0) * 100, 1),
+                "low_energy_pct": round(features.get("low_energy_ratio", 0) * 100, 1),
+                "mid_energy_pct": round(features.get("mid_energy_ratio", 0) * 100, 1),
+                "high_energy_pct": round((features.get("high_mid_energy_ratio", 0) + features.get("air_energy_ratio", 0)) * 100, 1)
+            },
+            "class_probabilities": {top_class: confidence}
+        }
+
+    # 2. Resilient Fallback: Acoustic Spectral Analysis + Filename Prior Bayesian Fusion
     features = extract_spectral_features(audio_data, sample_rate)
     acoustic_scores = compute_acoustic_scores(features)
     filename_priors, has_filename_hint = compute_filename_prior(file_name)
@@ -156,8 +195,10 @@ def classify_track(audio_data, sample_rate, file_name=""):
         "detected_label": top_class,
         "confidence_score": confidence,
         "needs_review": needs_review,
+        "inference_source": "acoustic_spectral_prior",
         "spectral_summary": {
             "confidence": confidence,
+            "inference_source": "acoustic_spectral_prior",
             "spectral_centroid_hz": round(features.get("spectral_centroid_hz", 0), 1),
             "spectral_rolloff_hz": round(features.get("spectral_rolloff_hz", 0), 1),
             "crest_factor_db": round(features.get("crest_factor_db", 0), 1),
