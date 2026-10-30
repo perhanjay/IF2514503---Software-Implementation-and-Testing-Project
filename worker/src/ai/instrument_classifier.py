@@ -122,27 +122,28 @@ def compute_acoustic_scores(features):
 
 def classify_track(audio_data, sample_rate, file_name=""):
     """
-    Main Classifier entry point.
-    1. Attempts deep neural classification via Hugging Face Audio Classification API.
-    2. Gracefully falls back to Acoustic Spectral Analysis with Filename Prior Bayesian Fusion.
+    Main Classifier entry point conforming to UC-12.
+    1. Attempts deep neural classification via Hugging Face Audio Classification (Local AST / Remote).
+    2. If Hugging Face achieves high confidence (>= 0.80) on a valid instrument class, use it directly.
+    3. If Hugging Face is unavailable or returns lower confidence (< 0.80), perform Bayesian Acoustic Spectral
+       Analysis with Filename Prior Fusion, integrating neural predictions.
     """
-    # 1. First attempt inference via Hugging Face Cloud model
+    # 1. First attempt inference via Hugging Face model (Local AST or Remote)
     try:
         hf_result = query_huggingface_model(audio_data, sample_rate, file_name=file_name)
     except Exception as err:
         hf_result = None
 
-    if hf_result and hf_result.get("detected_label") and hf_result["detected_label"] != "Other":
+    if hf_result and hf_result.get("detected_label") and hf_result["detected_label"] != "Other" and hf_result.get("confidence_score", 0.0) >= 0.80:
         features = extract_spectral_features(audio_data, sample_rate)
         top_class = hf_result["detected_label"]
         confidence = float(hf_result["confidence_score"])
-        needs_review = bool(confidence < 0.80)
         source = hf_result.get("inference_source", "huggingface")
 
         return {
             "detected_label": top_class,
             "confidence_score": confidence,
-            "needs_review": needs_review,
+            "needs_review": False,
             "inference_source": source,
             "spectral_summary": {
                 "confidence": confidence,
@@ -176,6 +177,10 @@ def classify_track(audio_data, sample_rate, file_name=""):
             # Audio-only acoustic prediction
             fused_score = np.log(a_score) * 2.2
 
+        # If HF model had a partial hint matching this class, reinforce
+        if hf_result and hf_result.get("detected_label") == cls:
+            fused_score += np.log(1.0 + float(hf_result.get("confidence_score", 0.0))) * 1.2
+
         log_probs[cls] = fused_score
 
     # Softmax with calibrated temperature
@@ -188,6 +193,11 @@ def classify_track(audio_data, sample_rate, file_name=""):
     top_class = max(class_probs, key=class_probs.get)
     confidence = class_probs[top_class]
 
+    # Source indicates acoustic prior or fusion
+    inference_source = "acoustic_spectral_prior"
+    if hf_result and hf_result.get("detected_label") == top_class:
+        inference_source = f"{hf_result.get('inference_source', 'huggingface')}+bayesian_fusion"
+
     # Confidence threshold as per UC-12
     needs_review = bool(confidence < 0.80)
 
@@ -195,10 +205,10 @@ def classify_track(audio_data, sample_rate, file_name=""):
         "detected_label": top_class,
         "confidence_score": confidence,
         "needs_review": needs_review,
-        "inference_source": "acoustic_spectral_prior",
+        "inference_source": inference_source,
         "spectral_summary": {
             "confidence": confidence,
-            "inference_source": "acoustic_spectral_prior",
+            "inference_source": inference_source,
             "spectral_centroid_hz": round(features.get("spectral_centroid_hz", 0), 1),
             "spectral_rolloff_hz": round(features.get("spectral_rolloff_hz", 0), 1),
             "crest_factor_db": round(features.get("crest_factor_db", 0), 1),

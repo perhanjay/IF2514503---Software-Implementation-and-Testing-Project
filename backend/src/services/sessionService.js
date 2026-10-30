@@ -66,7 +66,9 @@ function runPythonWorker(payload, mode = '--classify-stdin') {
         return reject(new Error(`Worker exited with code ${code}: ${stderr}`));
       }
       try {
-        const parsed = JSON.parse(stdout);
+        const jsonMatch = stdout.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : stdout.trim();
+        const parsed = JSON.parse(jsonStr);
         resolve(parsed);
       } catch (err) {
         reject(new Error(`Failed to parse worker output: ${stdout}\nStderr: ${stderr}`));
