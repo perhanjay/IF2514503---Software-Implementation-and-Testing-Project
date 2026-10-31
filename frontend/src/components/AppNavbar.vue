@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
@@ -51,6 +51,20 @@ function closeSettingsModal() {
   securityError.value = ''
   securitySuccess.value = ''
 }
+
+function handleKeyDown(e) {
+  if (e.key === 'Escape' && showSettingsModal.value) {
+    closeSettingsModal()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
 
 async function handleUpdateProfile() {
   profileError.value = ''
@@ -281,17 +295,21 @@ function handleLogout() {
       </div>
     </div>
 
-    <!-- Modal Pengaturan Akun (UC-04: Ubah Profil & UC-05: Ubah Kata Sandi) -->
+  </header>
+
+  <!-- Modal Pengaturan Akun (UC-04: Ubah Profil & UC-05: Ubah Kata Sandi) -->
+  <Teleport to="body">
     <div 
       v-if="showSettingsModal" 
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+      @click="closeSettingsModal">
       <div 
-        class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-xl relative"
+        class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative my-auto max-h-[90vh] overflow-y-auto"
         @click.stop>
         <!-- Modal Header -->
         <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center font-bold text-sm">
+            <div class="w-8 h-8 rounded-xl bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center font-bold text-sm shrink-0">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
@@ -304,6 +322,7 @@ function handleLogout() {
           <button 
             @click="closeSettingsModal" 
             type="button"
+            title="Tutup (Esc)"
             class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -457,5 +476,5 @@ function handleLogout() {
         </form>
       </div>
     </div>
-  </header>
+  </Teleport>
 </template>
