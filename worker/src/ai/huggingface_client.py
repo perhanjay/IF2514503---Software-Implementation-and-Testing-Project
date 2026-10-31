@@ -112,16 +112,18 @@ def map_hf_predictions_to_polaris(predictions):
             polaris_scores[matched_class] = polaris_scores.get(matched_class, 0.0) + score
 
     # Select best mapped category
-    if polaris_scores and max(polaris_scores.values()) >= 0.20:
+    if polaris_scores and max(polaris_scores.values()) >= 0.15:
+        total_matched = sum(polaris_scores.values())
         best_class = max(polaris_scores, key=polaris_scores.get)
-        confidence = round(polaris_scores[best_class], 4)
+        rel_conf = polaris_scores[best_class] / max(1e-6, total_matched)
+        confidence = min(0.99, max(0.60, round(rel_conf, 4)))
     else:
         best_class = "Other"
         confidence = 0.50
 
     return {
         "detected_label": best_class,
-        "confidence_score": min(0.99, max(0.50, confidence)),
+        "confidence_score": confidence,
         "raw_hf_top_label": raw_top_label,
         "raw_hf_top_score": raw_top_score
     }

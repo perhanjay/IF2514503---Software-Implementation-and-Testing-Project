@@ -134,7 +134,7 @@ def classify_track(audio_data, sample_rate, file_name=""):
     except Exception as err:
         hf_result = None
 
-    if hf_result and hf_result.get("detected_label") and hf_result["detected_label"] != "Other" and hf_result.get("confidence_score", 0.0) >= 0.80:
+    if hf_result and hf_result.get("detected_label") and hf_result["detected_label"] != "Other" and hf_result.get("confidence_score", 0.0) >= 0.60:
         features = extract_spectral_features(audio_data, sample_rate)
         top_class = hf_result["detected_label"]
         confidence = float(hf_result["confidence_score"])
@@ -143,7 +143,7 @@ def classify_track(audio_data, sample_rate, file_name=""):
         return {
             "detected_label": top_class,
             "confidence_score": confidence,
-            "needs_review": False,
+            "needs_review": bool(confidence < 0.80),
             "inference_source": source,
             "spectral_summary": {
                 "confidence": confidence,
