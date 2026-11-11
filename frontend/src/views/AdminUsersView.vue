@@ -2,6 +2,7 @@
 import { ref, watch, onMounted } from 'vue'
 import axios from 'axios'
 import AppNavbar from '../components/AppNavbar.vue'
+import UserSupportDrawer from '../components/admin/UserSupportDrawer.vue'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -391,5 +392,13 @@ onMounted(() => {
       </div>
 
     </main>
+
+    <!-- User Support Drawer & Action Modals -->
+    <UserSupportDrawer 
+      :user-id="selectedUserId" 
+      :is-open="isDrawerOpen" 
+      @close="isDrawerOpen = false" 
+      @user-updated="fetchUsers" 
+    />
   </div>
 </template>
