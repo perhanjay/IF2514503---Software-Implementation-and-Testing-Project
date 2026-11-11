@@ -9,11 +9,8 @@ import {
   Wallet, 
   RotateCw, 
   Ban, 
-  Check, 
   LogOut, 
-  Layers,
-  ArrowUpRight,
-  ArrowDownRight
+  Layers
 } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
 
