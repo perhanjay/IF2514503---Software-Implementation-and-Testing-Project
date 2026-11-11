@@ -45,6 +45,69 @@ services:
     volumes:
       - minio_data:/data
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: polaris_backend
+    restart: always
+    command: sh -c "npx prisma migrate deploy && npm run dev"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-polaris}:${POSTGRES_PASSWORD:-polaris_secret}@postgres:5432/${POSTGRES_DB:-polaris_audio}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+      - S3_ENDPOINT=http://minio:9000
+      - S3_PUBLIC_ENDPOINT=http://localhost:9000
+      - S3_REGION=us-east-1
+      - S3_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
+      - S3_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-polaris-audio-stems}
+      - JWT_SECRET=${JWT_SECRET:-super_secret_polaris_jwt_key_2026_ippl}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:5173}
+      - MIDTRANS_SERVER_KEY=${MIDTRANS_SERVER_KEY:-SB-Mid-server-DemoPolarisAudioKey123}
+      - MIDTRANS_CLIENT_KEY=${MIDTRANS_CLIENT_KEY:-SB-Mid-client-DemoPolarisAudioKey123}
+      - MIDTRANS_IS_PRODUCTION=${MIDTRANS_IS_PRODUCTION:-false}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
+      - HUGGINGFACE_MODEL_ID=${HUGGINGFACE_MODEL_ID:-MIT/ast-finetuned-audioset-10-10-0.4593}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/src:/app/backend/src
+      - ./backend/prisma:/app/backend/prisma
+      - ./worker/src:/app/worker/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: polaris_frontend
+    restart: always
+    environment:
+      - VITE_BACKEND_URL=http://backend:5000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
     driver: local
