@@ -1,11 +1,13 @@
-import express from 'express';
+import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middlewares/auth.js';
+import AdminUserController from '../controllers/adminUserController.js';
 
-const router = express.Router();
+const router = Router();
 
-// Placeholder route for middleware verification in Task 2
-router.get('/', authenticate, requireAdmin, (req, res) => {
-  res.json({ ok: true, message: 'Admin access granted' });
-});
+// Protect all admin endpoints with authentication and administrator RBAC guard
+router.use(authenticate, requireAdmin);
+
+router.get('/', AdminUserController.listUsers);
+router.get('/:id', AdminUserController.getUserDetail);
 
 export default router;
