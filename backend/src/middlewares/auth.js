@@ -20,6 +20,10 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized: Pengguna tidak ditemukan' });
     }
 
+    if (user.status === 'SUSPENDED') {
+      return res.status(403).json({ error: 'Akses ditolak: Akun Anda telah ditangguhkan oleh administrator' });
+    }
+
     // Revokasi Token JWT Saat Kata Sandi Diperbarui (Row 54 / UC-05)
     const isRevoked = await TokenRevocationService.isTokenRevoked(
       user.id,
@@ -42,4 +46,11 @@ export const authenticate = async (req, res, next) => {
     }
     return res.status(401).json({ error: 'Unauthorized: Token tidak valid' });
   }
+};
+
+export const requireAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({ error: 'Akses ditolak: Memerlukan hak akses Administrator' });
+  }
+  next();
 };

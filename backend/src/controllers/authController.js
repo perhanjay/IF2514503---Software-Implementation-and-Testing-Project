@@ -97,7 +97,8 @@ export class AuthController {
           id: result.user.id,
           name: result.user.name,
           email: result.user.email,
-          role: result.user.role
+          role: result.user.role,
+          status: result.user.status
         },
         wallet: {
           balance: result.wallet.balance
@@ -146,6 +147,13 @@ export class AuthController {
       // Reset counter percobaan gagal saat login berhasil
       await LoginRateLimiter.resetAttempts(email);
 
+      if (user.status === 'SUSPENDED') {
+        return res.status(403).json({
+          error: 'Akun Anda telah ditangguhkan oleh administrator. Silakan hubungi tim dukungan.',
+          reason: user.statusReason
+        });
+      }
+
       const expiresIn = rememberMe ? '30d' : (process.env.JWT_EXPIRES_IN || '7d');
       const token = jwt.sign(
         { userId: user.id, role: user.role, authTime: Date.now() },
@@ -160,7 +168,8 @@ export class AuthController {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role
+          role: user.role,
+          status: user.status
         },
         wallet: {
           balance: user.wallet?.balance ?? 0
@@ -339,6 +348,7 @@ export class AuthController {
         name: req.user.name,
         email: req.user.email,
         role: req.user.role,
+        status: req.user.status,
         isGuest
       },
       wallet: {

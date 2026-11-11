@@ -8,6 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import walletRoutes from './routes/walletRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
+import adminUserRoutes from './routes/adminUserRoutes.js';
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/wallet', walletRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/sessions', sessionRoutes);
+app.use('/api/v1/admin/users', adminUserRoutes);
 
 // Health Check API
 app.get('/api/health', async (req, res) => {

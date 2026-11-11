@@ -13,6 +13,8 @@ export async function createTestUser({
   email = null,
   password = 'Password123!',
   role = 'AUDIO_ENGINEER',
+  status = 'ACTIVE',
+  statusReason = null,
   balance = 5
 } = {}) {
   const uniqueEmail = email || `test-${Date.now()}-${Math.floor(Math.random() * 10000)}${TEST_EMAIL_DOMAIN}`;
@@ -24,7 +26,9 @@ export async function createTestUser({
         name,
         email: uniqueEmail,
         passwordHash,
-        role
+        role,
+        status,
+        statusReason
       }
     });
 
