@@ -1,4 +1,6 @@
 import prisma from '../config/prisma.js';
+import TokenRevocationService from '../services/tokenRevocationService.js';
+import { WalletService } from '../services/walletService.js';
 
 export class AdminUserController {
   /**
@@ -177,6 +179,196 @@ export class AdminUserController {
             failed: failedSessions
           }
         }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/admin/users/:id/role
+   * Promotes or demotes user role between AUDIO_ENGINEER and ADMIN.
+   * Prevents self-demotion by current admin.
+   */
+  static async updateRole(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { role } = req.body;
+
+      if (!role || !['AUDIO_ENGINEER', 'ADMIN'].includes(role)) {
+        return res.status(400).json({ error: 'Peran tidak valid. Harus AUDIO_ENGINEER atau ADMIN' });
+      }
+
+      if (req.user.id === id && role !== 'ADMIN') {
+        return res.status(400).json({ error: 'Tidak dapat mengubah peran akun Anda sendiri' });
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true }
+      });
+
+      if (!existingUser) {
+        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: { role },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          statusReason: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      return res.json({
+        message: 'Peran pengguna berhasil diperbarui',
+        user: updatedUser
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/admin/users/:id/status
+   * Activates or suspends a user account.
+   * Prevents self-suspension and immediately revokes sessions upon suspension.
+   */
+  static async updateStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { status, reason } = req.body;
+
+      if (!status || !['ACTIVE', 'SUSPENDED'].includes(status)) {
+        return res.status(400).json({ error: 'Status tidak valid. Harus ACTIVE atau SUSPENDED' });
+      }
+
+      if (req.user.id === id && status === 'SUSPENDED') {
+        return res.status(400).json({ error: 'Tidak dapat menangguhkan akun Anda sendiri' });
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true }
+      });
+
+      if (!existingUser) {
+        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+      }
+
+      if (status === 'SUSPENDED') {
+        await TokenRevocationService.revokeUserTokens(id);
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          status,
+          statusReason: req.body.reason || null
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          status: true,
+          statusReason: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      });
+
+      return res.json({
+        message: 'Status pengguna berhasil diperbarui',
+        user: updatedUser
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/users/:id/tokens
+   * Adjusts user token balance via atomic ledger transaction (TOPUP, REFUND, DEDUCTION).
+   */
+  static async adjustTokens(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { amount, type, description } = req.body;
+
+      if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+        return res.status(400).json({ error: 'Jumlah token harus berupa bilangan bulat positif lebih besar dari 0' });
+      }
+
+      if (!['TOPUP', 'REFUND', 'DEDUCTION'].includes(type)) {
+        return res.status(400).json({ error: 'Tipe penyesuaian token tidak valid. Harus TOPUP, REFUND, atau DEDUCTION' });
+      }
+
+      if (!description || typeof description !== 'string' || description.trim().length < 5) {
+        return res.status(400).json({ error: 'Deskripsi penyesuaian token minimal 5 karakter' });
+      }
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        include: { wallet: true }
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+      }
+
+      const trimmedDescription = description.trim();
+      const referenceId = `ADM:${req.user.id}`;
+
+      let result;
+      if (type === 'DEDUCTION') {
+        if (!targetUser.wallet || targetUser.wallet.balance < amount) {
+          return res.status(400).json({ error: 'Saldo token tidak mencukupi untuk pemotongan' });
+        }
+        result = await WalletService.debitToken(id, amount, type, trimmedDescription, referenceId);
+      } else {
+        result = await WalletService.creditToken(id, amount, type, trimmedDescription, referenceId);
+      }
+
+      return res.json({
+        message: 'Penyesuaian token berhasil diproses',
+        wallet: {
+          balance: result.wallet.balance
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/admin/users/:id/revoke-sessions
+   * Forcefully invalidates all active sessions/tokens for the target user.
+   */
+  static async revokeSessions(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true }
+      });
+
+      if (!targetUser) {
+        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+      }
+
+      await TokenRevocationService.revokeUserTokens(id);
+
+      return res.json({
+        message: 'Semua sesi pengguna telah berhasil dicabut'
       });
     } catch (err) {
       next(err);

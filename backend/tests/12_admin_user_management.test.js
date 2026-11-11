@@ -4,6 +4,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../src/app.js';
 import prisma from '../src/config/prisma.js';
+import TokenRevocationService from '../src/services/tokenRevocationService.js';
 import { createTestUser, cleanupTestData, TEST_EMAIL_DOMAIN } from './helpers/testDb.js';
 
 describe('Admin User Management & Security Middlewares (Task 2)', () => {
@@ -473,6 +474,373 @@ describe('Admin User Management & Security Middlewares (Task 2)', () => {
         .get(`/api/v1/admin/users/${detailUser.user.id}`)
         .set('Authorization', `Bearer ${engineerToken}`);
       assert.equal(engDet.status, 403);
+    });
+  });
+
+  describe('4. Account Actions & Token Adjustment API (Task 4)', () => {
+    let actionTargetUser;
+    let targetToken;
+
+    before(async () => {
+      actionTargetUser = await createTestUser({
+        name: 'Action Target Engineer',
+        email: `action-target-${Date.now()}${TEST_EMAIL_DOMAIN}`,
+        password: 'ActionTargetPassword2026!',
+        role: 'AUDIO_ENGINEER',
+        status: 'ACTIVE',
+        balance: 15
+      });
+
+      targetToken = jwt.sign(
+        { userId: actionTargetUser.user.id, role: actionTargetUser.user.role, authTime: Date.now() },
+        process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl',
+        { expiresIn: '7d' }
+      );
+    });
+
+    it('ADM-ACT-01: Admin can promote AUDIO_ENGINEER to ADMIN', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'ADMIN' });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.message, 'Peran pengguna berhasil diperbarui');
+      assert.equal(res.body.user.role, 'ADMIN');
+
+      const updated = await prisma.user.findUnique({ where: { id: actionTargetUser.user.id } });
+      assert.equal(updated.role, 'ADMIN');
+
+      // Revert back to AUDIO_ENGINEER for subsequent tests
+      await prisma.user.update({
+        where: { id: actionTargetUser.user.id },
+        data: { role: 'AUDIO_ENGINEER' }
+      });
+    });
+
+    it('ADM-ACT-02: Admin cannot demote themselves (400 Bad Request)', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${adminFixture.user.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'AUDIO_ENGINEER' });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error, 'Tidak dapat mengubah peran akun Anda sendiri');
+
+      // Verify admin role remains ADMIN in database
+      const adminInDb = await prisma.user.findUnique({ where: { id: adminFixture.user.id } });
+      assert.equal(adminInDb.role, 'ADMIN');
+    });
+
+    it('ADM-ACT-03: Role change with invalid role returns 400 Bad Request', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'SUPER_ADMIN_INVALID' });
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.error, /Peran tidak valid/i);
+    });
+
+    it('ADM-ACT-04: Admin can suspend active user with reason and statusReason is saved', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          status: 'SUSPENDED',
+          reason: 'Pelanggaran ketentuan lisensi audio pihak ketiga'
+        });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.message, 'Status pengguna berhasil diperbarui');
+      assert.equal(res.body.user.status, 'SUSPENDED');
+      assert.equal(res.body.user.statusReason, 'Pelanggaran ketentuan lisensi audio pihak ketiga');
+
+      const updated = await prisma.user.findUnique({ where: { id: actionTargetUser.user.id } });
+      assert.equal(updated.status, 'SUSPENDED');
+      assert.equal(updated.statusReason, 'Pelanggaran ketentuan lisensi audio pihak ketiga');
+    });
+
+    it('ADM-ACT-05: Admin cannot suspend their own account (400 Bad Request)', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${adminFixture.user.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          status: 'SUSPENDED',
+          reason: 'Mencoba menangguhkan diri sendiri'
+        });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error, 'Tidak dapat menangguhkan akun Anda sendiri');
+
+      const adminInDb = await prisma.user.findUnique({ where: { id: adminFixture.user.id } });
+      assert.equal(adminInDb.status, 'ACTIVE');
+    });
+
+    it('ADM-ACT-06: Status update to SUSPENDED revokes user tokens via TokenRevocationService', async () => {
+      // Prior to suspension in ADM-ACT-04, past token was revoked
+      const pastAuthTime = Date.now() - 10000;
+      const isRevokedBefore = await TokenRevocationService.isTokenRevoked(actionTargetUser.user.id, null, pastAuthTime);
+      assert.equal(isRevokedBefore, true, 'User was suspended in ADM-ACT-04 so previous tokens should be revoked');
+
+      // Now reactivate user
+      const reactivateRes = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'ACTIVE' });
+
+      assert.equal(reactivateRes.status, 200);
+      assert.equal(reactivateRes.body.user.status, 'ACTIVE');
+
+      // Small tick then issue fresh token timestamp
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      const freshAuthTime = Date.now();
+
+      // Ensure that immediately prior to second suspension, token issued now is valid relative to past revocation
+      // (Wait, past revocation was before freshAuthTime, so token is not revoked)
+      const isFreshRevoked = await TokenRevocationService.isTokenRevoked(actionTargetUser.user.id, null, freshAuthTime);
+      assert.equal(isFreshRevoked, false, 'Fresh token issued after past revocation timestamp should not be revoked');
+
+      // Small tick so re-suspension timestamp will be strictly greater than freshAuthTime
+      await new Promise((resolve) => setTimeout(resolve, 15));
+
+      // Suspend user again to verify revocation trigger
+      const suspendAgainRes = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'SUSPENDED', reason: 'Penangguhan ulang untuk uji token' });
+
+      assert.equal(suspendAgainRes.status, 200);
+      const isNowRevoked = await TokenRevocationService.isTokenRevoked(actionTargetUser.user.id, null, freshAuthTime);
+      assert.equal(isNowRevoked, true, 'Tokens issued before re-suspension must be revoked');
+
+      // Re-activate user for remaining tests
+      await prisma.user.update({
+        where: { id: actionTargetUser.user.id },
+        data: { status: 'ACTIVE', statusReason: null }
+      });
+    });
+
+    it('ADM-ACT-07: Status update with invalid status returns 400 Bad Request', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'BANNED_FOREVER' });
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.error, /Status tidak valid/i);
+    });
+
+    it('ADM-ACT-08: Token credit (TOPUP & REFUND) increases balance and records referenceId ADM:<adminId>', async () => {
+      // Target initial balance was 15.
+      // 1. TOPUP 10 tokens
+      const topupRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          amount: 10,
+          type: 'TOPUP',
+          description: 'Bonus loyalitas studio mixing'
+        });
+
+      assert.equal(topupRes.status, 200);
+      assert.equal(topupRes.body.message, 'Penyesuaian token berhasil diproses');
+      assert.equal(topupRes.body.wallet.balance, 25);
+
+      let txRecord = await prisma.tokenTransaction.findFirst({
+        where: { userId: actionTargetUser.user.id, type: 'TOPUP' },
+        orderBy: { createdAt: 'desc' }
+      });
+      assert.ok(txRecord);
+      assert.equal(txRecord.amount, 10);
+      assert.equal(txRecord.referenceId, `ADM:${adminFixture.user.id}`);
+      assert.equal(txRecord.description, 'Bonus loyalitas studio mixing');
+
+      // 2. REFUND 5 tokens
+      const refundRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          amount: 5,
+          type: 'REFUND',
+          description: 'Pengembalian kuota gagal ekspor'
+        });
+
+      assert.equal(refundRes.status, 200);
+      assert.equal(refundRes.body.wallet.balance, 30);
+
+      txRecord = await prisma.tokenTransaction.findFirst({
+        where: { userId: actionTargetUser.user.id, type: 'REFUND' },
+        orderBy: { createdAt: 'desc' }
+      });
+      assert.ok(txRecord);
+      assert.equal(txRecord.amount, 5);
+      assert.equal(txRecord.referenceId, `ADM:${adminFixture.user.id}`);
+    });
+
+    it('ADM-ACT-09: Token debit (DEDUCTION) decreases balance, records negative amount and referenceId ADM:<adminId>', async () => {
+      // Current balance is 30. Deduct 12.
+      const res = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          amount: 12,
+          type: 'DEDUCTION',
+          description: 'Penarikan token promosi kedaluwarsa'
+        });
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.message, 'Penyesuaian token berhasil diproses');
+      assert.equal(res.body.wallet.balance, 18);
+
+      const txRecord = await prisma.tokenTransaction.findFirst({
+        where: { userId: actionTargetUser.user.id, type: 'DEDUCTION' },
+        orderBy: { createdAt: 'desc' }
+      });
+      assert.ok(txRecord);
+      assert.equal(txRecord.amount, -12);
+      assert.equal(txRecord.referenceId, `ADM:${adminFixture.user.id}`);
+    });
+
+    it('ADM-ACT-10: Token debit fails if balance is insufficient (400 Bad Request)', async () => {
+      // Current balance is 18. Attempt to deduct 50 tokens.
+      const res = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          amount: 50,
+          type: 'DEDUCTION',
+          description: 'Penarikan melebihi saldo akun target'
+        });
+
+      assert.equal(res.status, 400);
+      assert.equal(res.body.error, 'Saldo token tidak mencukupi untuk pemotongan');
+
+      // Verify wallet balance remained untouched at 18
+      const wallet = await prisma.wallet.findUnique({ where: { userId: actionTargetUser.user.id } });
+      assert.equal(wallet.balance, 18);
+    });
+
+    it('ADM-ACT-11: Token adjustment validation rejects non-positive amount, invalid type, and short description (<5 chars)', async () => {
+      // Zero amount
+      const zeroRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 0, type: 'TOPUP', description: 'Valid description' });
+      assert.equal(zeroRes.status, 400);
+
+      // Negative amount
+      const negRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: -5, type: 'TOPUP', description: 'Valid description' });
+      assert.equal(negRes.status, 400);
+
+      // Decimal amount
+      const decRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 2.5, type: 'TOPUP', description: 'Valid description' });
+      assert.equal(decRes.status, 400);
+
+      // Invalid type
+      const typeRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 10, type: 'TRANSFER_INVALID', description: 'Valid description' });
+      assert.equal(typeRes.status, 400);
+
+      // Short description (< 5 chars)
+      const descRes = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 10, type: 'TOPUP', description: 'Ad' });
+      assert.equal(descRes.status, 400);
+    });
+
+    it('ADM-ACT-12: Session revocation POST /api/v1/admin/users/:id/revoke-sessions revokes user tokens successfully', async () => {
+      const now = Date.now();
+      const res = await request(app)
+        .post(`/api/v1/admin/users/${actionTargetUser.user.id}/revoke-sessions`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      assert.equal(res.status, 200);
+      assert.equal(res.body.message, 'Semua sesi pengguna telah berhasil dicabut');
+
+      const isRevoked = await TokenRevocationService.isTokenRevoked(actionTargetUser.user.id, null, now - 100);
+      assert.equal(isRevoked, true);
+    });
+
+    it('ADM-ACT-13: Action endpoints return 404 for non-existent target user', async () => {
+      const ghostId = '00000000-0000-0000-0000-000000000000';
+
+      const roleRes = await request(app)
+        .patch(`/api/v1/admin/users/${ghostId}/role`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'ADMIN' });
+      assert.equal(roleRes.status, 404);
+      assert.match(roleRes.body.error, /tidak ditemukan/i);
+
+      const statusRes = await request(app)
+        .patch(`/api/v1/admin/users/${ghostId}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'SUSPENDED' });
+      assert.equal(statusRes.status, 404);
+      assert.match(statusRes.body.error, /tidak ditemukan/i);
+
+      const tokenRes = await request(app)
+        .post(`/api/v1/admin/users/${ghostId}/tokens`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ amount: 5, type: 'TOPUP', description: 'Penyesuaian untuk user hantu' });
+      assert.equal(tokenRes.status, 404);
+      assert.match(tokenRes.body.error, /tidak ditemukan/i);
+
+      const revokeRes = await request(app)
+        .post(`/api/v1/admin/users/${ghostId}/revoke-sessions`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      assert.equal(revokeRes.status, 404);
+      assert.match(revokeRes.body.error, /tidak ditemukan/i);
+    });
+
+    it('ADM-ACT-14: Action endpoints reject unauthenticated (401) and non-admin (403)', async () => {
+      const targetId = actionTargetUser.user.id;
+
+      // 401 Unauthenticated
+      const unauthRole = await request(app).patch(`/api/v1/admin/users/${targetId}/role`).send({ role: 'ADMIN' });
+      assert.equal(unauthRole.status, 401);
+
+      const unauthStatus = await request(app).patch(`/api/v1/admin/users/${targetId}/status`).send({ status: 'SUSPENDED' });
+      assert.equal(unauthStatus.status, 401);
+
+      const unauthToken = await request(app).post(`/api/v1/admin/users/${targetId}/tokens`).send({ amount: 5, type: 'TOPUP', description: 'Test desc 5' });
+      assert.equal(unauthToken.status, 401);
+
+      const unauthRevoke = await request(app).post(`/api/v1/admin/users/${targetId}/revoke-sessions`);
+      assert.equal(unauthRevoke.status, 401);
+
+      // 403 Non-admin (Audio Engineer)
+      const engRole = await request(app)
+        .patch(`/api/v1/admin/users/${targetId}/role`)
+        .set('Authorization', `Bearer ${engineerToken}`)
+        .send({ role: 'ADMIN' });
+      assert.equal(engRole.status, 403);
+
+      const engStatus = await request(app)
+        .patch(`/api/v1/admin/users/${targetId}/status`)
+        .set('Authorization', `Bearer ${engineerToken}`)
+        .send({ status: 'SUSPENDED' });
+      assert.equal(engStatus.status, 403);
+
+      const engToken = await request(app)
+        .post(`/api/v1/admin/users/${targetId}/tokens`)
+        .set('Authorization', `Bearer ${engineerToken}`)
+        .send({ amount: 5, type: 'TOPUP', description: 'Test desc 5' });
+      assert.equal(engToken.status, 403);
+
+      const engRevoke = await request(app)
+        .post(`/api/v1/admin/users/${targetId}/revoke-sessions`)
+        .set('Authorization', `Bearer ${engineerToken}`);
+      assert.equal(engRevoke.status, 403);
     });
   });
 });

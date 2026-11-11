@@ -26,6 +26,13 @@ export class TokenRevocationService {
   }
 
   /**
+   * Alias for revokeUserTokens
+   */
+  static async revokeAllUserTokens(userId) {
+    return this.revokeUserTokens(userId);
+  }
+
+  /**
    * Check if a token (with issued-at timestamp or token authTime) is revoked
    */
   static async isTokenRevoked(userId, tokenIatSeconds, tokenAuthTime = null) {
