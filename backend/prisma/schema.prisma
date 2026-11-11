@@ -12,6 +12,11 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum TransactionType {
   WELCOME_GRANT
   TOPUP
@@ -49,6 +54,8 @@ model User {
   email         String             @unique
   passwordHash  String             @map("password_hash")
   role          Role               @default(AUDIO_ENGINEER)
+  status        UserStatus         @default(ACTIVE)
+  statusReason  String?            @map("status_reason")
   createdAt     DateTime           @default(now()) @map("created_at")
   updatedAt     DateTime           @updatedAt @map("updated_at")
 
