@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppNavbar from '../components/AppNavbar.vue'
@@ -10,9 +10,11 @@ import HealthScoreGauge from '../components/HealthScoreGauge.vue'
 import DiagnosticTrackCard from '../components/DiagnosticTrackCard.vue'
 import MultitrackAuditionPanel from '../components/audio/MultitrackAuditionPanel.vue'
 import { useAuthStore } from '../stores/auth'
+import { useStemAudioPlayer } from '../composables/useStemAudioPlayer'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const stemPlayer = useStemAudioPlayer()
 
 const isGuest = computed(() => {
   return !authStore.user || authStore.user?.isGuest || authStore.user?.email === 'guest@polaris.audio'
@@ -620,13 +622,17 @@ onMounted(async () => {
   await loadWallet()
   await loadSessions()
 })
+
+onUnmounted(() => {
+  stemPlayer.cleanup()
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
-    <AppNavbar />
+  <div class="min-h-screen bg-bone text-ink-black flex flex-col selection:bg-hot-pink selection:text-ink-black font-editorial">
+    <AppNavbar :fluid="true" />
 
-    <main class="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-8">
+    <main class="flex-1 w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-6 md:py-8 space-y-8">
       
       <!-- Inline Toast / System Notification (R-27) -->
       <div 
@@ -634,26 +640,26 @@ onMounted(async () => {
         role="status" 
         aria-live="polite"
         :class="[
-          'p-4 rounded-xl border flex items-center justify-between gap-3 text-xs font-medium transition-all shadow-sm',
-          notification.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' :
-          notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-          'bg-blue-50 border-blue-200 text-blue-900'
+          'p-4 border-2 flex items-center justify-between gap-3 text-xs font-semibold font-mono-accent transition-all',
+          notification.type === 'error' ? 'bg-[#FFF1F2] border-[#FDA4AF] text-rose-950' :
+          notification.type === 'success' ? 'bg-[#ECFDF5] border-[#6EE7B7] text-emerald-950' :
+          'bg-paper-white border-ink-black text-ink-black'
         ]">
         <div class="flex items-center gap-2.5">
-          <svg v-if="notification.type === 'error'" class="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-if="notification.type === 'error'" class="w-4 h-4 text-rose-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <svg v-else class="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else class="w-4 h-4 text-ink-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>{{ notification.message }}</span>
         </div>
         <button 
           @click="dismissNotification"
-          class="text-slate-400 hover:text-slate-700 p-1 rounded transition-colors cursor-pointer"
+          class="text-stone hover:text-ink-black p-1 transition-colors cursor-pointer"
           aria-label="Tutup pemberitahuan">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -661,39 +667,25 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Studio Header / Banner -->
-      <div class="bg-white border border-slate-200/90 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div class="space-y-1 max-w-2xl">
-          <h1 class="font-display text-2xl sm:text-3xl text-slate-900">
+      <!-- Studio Header / Banner (Seamless, blends into background) -->
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2 px-1">
+        <div>
+          <h1 class="font-editorial text-2xl sm:text-3xl font-bold text-ink-black tracking-tight">
             Studio Workspace
           </h1>
-          <p class="text-xs sm:text-sm text-slate-500 font-normal">
-            Unggah stem multitrack, audit fasa multi-mikrofon, dan siapkan sesi mixing Anda.
-          </p>
         </div>
 
-        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full md:w-auto shrink-0">
-          <button 
-            @click="handleClaimDaily" 
-            :disabled="claiming"
-            class="h-10 px-3.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
-            <svg class="w-4 h-4 text-slate-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V4a2 2 0 114 0v4H8V4a2 2 0 114 0zm0 0H3.5a1.5 1.5 0 00-1.5 1.5v3A1.5 1.5 0 003.5 10H12m0-2h8.5a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5H12m0 0v11m-9-11h18" />
-            </svg>
-            <span>{{ claiming ? 'Mengklaim...' : 'Klaim Token Harian' }}</span>
-          </button>
-
-          <router-link 
-            to="/billing"
-            class="h-10 px-3.5 rounded-lg border border-slate-300 hover:border-[#0052FF] bg-white text-slate-800 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
-            <span class="font-mono-accent text-[#0052FF] font-bold">{{ authStore.walletBalance }} Token</span>
-            <span class="text-slate-300">|</span>
-            <span>Beli Kuota</span>
+        <div class="flex items-center gap-2.5 shrink-0">
+          <router-link
+            v-if="authStore.user?.role === 'ADMIN'"
+            to="/admin/users"
+            class="text-xs font-semibold uppercase tracking-wider text-slate hover:text-ink-black transition-colors"
+          >
+            Admin: Users
           </router-link>
-          
           <button 
             @click="showUploadModal = true"
-            class="h-10 px-4 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold shadow-sm hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
+            class="btn-ink-stamp h-10 px-5 text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
             <span class="text-base leading-none font-bold">+</span>
             <span>Unggah Sesi Baru</span>
           </button>
@@ -701,57 +693,57 @@ onMounted(async () => {
       </div>
 
       <!-- Guest Upgrade Banner Warning (jika masih akun tamu) -->
-      <div v-if="isGuest" class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-        <div class="flex items-center gap-2.5 text-blue-900">
+      <div v-if="isGuest" class="bg-paper-white border-2 border-stone p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2.5 text-ink-black">
           <svg class="w-4 h-4 text-[#0052FF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>Anda menggunakan <strong>Sesi Studio Instan</strong> (Jatah 3 Token Demo). Daftar akun gratis untuk menyimpan riwayat sesi secara permanen dan top-up kuota besar.</span>
         </div>
-        <router-link to="/register" class="font-bold text-[#0052FF] hover:underline whitespace-nowrap">
-          Daftar Akun Permanen
+        <router-link to="/register" class="font-bold text-ink-black underline underline-offset-4 hover:text-[#0052FF] whitespace-nowrap font-mono-accent">
+          Daftar Akun Permanen →
         </router-link>
       </div>
 
       <!-- Notifikasi Claim Feedback -->
-      <div v-if="claimMsg" class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 font-medium">
+      <div v-if="claimMsg" class="bg-[#ECFDF5] border border-[#6EE7B7] text-emerald-950 text-xs p-3.5 font-semibold font-mono-accent">
         {{ claimMsg }}
       </div>
-      <div v-if="claimError" class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl p-3.5 font-medium">
+      <div v-if="claimError" class="bg-amber-50 border border-amber-300 text-amber-950 text-xs p-3.5 font-semibold font-mono-accent">
         {{ claimError }}
       </div>
 
       <!-- Sesi Multitrack Toolbar -->
       <div class="flex items-center justify-between px-1 pt-2">
         <div class="flex items-center gap-2.5">
-          <h2 class="font-display text-lg text-slate-900">Sesi Multitrack</h2>
-          <span class="font-mono-accent text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+          <h2 class="font-editorial text-xl font-bold text-ink-black tracking-tight">Sesi Multitrack</h2>
+          <span class="font-mono-accent text-[11px] px-2 py-0.5 border border-stone bg-paper-white text-ink-black font-semibold">
             {{ sessions.length }} Sesi
           </span>
         </div>
         <button 
           @click="loadSessions"
-          class="text-xs font-semibold text-[#0052FF] hover:underline cursor-pointer">
+          class="text-xs font-mono-accent font-bold text-ink-black hover:underline cursor-pointer">
           Segarkan
         </button>
       </div>
 
       <!-- Empty State -->
-      <div v-if="!sessions.length" class="border-2 border-dashed border-slate-200 bg-white rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3">
-        <div class="w-14 h-14 rounded-2xl bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center">
-          <svg class="w-7 h-7 text-[#0052FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+      <div v-if="!sessions.length" class="border-2 border-dashed border-stone bg-paper-white p-12 text-center flex flex-col items-center justify-center space-y-4">
+        <div class="w-14 h-14 bg-bone border border-stone text-ink-black flex items-center justify-center">
+          <svg class="w-7 h-7 text-ink-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
         <div class="space-y-1">
-          <h3 class="font-display text-lg text-slate-800">Belum ada sesi multitrack</h3>
-          <p class="text-xs text-slate-500 max-w-sm">
+          <h3 class="font-editorial text-lg font-bold text-ink-black">Belum ada sesi multitrack</h3>
+          <p class="text-xs text-stone max-w-sm">
             Tarik berkas stem WAV atau ZIP rekaman DAW Anda untuk memulai proses verifikasi fasa otomatis.
           </p>
         </div>
         <button 
           @click="showUploadModal = true"
-          class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs shadow-sm hover:bg-slate-800 cursor-pointer transition-all mt-2">
+          class="btn-ink-stamp px-6 py-2.5 text-xs font-semibold cursor-pointer transition-all mt-2">
           Unggah Stem Pertama
         </button>
       </div>
@@ -761,197 +753,112 @@ onMounted(async () => {
         <div 
           v-for="s in sessions" 
           :key="s.id"
-          class="border border-slate-200 hover:border-slate-300 rounded-2xl p-5 sm:p-6 transition-all bg-white shadow-xs space-y-4">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="space-y-1">
-                  <!-- Session Title with Inline Rename -->
-                  <div v-if="editingSessionId === s.id" class="flex items-center gap-1.5 py-0.5">
-                    <input 
-                      v-model="editTitleInput" 
-                      @keydown.enter="saveRename(s.id)"
-                      @keydown.esc="cancelRename"
-                      autofocus
-                      class="font-display text-base sm:text-lg text-slate-900 bg-white border border-[#0052FF] rounded-lg px-2.5 py-1 focus:outline-none shadow-xs w-full max-w-xs"
-                      placeholder="Nama judul sesi..."
-                    />
-                    <button 
-                      @click="saveRename(s.id)"
-                      :disabled="isSavingTitle"
-                      class="p-2 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                      title="Simpan Judul">
-                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
-                    <button 
-                      @click="cancelRename"
-                      class="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-500 transition-colors cursor-pointer shrink-0"
-                      title="Batal">
-                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div v-else class="flex items-center gap-2 group">
-                    <h3 class="font-display text-lg text-slate-900">{{ s.title }}</h3>
-                    <button 
-                      @click="startRename(s)"
-                      class="text-slate-400 hover:text-[#0052FF] p-1 rounded-md transition-colors cursor-pointer opacity-75 group-hover:opacity-100"
-                      title="Ubah judul sesi">
-                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <!-- Subtitle Metadata: Stems breakdown with Stereo/Mono count -->
-                  <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <span class="font-mono-accent text-[11px] text-slate-500">
-                      {{ s.tracks?.length || 0 }} Stems Audio ({{ countTrackChannels(s).stereo }} Stereo, {{ countTrackChannels(s).mono }} Mono)
-                    </span>
-                    <span class="text-slate-300">•</span>
-                    <span class="font-mono-accent text-[11px] px-2 py-0.5 rounded bg-[#0052FF]/10 text-[#0052FF] font-semibold">
-                      {{ s.status }}
-                    </span>
-                    <span 
-                      v-if="s.healthScore !== null"
-                      :class="s.healthScore >= 90 ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : (s.healthScore >= 65 ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-rose-100 text-rose-800 border-rose-300')"
-                      class="font-mono-accent text-[11px] font-bold px-2 py-0.5 rounded-full border">
-                      Mix Health: {{ Math.round(s.healthScore) }}/100
-                    </span>
-                  </div>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2">
-                  <button 
-                    @click="handleVerify(s)"
-                    :disabled="verifyingSessionId === s.id"
-                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
-                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <span>{{ verifyingSessionId === s.id ? 'Memindai...' : 'Verifikasi Integritas' }}</span>
-                  </button>
-
-                  <button 
-                    @click="handleClassify(s)"
-                    :disabled="classifyingSessionId === s.id"
-                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
-                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <span>{{ classifyingSessionId === s.id ? 'AI Memproses...' : 'Deteksi Pasangan' }}</span>
-                  </button>
-
-                  <button 
-                    @click="handleDiagnose(s)"
-                    :disabled="diagnosingSessionId === s.id"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
-                    <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span>{{ diagnosingSessionId === s.id ? 'DSP Menganalisis...' : 'Audit Fasa & DSP' }}</span>
-                  </button>
-
-                  <!-- UC-18: Unduh Laporan Audit PDF -->
-                  <button 
-                    v-if="s.healthScore !== null"
-                    @click="handleDownloadReport(s)"
-                    :disabled="downloadingPdfId === s.id"
-                    title="Unduh dokumen laporan audit PDF resmi"
-                    class="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-300 hover:border-[#0052FF] text-slate-800 text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
-                    <svg v-if="downloadingPdfId === s.id" class="animate-spin w-3.5 h-3.5 text-[#0052FF]" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <span>{{ downloadingPdfId === s.id ? 'Membuat PDF...' : 'Unduh Laporan Audit PDF' }}</span>
-                  </button>
-
-                  <!-- UC-17: Unduh Paket ZIP (Lossless) -->
-                  <button 
-                    v-if="s.status === 'REPAIRED'"
-                    @click="handleDownloadZip(s)"
-                    :disabled="downloadingZipId === s.id"
-                    title="Unduh seluruh audio stem perbaikan dalam arsip ZIP lossless"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer">
-                    <svg v-if="downloadingZipId === s.id" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    <svg v-else class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span>{{ downloadingZipId === s.id ? 'Mengemas ZIP...' : 'Unduh Paket ZIP (Lossless)' }}</span>
-                  </button>
-
-                  <button 
-                    v-if="s.status === 'REPAIRED'"
-                    @click="openAuditionSection(s)"
-                    class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
-                    title="Buka Studio Audisi Komparasi A/B">
-                    <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Audisi A/B</span>
-                  </button>
-
-                  <button 
-                    @click="toggleSession(s.id)"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                    <span>{{ isSessionExpanded(s.id) ? 'Tutup Sesi' : 'Buka Sesi' }}</span>
-                    <span class="text-[10px]">{{ isSessionExpanded(s.id) ? '▲' : '▼' }}</span>
-                  </button>
-
-                  <button 
-                    @click="confirmDeleteSession(s)"
-                    class="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-slate-300 hover:border-rose-300 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer"
-                    title="Hapus Sesi Multitrack">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span>Hapus Sesi</span>
-                  </button>
-                </div>
+          class="border border-stone hover:border-ink-black transition-all bg-paper-white overflow-hidden">
+          
+          <!-- Session Header: Always covers 100% of the top or the closed card -->
+          <div 
+            @click="toggleSession(s.id)"
+            class="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:bg-bone/40 transition-colors"
+            :class="{'border-b border-stone/60': isSessionExpanded(s.id)}">
+            <div class="space-y-1">
+              <!-- Session Title with Inline Rename -->
+              <div v-if="editingSessionId === s.id" @click.stop class="flex items-center gap-1.5 py-0.5">
+                <input 
+                  v-model="editTitleInput" 
+                  @keydown.enter="saveRename(s.id)"
+                  @keydown.esc="cancelRename"
+                  autofocus
+                  class="font-editorial text-base sm:text-lg font-bold text-ink-black bg-paper-white border-2 border-ink-black px-2.5 py-1 focus:outline-none w-full max-w-xs"
+                  placeholder="Nama judul sesi..."
+                />
+                <button 
+                  @click="saveRename(s.id)"
+                  :disabled="isSavingTitle"
+                  class="p-2 bg-ink-black hover:bg-slate text-paper-white transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                  title="Simpan Judul">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+                <button 
+                  @click="cancelRename"
+                  class="p-2 border border-stone hover:bg-bone text-stone transition-colors cursor-pointer shrink-0"
+                  title="Batal">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
+              <div v-else class="flex items-center gap-2 group">
+                <h3 class="font-editorial text-lg sm:text-xl font-bold text-ink-black tracking-tight">{{ s.title }}</h3>
+                <button 
+                  @click.stop="startRename(s)"
+                  class="text-stone hover:text-ink-black p-1 transition-colors cursor-pointer opacity-75 group-hover:opacity-100"
+                  title="Ubah judul sesi">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
 
-              <!-- Expanded Session Content -->
-              <div v-if="isSessionExpanded(s.id)" class="space-y-4 pt-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <button 
+                @click.stop="toggleSession(s.id)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-bone hover:bg-stone/20 text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+                <span>{{ isSessionExpanded(s.id) ? 'Tutup Sesi' : 'Buka Sesi' }}</span>
+                <span class="text-[10px]">{{ isSessionExpanded(s.id) ? '▲' : '▼' }}</span>
+              </button>
+
+              <button 
+                @click.stop="confirmDeleteSession(s)"
+                class="inline-flex items-center gap-1.5 px-3 py-2 bg-paper-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-stone hover:border-rose-400 text-xs font-semibold transition-all cursor-pointer font-mono-accent"
+                title="Hapus Sesi Multitrack">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Hapus Sesi</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Expanded Session Content -->
+          <div v-if="isSessionExpanded(s.id)" class="p-5 sm:p-6 space-y-4 pt-4">
 
                 <!-- Verification Result Card (Studio Workbench Theme) -->
                 <div 
                   v-if="verificationResult && verificationResult.sessionId === s.id"
-                  class="rounded-xl p-4 bg-slate-50/90 text-slate-900 border border-slate-200/90 space-y-2 animate-fade-in shadow-xs">
+                  class="p-4 bg-bone text-ink-black border border-stone space-y-2 animate-fade-in">
                   <div class="flex items-center justify-between">
-                    <span class="font-mono-accent text-[11px] uppercase tracking-wider text-[#0052FF] font-bold">
+                    <span class="font-mono-accent text-[11px] uppercase tracking-wider text-ink-black font-bold">
                       Integritas Sesi: {{ verificationResult.status }}
                     </span>
-                    <span class="font-mono-accent text-[10px] text-slate-500 font-semibold">
+                    <span class="font-mono-accent text-[10px] text-stone font-semibold">
                       {{ verificationResult.sampleRateConsistency }}
                     </span>
                   </div>
-                  <p class="text-xs text-slate-600 leading-relaxed font-normal">
+                  <p class="text-xs text-ink-black leading-relaxed font-mono-accent">
                     {{ verificationResult.message }}
                   </p>
                 </div>
 
                 <!-- Step 1: Deteksi Pasangan & Klasifikasi Stem -->
                 <div 
-                  class="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 transition-all shadow-xs"
-                  :class="{'space-y-4': !s.tracks?.some(t => t.detectedLabel) || isClassificationDetailsOpen(s.id)}">
+                  class="border border-stone bg-paper-white transition-all overflow-hidden">
                   <!-- Header -->
                   <div 
-                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    :class="{'border-b border-slate-200/80 pb-3': !s.tracks?.some(t => t.detectedLabel) || isClassificationDetailsOpen(s.id)}">
+                    @click="s.tracks?.some(t => t.detectedLabel) && toggleClassificationDetails(s.id)"
+                    class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none"
+                    :class="[
+                      {'border-b border-stone/60': !s.tracks?.some(t => t.detectedLabel) || isClassificationDetailsOpen(s.id)},
+                      s.tracks?.some(t => t.detectedLabel) ? 'cursor-pointer hover:bg-bone/40 transition-colors' : ''
+                    ]">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 rounded-lg bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
                         1
                       </div>
                       <div>
-                        <h4 class="font-display text-base font-semibold text-slate-900">
+                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
                           Klasifikasi Stem & Deteksi Pasangan
                         </h4>
                       </div>
@@ -960,22 +867,17 @@ onMounted(async () => {
                     <!-- Status Badge & Action Controls -->
                     <div class="flex items-center gap-2 shrink-0">
                       <span 
-                        v-if="s.tracks?.some(t => t.detectedLabel)"
-                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                        {{ s.trackPairs?.length || 0 }} Pasangan Terhubung
-                      </span>
-                      <span 
-                        v-else 
-                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium">
+                        v-if="!s.tracks?.some(t => t.detectedLabel)" 
+                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-stone border border-stone font-medium">
                         Belum Dijalankan
                       </span>
 
                       <!-- If unrun: action button -->
                       <button 
                         v-if="!s.tracks?.some(t => t.detectedLabel)"
-                        @click="handleClassify(s)"
+                        @click.stop="handleClassify(s)"
                         :disabled="classifyingSessionId === s.id"
-                        class="px-3 py-1.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent">
                         <svg v-if="classifyingSessionId === s.id" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -986,8 +888,8 @@ onMounted(async () => {
                       <!-- If run: toggle details button -->
                       <button 
                         v-else
-                        @click="toggleClassificationDetails(s.id)"
-                        class="px-3 py-1.5 rounded-lg border border-[#0052FF]/30 hover:border-[#0052FF] hover:bg-[#0052FF]/5 bg-white text-[#0052FF] text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                        @click.stop="toggleClassificationDetails(s.id)"
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
                         <span>{{ isClassificationDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
                         <span class="text-[10px]">{{ isClassificationDetailsOpen(s.id) ? '▲' : '▼' }}</span>
                       </button>
@@ -995,34 +897,35 @@ onMounted(async () => {
                   </div>
 
                   <!-- Case 1: Unrun Empty Template -->
-                  <div v-if="!s.tracks?.some(t => t.detectedLabel)" class="bg-white rounded-xl p-5 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center space-y-2.5">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                  <div v-if="!s.tracks?.some(t => t.detectedLabel)" class="m-5 bg-bone p-5 border border-dashed border-stone text-center flex flex-col items-center justify-center space-y-2.5">
+                    <div class="w-10 h-10 bg-paper-white border border-stone text-ink-black flex items-center justify-center">
                       <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
                       </svg>
                     </div>
                     <div class="space-y-0.5 max-w-md">
-                      <p class="text-xs font-semibold text-slate-800">Klasifikasi AI & Pasangan Belum Dijalankan</p>
-                      <p class="text-[11px] text-slate-500 font-normal">
+                      <p class="text-xs font-bold text-ink-black font-editorial">Klasifikasi AI & Pasangan Belum Dijalankan</p>
+                      <p class="text-[11px] text-stone font-normal">
                         Model deep learning kami akan memprediksi kategori instrumen untuk tiap stem dan secara otomatis menghubungkan pasangan mikrofon yang rentan degradasi fasa.
                       </p>
                     </div>
                     <button 
                       @click="handleClassify(s)"
                       :disabled="classifyingSessionId === s.id"
-                      class="mt-1 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer">
+                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent">
                       {{ classifyingSessionId === s.id ? 'Sedang Menganalisis Audio...' : 'Mulai Deteksi AI Sekarang' }}
                     </button>
                   </div>
 
                   <!-- Expanded Full Details -->
-                  <div v-else-if="isClassificationDetailsOpen(s.id)" class="space-y-4 pt-1 animate-fade-in">
-                    <!-- Stems List with TrackClassificationCard -->
-                    <div class="space-y-2.5">
+                  <div v-else-if="isClassificationDetailsOpen(s.id)" class="p-5 space-y-4 pt-4 animate-fade-in">
+                    <!-- Stems List with TrackClassificationCard (Unified Seamless List) -->
+                    <div class="divide-y divide-stone/40 border-b border-stone/60">
                       <TrackClassificationCard 
                         v-for="track in s.tracks" 
                         :key="track.id"
                         :track="track"
+                        :session-id="s.id"
                         :paired-track="getPairedTrack(s, track.id)"
                         :pair-info="getTrackPairInfo(s, track.id)"
                         :available-tracks="s.tracks.filter(t => t.id !== track.id)"
@@ -1031,25 +934,27 @@ onMounted(async () => {
                       />
                     </div>
 
-                    <!-- Manual Pairing Form -->
-                    <div class="bg-white border border-slate-200/90 rounded-xl p-4 space-y-3">
-                      <span class="font-semibold text-xs text-slate-800 block">Hubungkan Pasangan Mikrofon Secara Manual</span>
+                    <!-- Manual Pairing Form (Seamless, Borderless) -->
+                    <div class="pt-2 space-y-2">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-xs text-ink-black font-editorial">Hubungkan Pasangan Mikrofon Secara Manual</span>
+                      </div>
                       <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                         <select 
                           v-model="pairTrackA" 
-                          class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                          class="text-xs bg-paper-white border border-stone px-2.5 py-2 text-ink-black focus:outline-none focus:border-ink-black font-mono-accent">
                           <option value="" disabled>Pilih Trek Pertama (A)</option>
                           <option v-for="t in s.tracks" :key="'a-' + t.id" :value="t.id">{{ t.fileName }}</option>
                         </select>
                         <select 
                           v-model="pairTrackB" 
-                          class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                          class="text-xs bg-paper-white border border-stone px-2.5 py-2 text-ink-black focus:outline-none focus:border-ink-black font-mono-accent">
                           <option value="" disabled>Pilih Trek Kedua (B)</option>
                           <option v-for="t in s.tracks" :key="'b-' + t.id" :value="t.id">{{ t.fileName }}</option>
                         </select>
                         <select 
                           v-model="pairType" 
-                          class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-2 text-slate-800 focus:outline-none focus:border-[#0052FF]">
+                          class="text-xs bg-paper-white border border-stone px-2.5 py-2 text-ink-black focus:outline-none focus:border-ink-black font-mono-accent">
                           <option value="MIC_PAIR">MIC_PAIR (Kick In/Sub)</option>
                           <option value="DRUM_TOP_BOTTOM">DRUM_TOP_BOTTOM (Snare Top/Bottom)</option>
                           <option value="BASS_DI_MIC">BASS_DI_MIC (Bass DI/Amp)</option>
@@ -1058,25 +963,20 @@ onMounted(async () => {
                         <button 
                           @click="handleCreatePair(s.id)"
                           :disabled="isPairing || !pairTrackA || !pairTrackB"
-                          class="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+                          class="btn-ink-stamp text-xs py-2 px-3 flex items-center justify-center font-mono-accent disabled:opacity-50">
                           <span>Hubungkan</span>
                         </button>
                       </div>
                     </div>
 
-                    <!-- Finalize CTA Button & Close Button -->
-                    <div class="flex items-center justify-between pt-1">
-                      <button 
-                        @click="toggleClassificationDetails(s.id)"
-                        class="text-xs text-[#0052FF] hover:underline font-semibold cursor-pointer">
-                        Tutup ▲
-                      </button>
+                    <!-- Finalize CTA Button -->
+                    <div class="flex items-center justify-end pt-1">
                       <button 
                         @click="handleFinalizeClassification(s.id)"
                         :disabled="finalizingSessionId === s.id"
-                        class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white font-semibold text-xs shadow-xs transition-all cursor-pointer">
+                        class="btn-ink-stamp text-xs px-5 py-2.5 flex items-center gap-2 font-mono-accent">
                         <span>{{ finalizingSessionId === s.id ? 'Mengunci...' : 'Konfirmasi & Lanjut ke Audit Fasa' }}</span>
-                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <svg class="w-4 h-4 text-paper-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                         </svg>
                       </button>
@@ -1086,18 +986,21 @@ onMounted(async () => {
 
                 <!-- Step 2: Audit Diagnostik DSP & Kesehatan Fasa -->
                 <div 
-                  class="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 transition-all shadow-xs"
-                  :class="{'space-y-4': (s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) || isDiagnosticDetailsOpen(s.id)}">
+                  class="border border-stone bg-paper-white transition-all overflow-hidden">
                   <!-- Header -->
                   <div 
-                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    :class="{'border-b border-slate-200/80 pb-3': (s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) || isDiagnosticDetailsOpen(s.id)}">
+                    @click="!(s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) && toggleDiagnosticDetails(s.id)"
+                    class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none"
+                    :class="[
+                      {'border-b border-stone/60': (s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) || isDiagnosticDetailsOpen(s.id)},
+                      !(s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) ? 'cursor-pointer hover:bg-bone/40 transition-colors' : ''
+                    ]">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 rounded-lg bg-emerald-600/10 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
                         2
                       </div>
                       <div>
-                        <h4 class="font-display text-base font-semibold text-slate-900">
+                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
                           Audit Diagnostik DSP & Kesehatan Sesi
                         </h4>
                       </div>
@@ -1106,23 +1009,17 @@ onMounted(async () => {
                     <!-- Status Badge & Controls -->
                     <div class="flex items-center gap-2 shrink-0">
                       <span 
-                        v-if="s.healthScore !== null"
-                        :class="s.healthScore >= 90 ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (s.healthScore >= 65 ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-rose-50 text-rose-800 border-rose-200')"
-                        class="font-mono-accent text-[11px] font-bold px-2.5 py-1 rounded-md border">
-                        Mix Health: {{ Math.round(s.healthScore) }}/100
-                      </span>
-                      <span 
-                        v-else 
-                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium">
+                        v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)" 
+                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-stone border border-stone font-medium">
                         Belum Diaudit
                       </span>
 
                       <!-- If unrun: action button -->
                       <button 
                         v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)"
-                        @click="handleDiagnose(s)"
+                        @click.stop="handleDiagnose(s)"
                         :disabled="diagnosingSessionId === s.id"
-                        class="px-3 py-1.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent">
                         <svg v-if="diagnosingSessionId === s.id" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -1130,52 +1027,41 @@ onMounted(async () => {
                         <span>{{ diagnosingSessionId === s.id ? 'Menganalisis...' : 'Jalankan Audit DSP' }}</span>
                       </button>
 
-                      <!-- If run: rescan + toggle details button -->
-                      <div v-else class="flex items-center gap-2">
-                        <button 
-                          @click="handleDiagnose(s)"
-                          :disabled="diagnosingSessionId === s.id"
-                          class="px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-white text-slate-700 text-xs font-medium cursor-pointer flex items-center gap-1.5 transition-all">
-                          <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          <span class="hidden sm:inline">{{ diagnosingSessionId === s.id ? 'Memindai...' : 'Pindai Ulang' }}</span>
-                        </button>
-
-                        <button 
-                          @click="toggleDiagnosticDetails(s.id)"
-                          class="px-3 py-1.5 rounded-lg border border-[#0052FF]/30 hover:border-[#0052FF] hover:bg-[#0052FF]/5 bg-white text-[#0052FF] text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
-                          <span>{{ isDiagnosticDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
-                          <span class="text-[10px]">{{ isDiagnosticDetailsOpen(s.id) ? '▲' : '▼' }}</span>
-                        </button>
-                      </div>
+                      <!-- If run: toggle details button -->
+                      <button 
+                        v-else
+                        @click.stop="toggleDiagnosticDetails(s.id)"
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
+                        <span>{{ isDiagnosticDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
+                        <span class="text-[10px]">{{ isDiagnosticDetailsOpen(s.id) ? '▲' : '▼' }}</span>
+                      </button>
                     </div>
                   </div>
 
                   <!-- Case 1: Unrun Empty Template -->
-                  <div v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)" class="bg-white rounded-xl p-5 border border-dashed border-slate-200 text-center flex flex-col items-center justify-center space-y-2.5">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                  <div v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)" class="m-5 bg-bone p-5 border border-dashed border-stone text-center flex flex-col items-center justify-center space-y-2.5">
+                    <div class="w-10 h-10 bg-paper-white border border-stone text-ink-black flex items-center justify-center">
                       <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
                     </div>
                     <div class="space-y-0.5 max-w-md">
-                      <p class="text-xs font-semibold text-slate-800">Audit DSP & Fasa Belum Dilakukan</p>
-                      <p class="text-[11px] text-slate-500 font-normal">
+                      <p class="text-xs font-bold text-ink-black font-editorial">Audit DSP & Fasa Belum Dilakukan</p>
+                      <p class="text-[11px] text-stone font-normal">
                         Jalankan audit diagnostik untuk mengidentifikasi pembatalan fasa multi-mikrofon, penumpukan frekuensi rendah (mud), dan true-peak clipping sebelum mixing.
                       </p>
                     </div>
                     <button 
                       @click="handleDiagnose(s)"
                       :disabled="diagnosingSessionId === s.id"
-                      class="mt-1 px-4 py-2 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer">
+                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent">
                       {{ diagnosingSessionId === s.id ? 'Sedang Memindai Audio...' : 'Jalankan Audit DSP Sekarang' }}
                     </button>
                   </div>
 
                   <!-- Expanded Full Details -->
-                  <div v-else-if="isDiagnosticDetailsOpen(s.id)" class="space-y-5 pt-1 animate-fade-in">
-                    <!-- Radial Gauge Meter Component -->
+                  <div v-else-if="isDiagnosticDetailsOpen(s.id)" class="p-5 space-y-5 pt-4 animate-fade-in">
+                    <!-- Score Component with Integrated Rescan Button -->
                     <HealthScoreGauge 
                       :score="getSessionHealthData(s).health_score"
                       :rating="getSessionHealthData(s).session_rating"
@@ -1185,14 +1071,12 @@ onMounted(async () => {
                       :warning-tracks="getSessionHealthData(s).warning_tracks"
                       :critical-tracks="getSessionHealthData(s).critical_tracks"
                       :estimated-tokens="getSessionHealthData(s).estimated_tokens"
+                      :is-rescanning="diagnosingSessionId === s.id"
+                      @rescan="handleDiagnose(s)"
                     />
 
-                    <!-- Stems Diagnostic Cards -->
-                    <div class="space-y-3">
-                      <div class="flex items-center justify-between">
-                        <span class="font-display text-sm font-semibold text-slate-900">Stem Audio ({{ s.tracks?.length || 0 }})</span>
-                      </div>
-
+                    <!-- Stems Diagnostic Cards (Flat, Seamless) -->
+                    <div class="divide-y divide-stone/40 border-y border-stone/60">
                       <DiagnosticTrackCard 
                         v-for="track in s.tracks" 
                         :key="'diag-' + track.id"
@@ -1206,30 +1090,24 @@ onMounted(async () => {
                     <!-- Action Panel: DSP Audio Fixer Engine -->
                     <div 
                       v-if="s.status === 'REPAIRED'"
-                      class="rounded-xl p-5 bg-emerald-50 text-emerald-950 border border-emerald-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
+                      class="pt-3 border-t border-stone/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                       <div class="space-y-1">
                         <div class="flex items-center gap-2">
-                          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">✓</span>
-                          <h5 class="font-display text-sm font-bold text-emerald-900">Perbaikan DSP Selesai Diterapkan</h5>
-                          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold font-mono-accent">
-                            Mix Ready
-                          </span>
+                          <span class="w-6 h-6 bg-emerald-700 text-white flex items-center justify-center text-xs font-bold font-mono-accent">✓</span>
+                          <h5 class="font-editorial text-sm font-bold text-ink-black">Perbaikan DSP Selesai Diterapkan</h5>
                         </div>
-                        <p class="text-xs text-emerald-700 max-w-xl font-normal">
-                          Seluruh anomali fasa, mikro-delay, DC offset, dan headroom clipping telah diperbaiki secara presisi dan lossless di MinIO S3.
-                        </p>
                       </div>
 
                       <div class="flex items-center gap-2 shrink-0">
                         <button 
                           @click="openCustomRepairModal(s)"
-                          class="px-3 py-2 rounded-lg bg-white hover:bg-emerald-100/50 text-emerald-800 border border-emerald-300 text-xs font-semibold shadow-2xs transition-all cursor-pointer">
+                          class="px-3 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
                           Sesuaikan Ulang
                         </button>
                         <button 
                           @click="openAuditionSection(s)"
-                          class="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
-                          <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          class="px-3.5 py-2 bg-ink-black hover:bg-slate text-paper-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent border border-ink-black">
+                          <svg class="w-3.5 h-3.5 text-paper-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -1240,69 +1118,25 @@ onMounted(async () => {
 
                     <div 
                       v-else
-                      class="rounded-xl p-5 bg-white text-slate-900 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xs">
-                      <div class="space-y-1">
-                        <div class="flex items-center gap-2">
-                          <h5 class="font-display text-sm font-bold text-slate-900">Automated Audio Fixer</h5>
-                          <span class="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 font-semibold font-mono-accent">
-                            Siap Dijalankan
-                          </span>
-                        </div>
-                        <p class="text-xs text-slate-500 max-w-xl font-normal">
-                          Koreksi polaritas fasa 180°, penyelarasan micro-delay multi-mic, eliminasi DC offset, filter sub-rumble, dan normalisasi headroom -3 dBFS.
-                        </p>
-                      </div>
-
-                      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-                        <button 
-                          @click="handleDownloadReport(s)"
-                          :disabled="downloadingPdfId === s.id"
-                          class="px-3.5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5">
-                          <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                          <span>{{ downloadingPdfId === s.id ? 'Membuat...' : 'Unduh Laporan PDF' }}</span>
-                        </button>
-
-                        <button 
-                          v-if="s.status === 'REPAIRED'"
-                          @click="handleDownloadZip(s)"
-                          :disabled="downloadingZipId === s.id"
-                          class="px-3.5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5">
-                          <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                          <span>{{ downloadingZipId === s.id ? 'Mengemas...' : 'Unduh ZIP (Lossless)' }}</span>
-                        </button>
-
-                        <button 
-                          @click="openCustomRepairModal(s)"
-                          :disabled="repairingSessionId === s.id"
-                          class="px-3.5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer">
-                          Kustomisasi Perbaikan
-                        </button>
-
-                        <button 
-                          @click="handleRepairAuto(s)"
-                          :disabled="repairingSessionId === s.id"
-                          class="px-4 py-2.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D6] disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2">
-                          <svg v-if="repairingSessionId === s.id" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                          </svg>
-                          <span>
-                            {{ repairingSessionId === s.id ? 'Merender Audio DSP...' : `Terapkan Perbaikan (${getSessionHealthData(s).estimated_tokens} Token)` }}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Close Details Button at bottom of card -->
-                    <div class="flex justify-end pt-1">
+                      class="flex flex-wrap items-center justify-end gap-2.5 pt-2">
                       <button 
-                        @click="toggleDiagnosticDetails(s.id)"
-                        class="text-xs text-[#0052FF] hover:underline font-semibold cursor-pointer">
-                        Tutup ▲
+                        @click="openCustomRepairModal(s)"
+                        :disabled="repairingSessionId === s.id"
+                        class="px-3.5 py-2.5 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+                        Kustomisasi Perbaikan
+                      </button>
+
+                      <button 
+                        @click="handleRepairAuto(s)"
+                        :disabled="repairingSessionId === s.id"
+                        class="btn-ink-stamp text-xs px-5 py-2.5 flex items-center justify-center gap-2 font-mono-accent">
+                        <svg v-if="repairingSessionId === s.id" class="animate-spin w-3.5 h-3.5 text-paper-white" viewBox="0 0 24 24" fill="none">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>
+                          {{ repairingSessionId === s.id ? 'Merender Audio DSP...' : `Terapkan Perbaikan (${getSessionHealthData(s).estimated_tokens} Token)` }}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -1310,39 +1144,28 @@ onMounted(async () => {
 
                 <!-- Step 3: Studio Audisi Multitrack A/B & Analisis Fase -->
                 <div 
-                  class="rounded-2xl border border-slate-200 bg-slate-50/60 p-5 transition-all shadow-xs"
-                  :class="{'space-y-4': isAuditionDetailsOpen(s.id)}">
+                  class="border border-stone bg-paper-white transition-all overflow-hidden">
                   <!-- Header -->
                   <div 
-                    class="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    :class="{'border-b border-slate-200/80 pb-3': isAuditionDetailsOpen(s.id)}">
+                    @click="toggleAuditionDetails(s.id)"
+                    class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:bg-bone/40 transition-colors"
+                    :class="{'border-b border-stone/60': isAuditionDetailsOpen(s.id)}">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 rounded-lg bg-[#0052FF]/10 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
                         3
                       </div>
                       <div>
-                        <h4 class="font-display text-base font-semibold text-slate-900">
+                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
                           Studio Audisi Multitrack A/B & Analisis Fase
                         </h4>
                       </div>
                     </div>
 
-                    <!-- Status Badge & Controls -->
+                    <!-- Section Toggle Button -->
                     <div class="flex items-center gap-2 shrink-0">
-                      <span 
-                        v-if="s.status === 'REPAIRED'"
-                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
-                        Komparasi A/B Tersedia
-                      </span>
-                      <span 
-                        v-else 
-                        class="font-mono-accent text-[11px] px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium">
-                        Mode Audio Mentah
-                      </span>
-
                       <button 
-                        @click="toggleAuditionDetails(s.id)"
-                        class="px-3 py-1.5 rounded-lg border border-[#0052FF]/30 hover:border-[#0052FF] hover:bg-[#0052FF]/5 bg-white text-[#0052FF] text-xs font-semibold shadow-xs transition-all cursor-pointer flex items-center gap-1.5">
+                        @click.stop="toggleAuditionDetails(s.id)"
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
                         <span>{{ isAuditionDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
                         <span class="text-[10px]">{{ isAuditionDetailsOpen(s.id) ? '▲' : '▼' }}</span>
                       </button>
@@ -1350,18 +1173,39 @@ onMounted(async () => {
                   </div>
 
                   <!-- Dropdown Content: Multitrack Audition Panel (Cached via v-show after first load) -->
-                  <div v-if="auditionInitialized[s.id]" v-show="isAuditionDetailsOpen(s.id)" class="pt-2 space-y-3">
+                  <div v-if="auditionInitialized[s.id]" v-show="isAuditionDetailsOpen(s.id)" class="p-5 pt-3 space-y-3">
                     <MultitrackAuditionPanel :session="s" :is-open="isAuditionDetailsOpen(s.id)" />
-
-                    <!-- Close Button at bottom of Step 3 -->
-                    <div class="flex justify-end pt-1">
-                      <button 
-                        @click="toggleAuditionDetails(s.id)"
-                        class="text-xs text-[#0052FF] hover:underline font-semibold cursor-pointer">
-                        Tutup ▲
-                      </button>
-                    </div>
                   </div>
+                </div>
+
+                <!-- Deliverables Actions Bar: Unduh Laporan PDF & Unduh Paket ZIP (Lossless) -->
+                <div class="flex flex-wrap items-center justify-end gap-3 pt-1">
+                  <button 
+                    @click="handleDownloadReport(s)"
+                    :disabled="downloadingPdfId === s.id"
+                    class="px-4 py-2.5 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent"
+                    title="Unduh ringkasan audit audio DSP dalam format dokumen PDF">
+                    <svg class="w-3.5 h-3.5 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>{{ downloadingPdfId === s.id ? 'Membuat...' : 'Unduh Laporan PDF' }}</span>
+                  </button>
+
+                  <button 
+                    v-if="s.status === 'REPAIRED'"
+                    @click="handleDownloadZip(s)"
+                    :disabled="downloadingZipId === s.id"
+                    class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent border border-emerald-800"
+                    title="Unduh seluruh audio stem perbaikan dalam arsip ZIP lossless">
+                    <svg v-if="downloadingZipId === s.id" class="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <svg v-else class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>{{ downloadingZipId === s.id ? 'Mengemas ZIP...' : 'Unduh Paket ZIP (Lossless)' }}</span>
+                  </button>
                 </div>
 
               </div>
@@ -1379,38 +1223,38 @@ onMounted(async () => {
     <!-- Modal Konfirmasi Hapus Sesi -->
     <div 
       v-if="sessionToDelete" 
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-black/60 backdrop-blur-xs animate-fade-in"
       @click.self="sessionToDelete = null">
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 space-y-4">
+      <div class="bg-paper-white border-2 border-ink-black max-w-sm w-full p-6 space-y-4">
         <div class="space-y-1">
-          <h3 class="font-display text-lg font-bold text-slate-900">
+          <h3 class="font-editorial text-lg font-bold text-ink-black tracking-tight">
             Apakah Anda Yakin
           </h3>
-          <p class="text-xs text-slate-500 font-normal">
+          <p class="text-xs text-stone font-normal">
             Tindakan Ini Tidak Dapat Diulang
           </p>
         </div>
 
-        <p class="text-xs text-slate-600 leading-relaxed font-normal">
-          Sesi <span class="font-semibold text-slate-900 font-mono-accent">{{ sessionToDelete.name }}</span> beserta seluruh trek stem dan hasil analisisnya akan dihapus permanen.
+        <p class="text-xs text-ink-black leading-relaxed font-normal">
+          Sesi <span class="font-bold text-ink-black font-mono-accent">{{ sessionToDelete.title || sessionToDelete.name }}</span> beserta seluruh trek stem dan hasil analisisnya akan dihapus permanen.
         </p>
 
         <div class="flex items-center justify-end gap-2.5 pt-2">
           <button 
             @click="sessionToDelete = null"
             :disabled="isDeletingSession"
-            class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer">
+            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
             Batal
           </button>
           <button 
             @click="handleDeleteSession"
             :disabled="isDeletingSession"
-            class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50">
-            <svg v-if="isDeletingSession" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+            class="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 font-mono-accent border border-rose-800">
+            <svg v-if="isDeletingSession" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>
-            <span>{{ isDeletingSession ? 'Menghapus...' : 'Ya' }}</span>
+            <span>{{ isDeletingSession ? 'Menghapus...' : 'Ya, Hapus' }}</span>
           </button>
         </div>
       </div>
@@ -1419,21 +1263,21 @@ onMounted(async () => {
     <!-- Modal Granular Custom Repair -->
     <div 
       v-if="showCustomRepairModal && activeRepairSession" 
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-black/60 backdrop-blur-xs animate-fade-in"
       @click.self="showCustomRepairModal = false">
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between border-b border-slate-200/80 pb-3">
+      <div class="bg-paper-white border-2 border-ink-black max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-stone/60 pb-3">
           <div>
-            <h3 class="font-display text-lg font-bold text-slate-900">
+            <h3 class="font-editorial text-xl font-bold text-ink-black tracking-tight">
               Kustomisasi Modul Perbaikan DSP
             </h3>
-            <p class="text-xs text-slate-500 font-normal">
+            <p class="text-xs text-stone font-normal">
               Aktifkan atau nonaktifkan perbaikan spesifik per-track sesuai kebutuhan artistik mixing.
             </p>
           </div>
           <button 
             @click="showCustomRepairModal = false"
-            class="text-slate-400 hover:text-slate-600 text-sm font-bold p-1 cursor-pointer">
+            class="text-stone hover:text-ink-black text-base font-bold p-1 cursor-pointer font-mono-accent">
             ✕
           </button>
         </div>
@@ -1442,77 +1286,77 @@ onMounted(async () => {
           <div 
             v-for="track in activeRepairSession.tracks" 
             :key="'custom-' + track.id"
-            class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
+            class="p-4 border border-stone bg-bone space-y-3">
             <div class="flex items-center justify-between">
-              <span class="font-mono-accent text-xs font-bold text-slate-900">{{ track.fileName }}</span>
-              <span class="text-[11px] px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-semibold font-mono-accent">
+              <span class="font-mono-accent text-xs font-bold text-ink-black">{{ track.fileName }}</span>
+              <span class="text-[11px] px-2 py-0.5 border border-stone bg-paper-white text-ink-black font-semibold font-mono-accent">
                 {{ track.instrumentLabel || track.detectedLabel || 'Other' }}
               </span>
             </div>
 
             <div v-if="customRepairSettings[track.id]" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].flipPolarity"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>Invert Polaritas (180°)</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].alignDelay"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>Micro-Delay Align</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].fixFakeStereo"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>True Mono (Fake Stereo)</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].removeDcOffset"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>Buang DC Offset</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].filterSubRumble"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>Filter Sub-Rumble</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].gainStaging"
-                  class="rounded text-[#0052FF] focus:ring-0">
+                  class="accent-ink-black cursor-pointer">
                 <span>Gain Staging (-3dB)</span>
               </label>
             </div>
           </div>
         </div>
 
-        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-stone/60">
           <button 
             @click="showCustomRepairModal = false"
-            class="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer">
+            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
             Batal
           </button>
           <button 
             @click="handleRepairCustom"
             :disabled="repairingSessionId === activeRepairSession.id"
-            class="px-4 py-2 bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold rounded-lg shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50">
-            <svg v-if="repairingSessionId === activeRepairSession.id" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
+            class="btn-ink-stamp text-xs px-5 py-2.5 flex items-center justify-center gap-2 disabled:opacity-50 font-mono-accent">
+            <svg v-if="repairingSessionId === activeRepairSession.id" class="animate-spin w-3.5 h-3.5 text-paper-white" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
             </svg>

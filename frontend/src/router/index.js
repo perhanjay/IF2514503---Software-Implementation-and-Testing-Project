@@ -11,6 +11,12 @@ const routes = [
   { path: '/register', component: RegisterView },
   { path: '/dashboard', component: DashboardView },
   { path: '/billing', component: BillingView, alias: '/wallet' },
+  {
+    path: '/admin/users',
+    name: 'AdminUsers',
+    component: () => import('../views/AdminUsersView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
 ];
 
 const router = createRouter({
@@ -23,12 +29,18 @@ router.beforeEach((to, from, next) => {
   const user = JSON.parse(localStorage.getItem('polaris_user') || 'null');
   const isGuest = !user || user.isGuest || user.email === 'guest@polaris.audio';
 
+  if (to.meta.requiresAdmin) {
+    if (!token || !user || user.role !== 'ADMIN') {
+      return next('/dashboard');
+    }
+  }
+
   // If already authenticated with a real permanent account, avoid login/register forms
   if ((to.path === '/login' || to.path === '/register') && token && !isGuest) {
-    next('/dashboard');
-  } else {
-    next();
+    return next('/dashboard');
   }
+
+  next();
 });
 
 export default router;

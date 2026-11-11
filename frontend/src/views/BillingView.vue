@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AppNavbar from '../components/AppNavbar.vue'
-import SectionBadge from '../components/SectionBadge.vue'
 import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
@@ -135,10 +134,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#FAFAFA] text-slate-900 flex flex-col selection:bg-[#0052FF]/20 selection:text-[#0052FF]">
-    <AppNavbar />
+  <div class="min-h-screen bg-paper-white text-ink-black flex flex-col selection:bg-black selection:text-white">
+    <AppNavbar :fluid="true" />
 
-    <main class="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-8">
+    <main class="flex-1 w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-6 md:py-8 space-y-8">
 
       <!-- Inline Toast / System Notification -->
       <div 
@@ -146,26 +145,26 @@ onMounted(async () => {
         role="status" 
         aria-live="polite"
         :class="[
-          'p-4 rounded-xl border flex items-center justify-between gap-3 text-xs font-medium transition-all shadow-sm',
-          notification.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' :
-          notification.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' :
-          'bg-blue-50 border-blue-200 text-blue-900'
+          'p-4 border flex items-center justify-between gap-3 text-xs font-medium transition-all rounded-none',
+          notification.type === 'error' ? 'bg-rose-50 border-rose-300 text-rose-900' :
+          notification.type === 'success' ? 'bg-[#ECFDF5] border-[#6EE7B7] text-emerald-950 font-mono-accent' :
+          'bg-bone border-stone text-ink-black'
         ]">
         <div class="flex items-center gap-2.5">
           <svg v-if="notification.type === 'error'" class="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <svg v-else class="w-4 h-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else class="w-4 h-4 text-ink-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>{{ notification.message }}</span>
         </div>
         <button 
           @click="dismissNotification"
-          class="text-slate-400 hover:text-slate-700 p-1 rounded transition-colors cursor-pointer"
+          class="text-slate hover:text-ink-black p-1 transition-colors cursor-pointer rounded-none"
           aria-label="Tutup pemberitahuan">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -173,24 +172,27 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- Header Section -->
-      <div class="bg-white border border-slate-200/90 rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div class="space-y-2 max-w-2xl">
-          <SectionBadge label="Transaksi & Saldo Studio" />
-          <h1 class="font-display text-2xl sm:text-3xl text-slate-900 mt-1">
+      <!-- Header Section (Seamless, blends into background) -->
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 py-2 px-1">
+        <div>
+          <h1 class="font-editorial text-2xl sm:text-3xl font-bold text-ink-black tracking-tight">
             Dompet & Kuota Token
           </h1>
-          <p class="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-            Kelola kuota pemrosesan sesi multitrack, lakukan top-up paket token via Midtrans Sandbox, dan pantau catatan transaksi mutasi akun.
-          </p>
         </div>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <router-link
+            v-if="authStore.user?.role === 'ADMIN'"
+            to="/admin/users"
+            class="text-xs font-semibold uppercase tracking-wider text-slate hover:text-ink-black transition-colors self-center"
+          >
+            Admin: Users
+          </router-link>
           <button 
             @click="handleClaimDaily" 
             :disabled="claiming"
-            class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2">
-            <svg class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            class="btn-bone-secondary border border-stone h-10 px-5 text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+            <svg class="w-4 h-4 text-ink-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V4a2 2 0 114 0v4H8V4a2 2 0 114 0zm0 0H3.5a1.5 1.5 0 00-1.5 1.5v3A1.5 1.5 0 003.5 10H12m0-2h8.5a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5H12m0 0v11m-9-11h18" />
             </svg>
             <span>{{ claiming ? 'Mengklaim...' : 'Klaim Token Harian' }}</span>
@@ -198,100 +200,91 @@ onMounted(async () => {
 
           <router-link 
             to="/dashboard"
-            class="px-5 py-3 rounded-xl bg-[#0052FF] hover:bg-[#0043D6] text-white text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2">
-            <span>Buka Studio Workspace</span>
+            class="btn-ink-stamp h-10 px-5 text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap">
+            <span>Buka Studio Workspace →</span>
           </router-link>
         </div>
       </div>
 
       <!-- Guest Upgrade Callout -->
-      <div v-if="isGuest" class="bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-        <div class="flex items-center gap-2.5 text-blue-900">
+      <div v-if="isGuest" class="bg-paper-white border-2 border-stone p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs rounded-none">
+        <div class="flex items-center gap-2.5 text-ink-black">
           <svg class="w-4 h-4 text-[#0052FF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>Anda menggunakan <strong>Sesi Studio Instan</strong>. Daftar akun permanen untuk menyimpan saldo kuota dan riwayat mutasi tanpa batas waktu.</span>
         </div>
-        <router-link to="/register" class="font-bold text-[#0052FF] hover:underline whitespace-nowrap">
-          Daftar Akun Permanen
+        <router-link to="/register" class="font-bold text-ink-black underline underline-offset-4 hover:text-[#0052FF] whitespace-nowrap font-mono-accent">
+          Daftar Akun Permanen →
         </router-link>
       </div>
 
       <!-- Claim Feedback -->
-      <div v-if="claimMsg" class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl p-3.5 font-medium">
+      <div v-if="claimMsg" class="bg-[#ECFDF5] border border-[#6EE7B7] text-emerald-950 text-xs p-3.5 font-semibold font-mono-accent rounded-none">
         {{ claimMsg }}
       </div>
-      <div v-if="claimError" class="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl p-3.5 font-medium">
+      <div v-if="claimError" class="bg-amber-50 border border-amber-300 text-amber-950 text-xs p-3.5 font-semibold font-mono-accent rounded-none">
         {{ claimError }}
       </div>
 
       <!-- Main Content Grid -->
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        <!-- Left / Top Column: Saldo & Top-Up Gateway (7 cols) -->
-        <div class="lg:col-span-7 space-y-6">
+        <!-- Left Column: Saldo & Top-Up Gateway (7 cols) -->
+        <div class="lg:col-span-7 space-y-8">
 
-          <!-- Current Balance Card -->
-          <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h2 class="font-display text-xl text-slate-900">Saldo Kuota Studio</h2>
-                <span class="text-xs text-slate-500">Kuota operasional perbaikan fasa audio</span>
-              </div>
-              <span class="font-mono-accent text-[11px] bg-blue-50 text-[#0052FF] border border-blue-200/80 px-2.5 py-1 rounded-md font-semibold">
+          <!-- Current Balance Section -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-stone/60">
+              <h2 class="font-editorial text-xl font-bold text-ink-black tracking-tight">Saldo Kuota Studio</h2>
+              <span class="font-mono-accent text-[11px] bg-paper-white text-ink-black border border-stone px-2.5 py-1 font-semibold rounded-none">
                 1 Token = 1 Sesi Stems
               </span>
             </div>
 
-            <div class="bg-[#F1F5F9] border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="bg-bone border border-stone p-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-none">
               <div class="space-y-1 text-center sm:text-left">
-                <span class="font-mono-accent text-xs uppercase tracking-wider text-slate-500">Saldo Kuota Aktif</span>
-                <div class="font-display text-5xl text-[#0052FF] leading-none">
+                <span class="font-mono-accent text-xs uppercase tracking-wider text-slate">Saldo Kuota Aktif</span>
+                <div class="font-mono-accent text-5xl font-bold text-ink-black leading-none">
                   {{ authStore.walletBalance }}
                 </div>
-                <span class="text-xs text-slate-500 font-mono-accent block">Token Tersedia</span>
-              </div>
-
-              <div class="text-xs text-slate-600 max-w-xs space-y-1 text-center sm:text-right">
-                <p class="font-medium text-slate-800">Perhitungan Penggunaan</p>
-                <p class="text-slate-500 leading-relaxed text-[11px]">
-                  Diagnostik deterministik dan verifikasi fasa multitrack dipotong berdasarkan jumlah stem yang diproses.
-                </p>
+                <span class="text-xs text-slate font-mono-accent block">Token Tersedia</span>
               </div>
             </div>
           </div>
 
-          <!-- Purchase Packages Card -->
-          <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-sm space-y-6">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h2 class="font-display text-xl text-slate-900">Beli Paket Token</h2>
-                <span class="text-xs text-slate-500">Pembayaran instan via QRIS, GoPay, & Bank Transfer</span>
-              </div>
-              <span class="font-mono-accent text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded font-bold">
+          <!-- Purchase Packages Section -->
+          <div class="space-y-5">
+            <div class="flex items-center justify-between pb-3 border-b border-stone/60">
+              <h2 class="font-editorial text-xl font-bold text-ink-black tracking-tight">Beli Paket Token</h2>
+              <span class="font-mono-accent text-[10px] bg-bone text-emerald-800 border border-stone px-2.5 py-1 font-bold rounded-none">
                 MIDTRANS SANDBOX
               </span>
             </div>
 
             <!-- Packages Radio List -->
-            <div class="space-y-3">
+            <div class="space-y-2.5">
               <label 
                 v-for="pkg in packages" 
                 :key="pkg.id"
-                :class="selectedPackage === pkg.id ? 'border-[#0052FF] bg-[#0052FF]/5 shadow-sm ring-1 ring-[#0052FF]' : 'border-slate-200 bg-white hover:border-slate-300'"
-                class="flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all">
+                :class="selectedPackage === pkg.id ? 'border-2 border-black bg-bone' : 'border border-stone bg-paper-white hover:border-black'"
+                class="flex items-center justify-between p-4 cursor-pointer transition-all rounded-none">
                 <div class="flex items-center gap-3">
-                  <input type="radio" v-model="selectedPackage" :value="pkg.id" class="text-[#0052FF] w-4 h-4" />
+                  <input 
+                    type="radio" 
+                    v-model="selectedPackage" 
+                    :value="pkg.id" 
+                    class="w-4 h-4 accent-black cursor-pointer" />
                   <div>
-                    <span class="font-semibold text-slate-900 text-sm block">{{ pkg.name }}</span>
-                    <span class="text-xs text-slate-500 font-mono-accent">{{ pkg.tokens }} Token Pemrosesan Sesi</span>
+                    <span class="font-semibold text-ink-black text-sm block">{{ pkg.name }}</span>
+                    <span class="text-xs text-slate font-mono-accent">{{ pkg.tokens }} Token Pemrosesan Sesi</span>
                   </div>
                 </div>
                 <div class="text-right">
-                  <span class="font-mono-accent font-bold text-sm text-[#0052FF] block">
+                  <span class="font-mono-accent font-bold text-sm text-ink-black block">
                     Rp {{ pkg.priceIdr.toLocaleString() }}
                   </span>
-                  <span class="text-[10px] text-slate-400 font-mono-accent">
+                  <span class="text-[10px] text-slate font-mono-accent">
                     Rp {{ Math.round(pkg.priceIdr / pkg.tokens).toLocaleString() }} / token
                   </span>
                 </div>
@@ -301,28 +294,28 @@ onMounted(async () => {
             <button 
               @click="handleCheckout"
               :disabled="checkoutLoading"
-              class="w-full py-3.5 bg-[#0052FF] hover:bg-[#0043D6] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm hover:-translate-y-0.5 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2">
+              class="w-full btn-ink-stamp py-3.5 text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2">
               <span>{{ checkoutLoading ? 'Menghubungkan Midtrans Sandbox...' : (isGuest ? 'Daftar Akun untuk Beli Token' : 'Lanjutkan ke Pembayaran Midtrans') }}</span>
             </button>
 
-            <!-- Invoice Simulation Preview -->
-            <div v-if="activeOrder" class="p-5 bg-slate-900 text-white border border-slate-800 rounded-xl space-y-3 animate-fade-in">
-              <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                <span class="font-mono-accent text-[11px] text-slate-400 uppercase tracking-wider">Simulasi Sandbox Midtrans</span>
-                <span class="font-mono-accent text-xs text-cyan-400 font-bold">{{ activeOrder.orderId }}</span>
+            <!-- Invoice Simulation Preview (Opsi B: Panel flat bone, serasi dengan kanvas kertas) -->
+            <div v-if="activeOrder" class="p-5 bg-bone text-ink-black border border-stone rounded-none space-y-3 animate-fade-in">
+              <div class="flex items-center justify-between border-b border-stone pb-2.5">
+                <span class="font-mono-accent text-[11px] text-slate uppercase tracking-wider font-semibold">Simulasi Sandbox Midtrans</span>
+                <span class="font-mono-accent text-xs text-ink-black font-bold">{{ activeOrder.orderId }}</span>
               </div>
               <div class="flex justify-between text-xs py-1">
-                <span class="text-slate-400">Paket:</span>
-                <span class="font-semibold text-white">{{ activeOrder.package?.name }} ({{ activeOrder.package?.tokens }} Token)</span>
+                <span class="text-slate">Paket:</span>
+                <span class="font-semibold text-ink-black">{{ activeOrder.package?.name }} ({{ activeOrder.package?.tokens }} Token)</span>
               </div>
               <div class="flex justify-between text-xs py-1">
-                <span class="text-slate-400">Total Pembayaran:</span>
-                <span class="font-bold text-white font-mono-accent">Rp {{ activeOrder.package?.priceIdr?.toLocaleString() }}</span>
+                <span class="text-slate">Total Pembayaran:</span>
+                <span class="font-bold text-ink-black font-mono-accent">Rp {{ activeOrder.package?.priceIdr?.toLocaleString() }}</span>
               </div>
-              <div class="pt-2 border-t border-slate-800">
+              <div class="pt-2 border-t border-stone">
                 <button 
                   @click="handleSimulatePayment"
-                  class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg cursor-pointer transition-all flex items-center justify-center gap-2">
+                  class="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-none cursor-pointer transition-all flex items-center justify-center gap-2">
                   <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
@@ -337,45 +330,42 @@ onMounted(async () => {
 
         <!-- Right Column: Transaction Mutation Ledger (5 cols) -->
         <div class="lg:col-span-5 space-y-6">
-          <div class="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div>
-                <h3 class="font-display text-xl text-slate-900">Riwayat Mutasi Token</h3>
-                <span class="text-xs text-slate-500">Catatan penambahan & pemakaian kuota</span>
-              </div>
+          <div class="space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-stone/60">
+              <h3 class="font-editorial text-xl font-bold text-ink-black tracking-tight">Riwayat Mutasi Token</h3>
               <button 
                 @click="loadWallet"
-                class="text-xs font-semibold text-[#0052FF] hover:underline cursor-pointer">
+                class="text-xs font-mono-accent font-bold text-ink-black hover:underline cursor-pointer">
                 Segarkan
               </button>
             </div>
 
             <div class="overflow-x-auto">
               <table class="w-full text-xs text-left">
-                <thead class="text-slate-400 font-mono-accent border-b border-slate-100">
+                <thead class="text-slate font-mono-accent border-b border-stone/60 text-[11px] uppercase tracking-wider">
                   <tr>
                     <th class="py-2.5 font-medium">Waktu</th>
                     <th class="py-2.5 font-medium">Tipe</th>
                     <th class="py-2.5 text-right font-medium">Mutasi</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100 font-mono-accent">
-                  <tr v-for="tx in walletDetails?.transactions" :key="tx.id">
-                    <td class="py-3 text-slate-500 text-[11px] whitespace-nowrap">
+                <tbody class="divide-y divide-stone/40 font-mono-accent">
+                  <tr v-for="tx in walletDetails?.transactions" :key="tx.id" class="hover:bg-bone/40 transition-colors">
+                    <td class="py-3 text-slate text-[11px] whitespace-nowrap">
                       {{ new Date(tx.createdAt).toLocaleDateString() }}
                     </td>
-                    <td class="py-3 font-semibold text-slate-800 text-[11px]">
+                    <td class="py-3 font-semibold text-ink-black text-[11px]">
                       {{ tx.type }}
                     </td>
-                    <td class="py-3 text-right font-bold text-[11px]" :class="tx.amount > 0 ? 'text-[#0052FF]' : 'text-rose-500'">
+                    <td class="py-3 text-right font-bold text-[11px]" :class="tx.amount > 0 ? 'text-emerald-700' : 'text-rose-700'">
                       {{ tx.amount > 0 ? '+' + tx.amount : tx.amount }}
                     </td>
                   </tr>
                   <tr v-if="!walletDetails?.transactions?.length">
-                    <td colspan="3" class="py-12 text-center text-slate-500 text-xs">
-                      <div class="space-y-1.5 max-w-xs mx-auto">
-                        <p class="font-medium text-slate-700">Belum ada catatan mutasi</p>
-                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                    <td colspan="3" class="py-12 text-center text-slate text-xs">
+                      <div class="border border-dashed border-stone p-6 bg-paper-white space-y-1.5 max-w-sm mx-auto">
+                        <p class="font-medium text-ink-black">Belum ada catatan mutasi</p>
+                        <p class="text-[11px] text-slate leading-relaxed">
                           Gunakan tombol Klaim Token Harian atau selesaikan pembelian paket via Midtrans untuk melihat riwayat mutasi kuota.
                         </p>
                       </div>
