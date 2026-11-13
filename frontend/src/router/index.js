@@ -43,7 +43,7 @@ router.beforeEach((to, from, next) => {
   }
 
   // If user is ADMIN, prevent access to consumer studio workspace and billing
-  if (user && user.role === 'ADMIN') {
+  if (user?.role === 'ADMIN') {
     if (to.path === '/dashboard' || to.path.startsWith('/dashboard') || to.path === '/billing' || to.path === '/wallet') {
       return next('/admin/users');
     }
@@ -51,7 +51,7 @@ router.beforeEach((to, from, next) => {
 
   // If already authenticated with a real permanent account, avoid login/register forms
   if ((to.path === '/login' || to.path === '/register') && token && !isGuest) {
-    if (user.role === 'ADMIN') {
+    if (user?.role === 'ADMIN') {
       return next('/admin/users');
     }
     return next('/dashboard');

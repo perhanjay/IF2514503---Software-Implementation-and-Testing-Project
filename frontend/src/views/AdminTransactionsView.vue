@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import AppNavbar from '../components/AppNavbar.vue'
 import UserSupportDrawer from '../components/admin/UserSupportDrawer.vue'
@@ -34,6 +34,12 @@ const selectedUserId = ref(null)
 const isDrawerOpen = ref(false)
 
 let searchTimeout = null
+
+onBeforeUnmount(() => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+})
 
 const typeFilterOptions = [
   { id: 'ALL', label: 'Semua' },
