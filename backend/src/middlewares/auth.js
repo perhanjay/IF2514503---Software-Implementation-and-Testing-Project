@@ -10,20 +10,8 @@ export const authenticate = async (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl');
-    } catch (verifyErr) {
-      if (verifyErr.name !== 'TokenExpiredError') {
-        try {
-          decoded = jwt.verify(token, 'test-secret');
-        } catch {
-          throw verifyErr;
-        }
-      } else {
-        throw verifyErr;
-      }
-    }
+    const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl';
+    const decoded = jwt.verify(token, JWT_SECRET);
 
     const userId = decoded.userId || decoded.id;
     const user = await prisma.user.findUnique({

@@ -5,6 +5,8 @@ import { app } from '../src/server.js';
 import prisma from '../src/config/prisma.js';
 import jwt from 'jsonwebtoken';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_polaris_jwt_key_2026_ippl';
+
 describe('Admin Role Segregation & Read-Only Session Inspection', () => {
   let adminToken, engineerToken, engineerUser, engineerSession;
 
@@ -16,7 +18,10 @@ describe('Admin Role Segregation & Read-Only Session Inspection', () => {
         data: { name: 'System Admin', email: 'admin@polaris.audio', passwordHash: 'hash', role: 'ADMIN', status: 'ACTIVE' }
       });
     }
-    adminToken = jwt.sign({ id: admin.id, email: admin.email, role: 'ADMIN' }, process.env.JWT_SECRET || 'test-secret');
+    adminToken = jwt.sign(
+      { userId: admin.id, id: admin.id, email: admin.email, role: 'ADMIN' },
+      JWT_SECRET
+    );
 
     // 2. Create engineer user
     engineerUser = await prisma.user.upsert({
@@ -24,14 +29,35 @@ describe('Admin Role Segregation & Read-Only Session Inspection', () => {
       update: {},
       create: { name: 'Test Engineer', email: 'test_seg_engineer@polaris.audio', passwordHash: 'hash', role: 'AUDIO_ENGINEER', status: 'ACTIVE' }
     });
-    engineerToken = jwt.sign({ id: engineerUser.id, email: engineerUser.email, role: 'AUDIO_ENGINEER' }, process.env.JWT_SECRET || 'test-secret');
+    engineerToken = jwt.sign(
+      { userId: engineerUser.id, id: engineerUser.id, email: engineerUser.email, role: 'AUDIO_ENGINEER' },
+      JWT_SECRET
+    );
 
-    // 3. Create test session for engineer
+    // 3. Create test session for engineer with diagnostic data
     engineerSession = await prisma.session.create({
       data: {
         userId: engineerUser.id,
         title: 'Session For Support Inspection',
-        status: 'READY'
+        status: 'READY',
+        healthScore: 88,
+        tracks: {
+          create: [
+            {
+              fileName: 'Kick.wav',
+              durationSec: 120.0,
+              originalStorageKey: 'mock/kick.wav',
+              diagnosticResult: {
+                create: {
+                  truePeakDbfs: -1.2,
+                  crestFactor: 12.8,
+                  healthStatus: 'Clean',
+                  recommendations: ['Tingkat puncak optimal.']
+                }
+              }
+            }
+          ]
+        }
       }
     });
   });
@@ -83,11 +109,33 @@ describe('Admin Role Segregation & Read-Only Session Inspection', () => {
       update: {},
       create: { name: 'Another Eng', email: 'another_eng@polaris.audio', passwordHash: 'hash', role: 'AUDIO_ENGINEER', status: 'ACTIVE' }
     });
-    const anotherToken = jwt.sign({ id: anotherEngineer.id, email: anotherEngineer.email, role: 'AUDIO_ENGINEER' }, process.env.JWT_SECRET || 'test-secret');
+    const anotherToken = jwt.sign(
+      { userId: anotherEngineer.id, id: anotherEngineer.id, email: anotherEngineer.email, role: 'AUDIO_ENGINEER' },
+      JWT_SECRET
+    );
 
     const res = await request(app)
       .get(`/api/v1/sessions/${engineerSession.id}`)
       .set('Authorization', `Bearer ${anotherToken}`);
     assert.equal(res.status, 404);
+  });
+
+  test('ADM-SEG-07: Admin can inspect an engineer session diagnostics (GET /:id/diagnostics) (200 OK)', async () => {
+    const res = await request(app)
+      .get(`/api/v1/sessions/${engineerSession.id}/diagnostics`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.session.id, engineerSession.id);
+    assert.equal(res.body.healthScore, 88);
+    assert.ok(Array.isArray(res.body.tracks));
+  });
+
+  test('ADM-SEG-08: Admin can inspect and download an engineer session PDF report (GET /:id/report) (200 OK)', async () => {
+    const res = await request(app)
+      .get(`/api/v1/sessions/${engineerSession.id}/report`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'], /application\/pdf/i);
+    assert.ok(res.body);
   });
 });
