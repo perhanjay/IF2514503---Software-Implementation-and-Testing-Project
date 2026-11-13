@@ -79,4 +79,5 @@ app.use((err, req, res, next) => {
   return res.status(status).json({ error: message });
 });
 
+export { app };
 export default app;

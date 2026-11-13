@@ -89,11 +89,12 @@ export class SessionController {
   static async getDetails(req, res) {
     try {
       const { id } = req.params;
-      const session = await SessionService.getSessionDetails(id, req.user.id);
+      const isAdmin = req.user?.role === 'ADMIN';
+      const session = await SessionService.getSessionDetails(id, req.user.id, isAdmin);
       if (!session) {
         return res.status(404).json({ error: 'Sesi tidak ditemukan' });
       }
-      return res.json({ session });
+      return res.json({ ...session, session });
     } catch (err) {
       return res.status(500).json({ error: 'Gagal memuat detail sesi' });
     }
@@ -268,7 +269,8 @@ export class SessionController {
   static async getDiagnostics(req, res) {
     try {
       const { id } = req.params;
-      const result = await SessionService.getSessionDiagnostics(id, req.user.id);
+      const isAdmin = req.user?.role === 'ADMIN';
+      const result = await SessionService.getSessionDiagnostics(id, req.user.id, isAdmin);
       return res.json(result);
     } catch (err) {
       console.error('[Get Diagnostics Error]', err);
@@ -429,7 +431,8 @@ export class SessionController {
   static async downloadReport(req, res) {
     try {
       const { id } = req.params;
-      const { filename, buffer } = await SessionService.generateSessionReportPdf(id, req.user.id);
+      const isAdmin = req.user?.role === 'ADMIN';
+      const { filename, buffer } = await SessionService.generateSessionReportPdf(id, req.user.id, isAdmin);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', buffer.length);

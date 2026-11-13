@@ -20,13 +20,17 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, async () => {
-  console.log(`[Polaris Audio Backend] Server running on http://localhost:${PORT}`);
-  try {
-    await ensureBucketExists();
-  } catch (err) {
-    console.warn(`[Storage Initialization]`, err.message);
-  }
-});
+const isTest = process.env.NODE_ENV === 'test' || process.argv.some(arg => typeof arg === 'string' && arg.includes('test'));
 
-export { server };
+if (!isTest) {
+  server.listen(PORT, async () => {
+    console.log(`[Polaris Audio Backend] Server running on http://localhost:${PORT}`);
+    try {
+      await ensureBucketExists();
+    } catch (err) {
+      console.warn(`[Storage Initialization]`, err.message);
+    }
+  });
+}
+
+export { server, app };

@@ -7,7 +7,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../config/prisma.js';
-import { s3Client, BUCKET_NAME } from '../config/s3.js';
+import { s3Client, s3PublicClient, BUCKET_NAME } from '../config/s3.js';
 import { WalletService } from './walletService.js';
 
 function makeFallbackWav(sampleRate = 48000, durationSec = 0.5) {
@@ -106,7 +106,7 @@ export class SessionService {
           ContentType: file.type || 'audio/wav'
         });
 
-        const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        const uploadUrl = await getSignedUrl(s3PublicClient, command, { expiresIn: 3600 });
 
         // Simpan track record status PENDING
         const track = await prisma.track.create({
@@ -380,9 +380,9 @@ export class SessionService {
   /**
    * Mengambil detail spesifik sesi
    */
-  static async getSessionDetails(sessionId, userId) {
+  static async getSessionDetails(sessionId, userId, isAdmin = false) {
     return await prisma.session.findFirst({
-      where: { id: sessionId, userId },
+      where: isAdmin ? { id: sessionId } : { id: sessionId, userId },
       include: {
         tracks: {
           include: { diagnosticResult: true }
@@ -868,7 +868,7 @@ export class SessionService {
   /**
    * UC-13: Mengambil hasil diagnostik sesi lengkap
    */
-  static async getSessionDiagnostics(sessionId, userId = null) {
+  static async getSessionDiagnostics(sessionId, userId = null, isAdmin = false) {
     const session = await prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -886,7 +886,7 @@ export class SessionService {
       err.statusCode = 404;
       throw err;
     }
-    if (userId && session.userId !== userId) {
+    if (!isAdmin && userId && session.userId !== userId) {
       const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
       err.statusCode = 403;
       throw err;
@@ -898,6 +898,10 @@ export class SessionService {
       tracks: session.tracks,
       trackPairs: session.trackPairs
     };
+  }
+
+  static async getDiagnostics(sessionId, userId = null, isAdmin = false) {
+    return this.getSessionDiagnostics(sessionId, userId, isAdmin);
   }
 
   /**
@@ -1163,7 +1167,7 @@ export class SessionService {
             Bucket: BUCKET_NAME,
             Key: track.originalStorageKey
           });
-          rawAudioUrl = await getSignedUrl(s3Client, rawCommand, { expiresIn: 3600 });
+          rawAudioUrl = await getSignedUrl(s3PublicClient, rawCommand, { expiresIn: 3600 });
         }
 
         if (track.repairedStorageKey) {
@@ -1171,7 +1175,7 @@ export class SessionService {
             Bucket: BUCKET_NAME,
             Key: track.repairedStorageKey
           });
-          repairedAudioUrl = await getSignedUrl(s3Client, repairedCommand, { expiresIn: 3600 });
+          repairedAudioUrl = await getSignedUrl(s3PublicClient, repairedCommand, { expiresIn: 3600 });
         }
 
         return {
@@ -1296,7 +1300,7 @@ export class SessionService {
   /**
    * UC-18: Menghasilkan Laporan Diagnostik Sesi PDF Resmi
    */
-  static async generateSessionReportPdf(sessionId, userId) {
+  static async generateSessionReportPdf(sessionId, userId, isAdmin = false) {
     if (!isValidUuid(sessionId)) {
       const err = new Error('Sesi tidak ditemukan');
       err.statusCode = 404;
@@ -1321,7 +1325,7 @@ export class SessionService {
       throw err;
     }
 
-    if (session.userId !== userId) {
+    if (!isAdmin && session.userId !== userId) {
       const err = new Error('Akses ditolak: Anda bukan pemilik sesi ini');
       err.statusCode = 403;
       throw err;
@@ -1368,184 +1372,264 @@ export class SessionService {
       });
       doc.on('error', reject);
 
-      // --- PDF CONTENT GENERATION CONFORMING TO DESIGN.MD ---
-      const primaryColor = '#0052FF';
-      const slateDark = '#0F172A';
-      const slateMuted = '#64748B';
-      const slateBorder = '#E2E8F0';
-      const cardBg = '#F8FAFC';
+      // --- POLARIS EDITORIAL BOUTIQUE DESIGN SYSTEM TOKENS ---
+      const colorInkBlack = '#000000';
+      const colorBone = '#F4F3EF';
+      const colorPaperWhite = '#FFFFFF';
+      const colorStone = '#C1C0BC';
+      const colorHairline = '#E5E4E0';
+      const colorSlate = '#60605E';
+      const colorElectricBlue = '#0052FF';
+      const colorEmerald = '#047857';
+      const colorRose = '#BE123C';
+      const colorAmber = '#B45309';
 
-      // Header Banner
-      doc.rect(40, 40, 515, 60).fillAndStroke(slateDark, slateDark);
-      doc.fillColor('#FFFFFF').fontSize(16).font('Helvetica-Bold').text('POLARIS AUDIO', 55, 52);
-      doc.fillColor('#94A3B8').fontSize(9).font('Helvetica').text('Multitrack Audio Session Prep & Deterministic DSP Diagnostics', 55, 72);
-      doc.fillColor(primaryColor).fontSize(10).font('Helvetica-Bold').text('AUDIT REPORT', 450, 52, { align: 'right', width: 90 });
+      // Header: Pure Light Mode (Flat on White Canvas)
+      doc.fillColor(colorInkBlack).fontSize(16).font('Helvetica-Bold').text('POLARIS AUDIO', 40, 42);
+      doc.fillColor(colorSlate).fontSize(8.5).font('Helvetica').text('Multitrack Audio Session Prep & Deterministic DSP Diagnostics', 40, 62);
+      
+      // Right Accent Badge & Standard Stamp
+      doc.rect(450, 42, 105, 18).fill(colorElectricBlue);
+      doc.fillColor('#FFFFFF').fontSize(8.5).font('Helvetica-Bold').text('AUDIT REPORT', 450, 46.5, { align: 'center', width: 105 });
+      doc.fillColor(colorSlate).fontSize(7).font('Helvetica').text('ITU-R BS.1770-4 COMPLIANT', 405, 64, { align: 'right', width: 150 });
 
-      // Metadata Sesi Card
-      const metaY = 115;
-      doc.roundedRect(40, metaY, 515, 75, 4).fillAndStroke(cardBg, slateBorder);
-      doc.fillColor(slateDark).fontSize(10).font('Helvetica-Bold').text('METADATA SESI', 55, metaY + 12);
+      // Clean Header Separator Hairline
+      doc.moveTo(40, 76).lineTo(555, 76).lineWidth(0.75).stroke(colorStone);
 
-      doc.fontSize(8.5).font('Helvetica');
-      doc.fillColor(slateMuted).text('Judul Sesi:', 55, metaY + 30);
-      doc.fillColor(slateDark).font('Helvetica-Bold').text(cleanPdfText(session.title, 'Untitled'), 120, metaY + 30);
+      // Metadata Sesi (Flat on Canvas, No Enclosing Card)
+      const metaY = 88;
+      doc.fillColor(colorInkBlack).fontSize(8.5).font('Helvetica-Bold').text('METADATA SESI', 40, metaY);
 
-      doc.fillColor(slateMuted).font('Helvetica').text('Status:', 55, metaY + 45);
-      doc.fillColor(slateDark).font('Helvetica-Bold').text(session.status, 120, metaY + 45);
+      doc.fontSize(8).font('Helvetica');
+      doc.fillColor(colorSlate).text('Judul Sesi:', 40, metaY + 14);
+      doc.fillColor(colorInkBlack).font('Helvetica-Bold').text(cleanPdfText(session.title, 'Untitled Session'), 100, metaY + 14);
 
-      doc.fillColor(slateMuted).font('Helvetica').text('Sample Rate:', 280, metaY + 30);
-      doc.fillColor(slateDark).font('Helvetica-Bold').text(`${(session.sampleRate || 48000) / 1000} kHz`, 350, metaY + 30);
+      doc.fillColor(colorSlate).font('Helvetica').text('Status Sesi:', 40, metaY + 27);
+      const sessionStatusText = session.status === 'REPAIRED' ? 'REPAIRED (Hasil Perbaikan DSP)' : session.status;
+      const sessionStatusColor = session.status === 'REPAIRED' ? colorEmerald : colorInkBlack;
+      doc.fillColor(sessionStatusColor).font('Helvetica-Bold').text(sessionStatusText, 100, metaY + 27);
 
-      doc.fillColor(slateMuted).font('Helvetica').text('Bit Depth:', 280, metaY + 45);
-      doc.fillColor(slateDark).font('Helvetica-Bold').text(`${session.bitDepth || 24}-bit PCM`, 350, metaY + 45);
+      doc.fillColor(colorSlate).font('Helvetica').text('Tanggal Audit:', 40, metaY + 40);
+      const auditDateStr = new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+      doc.fillColor(colorInkBlack).font('Helvetica-Bold').text(auditDateStr, 100, metaY + 40);
 
-      doc.fillColor(slateMuted).font('Helvetica').text('Tanggal Audit:', 55, metaY + 60);
-      doc.fillColor(slateDark).font('Helvetica-Bold').text(new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }), 120, metaY + 60);
+      doc.fillColor(colorSlate).font('Helvetica').text('Sample Rate:', 310, metaY + 14);
+      doc.fillColor(colorInkBlack).font('Courier-Bold').text(`${(session.sampleRate || 48000) / 1000} kHz`, 380, metaY + 14);
 
-      // Mix Health Score & Kategori Status
-      const scoreY = 205;
+      doc.fillColor(colorSlate).font('Helvetica').text('Bit Depth:', 310, metaY + 27);
+      doc.fillColor(colorInkBlack).font('Courier-Bold').text(`${session.bitDepth || 24}-bit Float PCM`, 380, metaY + 27);
+
+      doc.fillColor(colorSlate).font('Helvetica').text('Total Trek:', 310, metaY + 40);
+      doc.fillColor(colorInkBlack).font('Helvetica-Bold').text(`${session.tracks.length} Stems Dimuat`, 380, metaY + 40);
+
+      // Hairline Separator below Metadata
+      doc.moveTo(40, metaY + 54).lineTo(555, metaY + 54).lineWidth(0.5).stroke(colorHairline);
+
+      // Mix Health Score & Kategori Status (Flat, No Enclosing Card)
+      const scoreY = metaY + 64;
       const score = Math.round(session.healthScore ?? 100);
-      let statusCategory = 'Clean';
-      let scoreColor = '#059669'; // Emerald
+      let statusCategory = 'Optimal (Bersih)';
+      let scoreColor = colorEmerald;
+      let statusDesc = 'Sesi selaras sempurna (zero-aligned), tidak ada anomali polaritas fasa atau digital clipping.';
+      
       if (score < 65) {
-        statusCategory = 'Critical';
-        scoreColor = '#E11D48'; // Rose
+        statusCategory = 'Kritis (Perlu Tindakan)';
+        scoreColor = colorRose;
+        statusDesc = 'Ditemukan pembatalan fasa masif 180° atau clipping inter-sample yang kritis. Perbaikan DSP sangat disarankan.';
       } else if (score < 90) {
-        statusCategory = 'Warning';
-        scoreColor = '#D97706'; // Amber
+        statusCategory = 'Perlu Penyesuaian';
+        scoreColor = colorAmber;
+        statusDesc = 'Ditemukan anomali fasa ringan, DC offset, atau headroom staging yang perlu diselaraskan.';
       }
 
-      doc.roundedRect(40, scoreY, 515, 60, 4).fillAndStroke(cardBg, slateBorder);
-      doc.fillColor(slateDark).fontSize(10).font('Helvetica-Bold').text('MIX HEALTH SCORE', 55, scoreY + 14);
-      doc.fillColor(scoreColor).fontSize(22).font('Helvetica-Bold').text(`${score}/100`, 55, scoreY + 30);
+      // Left side: Score
+      doc.fillColor(colorSlate).fontSize(8).font('Helvetica-Bold').text('MIX HEALTH SCORE', 40, scoreY);
+      doc.fillColor(scoreColor).fontSize(22).font('Helvetica-Bold').text(`${score}`, 40, scoreY + 12);
+      doc.fillColor(colorSlate).fontSize(10).font('Helvetica').text('/ 100', 40 + (score >= 100 ? 44 : score >= 10 ? 30 : 16), scoreY + 20);
 
-      doc.fillColor(slateMuted).fontSize(8.5).font('Helvetica').text('Kategori Status:', 280, scoreY + 16);
-      doc.fillColor(scoreColor).font('Helvetica-Bold').fontSize(11).text(statusCategory, 350, scoreY + 15);
+      // Vertical hairline divider
+      doc.moveTo(150, scoreY).lineTo(150, scoreY + 40).lineWidth(0.5).stroke(colorHairline);
 
-      const statusDesc = statusCategory === 'Clean'
-        ? 'Sesi selaras sempurna (zero-aligned), tidak ada anomali polaritas atau clipping.'
-        : statusCategory === 'Warning'
-        ? 'Ditemukan beberapa anomali fasa atau headroom staging yang perlu penyesuaian.'
-        : 'Ditemukan pembatalan fasa masif 180° atau clipping inter-sample yang kritis.';
-      doc.fillColor(slateDark).font('Helvetica').fontSize(8).text(statusDesc, 280, scoreY + 34, { width: 260 });
+      // Right side: Status and Description
+      doc.fillColor(colorSlate).fontSize(8).font('Helvetica').text('Kondisi Akustik & Fasa Sesi:', 165, scoreY);
+      doc.fillColor(scoreColor).fontSize(11).font('Helvetica-Bold').text(statusCategory, 165, scoreY + 11);
+      doc.fillColor(colorInkBlack).fontSize(8).font('Helvetica').text(statusDesc, 165, scoreY + 25, { width: 390 });
 
-      // Rekapitulasi Trek Audio Table
-      let tableY = 280;
-      doc.fillColor(slateDark).fontSize(11).font('Helvetica-Bold').text('REKAPITULASI TREK AUDIO', 40, tableY);
-      tableY += 18;
+      // Hairline Separator below Mix Health Score
+      doc.moveTo(40, scoreY + 48).lineTo(555, scoreY + 48).lineWidth(0.5).stroke(colorHairline);
+
+      // Rekapitulasi Trek Audio Table (Open Flat Table, No Cell Boxes)
+      let tableY = scoreY + 58;
+      doc.fillColor(colorInkBlack).fontSize(9).font('Helvetica-Bold').text('REKAPITULASI TREK AUDIO', 40, tableY);
+      tableY += 13;
 
       const drawTableHeader = (y) => {
-        doc.rect(40, y, 515, 20).fillAndStroke('#E2E8F0', '#CBD5E1');
-        doc.fillColor(slateDark).fontSize(8).font('Helvetica-Bold');
-        doc.text('Nama Trek / Berkas', 45, y + 6);
-        doc.text('Instrumen', 180, y + 6);
-        doc.text('True-Peak', 260, y + 6);
-        doc.text('Korelasi', 330, y + 6);
-        doc.text('DC Offset', 390, y + 6);
-        doc.text('Status / Anomali', 445, y + 6);
+        // Flat header strip with top and bottom hairlines (no side borders)
+        doc.rect(40, y, 515, 18).fill(colorBone);
+        doc.moveTo(40, y).lineTo(555, y).lineWidth(0.75).stroke(colorStone);
+        doc.moveTo(40, y + 18).lineTo(555, y + 18).lineWidth(0.75).stroke(colorStone);
+
+        doc.fillColor(colorInkBlack).fontSize(7.5).font('Helvetica-Bold');
+        doc.text('NAMA TREK / BERKAS', 45, y + 5.5);
+        doc.text('INSTRUMEN', 175, y + 5.5);
+        doc.text('TRUE-PEAK', 255, y + 5.5);
+        doc.text('KORELASI', 330, y + 5.5);
+        doc.text('DC OFFSET', 395, y + 5.5);
+        doc.text('STATUS / ANOMALI', 450, y + 5.5);
       };
 
       drawTableHeader(tableY);
-      tableY += 20;
+      tableY += 18;
 
       // Table Rows
       for (let i = 0; i < session.tracks.length; i++) {
         const track = session.tracks[i];
         const diag = track.diagnosticResult || {};
         const isEven = i % 2 === 0;
-        const rowBg = isEven ? '#FFFFFF' : '#F8FAFC';
-        
-        doc.rect(40, tableY, 515, 22).fillAndStroke(rowBg, slateBorder);
+
+        // Subtle alternating row tint without side borders
+        if (!isEven) {
+          doc.rect(40, tableY, 515, 20).fill('#FAFAFA');
+        }
 
         const rawFileName = track.fileName || `Track_${track.id}`;
         const fileNameClean = cleanPdfText(rawFileName);
-        const fileNameShort = fileNameClean.length > 25 ? fileNameClean.substring(0, 22) + '...' : fileNameClean;
-        doc.fontSize(7.5).font('Helvetica').fillColor(slateDark);
-        doc.text(fileNameShort, 45, tableY + 7);
+        const fileNameShort = fileNameClean.length > 24 ? fileNameClean.substring(0, 21) + '...' : fileNameClean;
+        doc.fontSize(7.5).font('Helvetica-Bold').fillColor(colorInkBlack);
+        doc.text(fileNameShort, 45, tableY + 6);
 
-        const instLabel = cleanPdfText(track.instrumentLabel || track.detectedLabel || 'Other');
-        doc.text(instLabel, 180, tableY + 7);
+        const instLabel = cleanPdfText(track.instrumentLabel || track.detectedLabel || 'Audio');
+        doc.font('Helvetica').fillColor(colorSlate).text(instLabel, 175, tableY + 6);
 
-        // Monospace telemetry font for metrics conforming to DESIGN.md
+        // Monospace telemetry font for metrics
+        doc.font('Courier-Bold');
+        const truePeakVal = diag.truePeakDbfs !== null && diag.truePeakDbfs !== undefined ? diag.truePeakDbfs : -0.0;
+        const truePeakText = `${truePeakVal.toFixed(1)} dBFS`;
+        doc.fillColor(diag.hasClipping ? colorRose : colorInkBlack).text(truePeakText, 255, tableY + 6);
+
+        const corrVal = diag.phaseCorrelation !== null && diag.phaseCorrelation !== undefined ? diag.phaseCorrelation : 1.0;
+        const phaseCorrText = `${corrVal >= 0 ? '+' : ''}${corrVal.toFixed(2)}`;
+        const corrColor = corrVal < 0.0 ? colorRose : corrVal < 0.4 ? colorAmber : colorEmerald;
+        doc.fillColor(corrColor).text(phaseCorrText, 330, tableY + 6);
+
         doc.font('Courier');
-        const truePeak = diag.truePeakDbfs !== null && diag.truePeakDbfs !== undefined ? `${diag.truePeakDbfs.toFixed(1)} dBFS` : '-0.0 dBFS';
-        doc.text(truePeak, 260, tableY + 7);
+        const dcText = diag.hasDcOffset ? 'OFFSET' : '0.00%';
+        doc.fillColor(diag.hasDcOffset ? colorAmber : colorInkBlack).text(dcText, 395, tableY + 6);
 
-        const phaseCorr = diag.phaseCorrelation !== null && diag.phaseCorrelation !== undefined ? diag.phaseCorrelation.toFixed(2) : '+1.00';
-        doc.text(phaseCorr, 330, tableY + 7);
-
-        const dcText = diag.hasDcOffset ? 'Terdeteksi' : '0.0%';
-        doc.text(dcText, 390, tableY + 7);
-
-        doc.font('Helvetica');
+        doc.font('Helvetica-Bold');
         const issues = [];
-        if (diag.hasPolarityInvert) issues.push('Polaritas (Invert)');
-        if (diag.hasClipping) issues.push('Clipping');
+        if (diag.hasPolarityInvert) issues.push('Polaritas 180°');
+        if (diag.hasClipping) issues.push('Peak Clipping');
         if (diag.hasFakeStereo) issues.push('Haas Stereo');
         if (diag.hasSubRumble) issues.push('Sub-Rumble');
-        if (diag.hasCombFiltering) issues.push('Delay Offset');
-        const issueStr = issues.length > 0 ? issues.join(', ') : 'Clean';
+        if (diag.hasCombFiltering) issues.push('Comb Filter');
         
-        const issueColor = issues.length > 0 ? (diag.hasPolarityInvert || diag.hasClipping ? '#E11D48' : '#D97706') : '#059669';
-        doc.fillColor(issueColor).font(issues.length > 0 ? 'Helvetica-Bold' : 'Helvetica').text(issueStr, 445, tableY + 7, { width: 105 });
+        const isClean = issues.length === 0;
+        const issueStr = isClean ? 'Bersih' : issues.join(', ');
+        const issueColor = isClean ? colorEmerald : (diag.hasPolarityInvert || diag.hasClipping ? colorRose : colorAmber);
+        doc.fillColor(issueColor).text(issueStr, 450, tableY + 6, { width: 105 });
 
-        tableY += 22;
+        // Bottom hairline divider per row
+        doc.moveTo(40, tableY + 20).lineTo(555, tableY + 20).lineWidth(0.5).stroke(colorHairline);
 
-        if (tableY > 690 && i < session.tracks.length - 1) {
+        tableY += 20;
+
+        // Auto-page break if near page bottom (accounting for footer at 785)
+        if (tableY > 730 && i < session.tracks.length - 1) {
           doc.addPage();
-          tableY = 40;
+          tableY = 42;
           drawTableHeader(tableY);
-          tableY += 20;
+          tableY += 18;
         }
       }
 
-      // Rekomendasi Teknis Mixing Audio Section
-      tableY += 15;
-      if (tableY > 640) {
+      // Close bottom of table with subtle rule
+      doc.moveTo(40, tableY).lineTo(555, tableY).lineWidth(0.75).stroke(colorStone);
+
+      // Rekomendasi Teknis Mixing Audio Section (Flat on Canvas, No Enclosing Card)
+      tableY += 16;
+      if (tableY > 670) {
         doc.addPage();
-        tableY = 40;
+        tableY = 42;
       }
 
-      doc.fillColor(slateDark).fontSize(11).font('Helvetica-Bold').text('REKOMENDASI TEKNIS MIXING AUDIO', 40, tableY);
-      tableY += 16;
+      doc.fillColor(colorInkBlack).fontSize(9).font('Helvetica-Bold').text('REKOMENDASI TEKNIS MIXING AUDIO', 40, tableY);
+      doc.moveTo(40, tableY + 13).lineTo(555, tableY + 13).lineWidth(0.5).stroke(colorHairline);
+      tableY += 20;
 
       const allRecs = [];
       for (const t of session.tracks) {
         if (t.diagnosticResult?.recommendations && Array.isArray(t.diagnosticResult.recommendations)) {
           for (const rec of t.diagnosticResult.recommendations) {
-            allRecs.push(`* [${cleanPdfText(t.fileName || 'Trek')}]: ${cleanPdfText(rec)}`);
+            const trackName = cleanPdfText(t.fileName || 'Trek Audio');
+            let recMsg = '';
+            if (typeof rec === 'object' && rec !== null) {
+              recMsg = rec.message || rec.text || rec.description || JSON.stringify(rec);
+            } else {
+              recMsg = String(rec);
+            }
+            allRecs.push({
+              track: trackName,
+              text: cleanPdfText(recMsg),
+              severity: (typeof rec === 'object' && rec?.severity) || 'INFO'
+            });
           }
         }
       }
 
       if (allRecs.length === 0) {
-        allRecs.push('* Seluruh stem audio berada dalam kondisi fase optimal dan tidak memerlukan perbaikan.');
+        allRecs.push({
+          track: 'Seluruh Stem Audio',
+          text: 'Kondisi stem optimal — seluruh parameter DSP memenuhi standar toleransi mixing. Tidak diperlukan perbaikan lanjutan.',
+          severity: 'CLEAN'
+        });
       }
 
-      const recBoxHeight = Math.min(100, Math.max(50, allRecs.length * 15 + 16));
-      doc.roundedRect(40, tableY, 515, recBoxHeight, 4).fillAndStroke(cardBg, slateBorder);
-      let recY = tableY + 10;
-      doc.fillColor(slateDark).fontSize(8).font('Helvetica');
-      for (const rec of allRecs.slice(0, 6)) {
-        doc.text(rec, 50, recY, { width: 495 });
-        recY += 14;
+      for (const item of allRecs.slice(0, 10)) {
+        if (tableY > 745) {
+          doc.addPage();
+          tableY = 42;
+        }
+
+        const bulletColor = item.severity === 'CRITICAL' ? colorRose : item.severity === 'WARNING' ? colorAmber : colorEmerald;
+        
+        doc.fillColor(bulletColor).fontSize(8.5).font('Helvetica-Bold').text('•', 45, tableY);
+        doc.fillColor(colorInkBlack).fontSize(8).font('Helvetica-Bold').text(`[${item.track}] `, 55, tableY, { continued: true });
+        doc.font('Helvetica').fillColor(colorSlate).text(item.text, { width: 495 });
+        
+        const textHeight = doc.heightOfString(`[${item.track}] ${item.text}`, { width: 495, fontSize: 8 });
+        tableY += Math.max(16, textHeight + 6);
       }
 
-      // Add footers on every buffered page
+      // Add footers on every buffered page with crisp hairline separator
       const range = doc.bufferedPageRange();
       for (let p = range.start; p < range.start + range.count; p++) {
         doc.switchToPage(p);
-        doc.fontSize(7.5).font('Helvetica').fillColor(slateMuted);
+        
+        doc.moveTo(40, 785).lineTo(555, 785).lineWidth(0.5).stroke(colorStone);
+        
+        doc.fontSize(7.5).font('Helvetica').fillColor(colorSlate);
         doc.text(
-          `Dokumen audit ini diterbitkan secara otomatis oleh Polaris Audio DSP Diagnostics Engine sesuai spesifikasi ITU-R BS.1770-4. | Halaman ${p + 1} dari ${range.count}`,
+          'POLARIS AUDIO • WORKSTATION PERSIAPAN MIXING & DSP DETERMINISTIK ITU-R BS.1770-4',
           40,
-          800,
-          { align: 'center', width: 515 }
+          790,
+          { lineBreak: false }
+        );
+        doc.font('Helvetica-Bold').fillColor(colorInkBlack);
+        doc.text(
+          `HALAMAN ${p + 1} / ${range.count}`,
+          440,
+          790,
+          { align: 'right', width: 115, lineBreak: false }
         );
       }
 
       doc.end();
     });
+  }
+
+  static async downloadReport(sessionId, userId, isAdmin = false) {
+    return this.generateSessionReportPdf(sessionId, userId, isAdmin);
   }
 }
 

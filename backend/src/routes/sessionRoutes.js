@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { SessionController } from '../controllers/sessionController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, requireAudioEngineer } from '../middlewares/auth.js';
 
 const router = Router();
 const upload = multer({
@@ -28,27 +28,27 @@ router.use(authenticate);
 
 router.get('/', SessionController.listSessions);
 router.get('/:id', SessionController.getDetails);
-router.patch('/:id/title', SessionController.updateTitle);
-router.delete('/:id', SessionController.deleteSession);
-router.post('/upload-init', SessionController.initUpload);
-router.post('/upload-direct', uploadFilesMiddleware, SessionController.uploadDirect);
-router.post('/:id/verify-integrity', SessionController.verifySession);
+router.patch('/:id/title', requireAudioEngineer, SessionController.updateTitle);
+router.delete('/:id', requireAudioEngineer, SessionController.deleteSession);
+router.post('/upload-init', requireAudioEngineer, SessionController.initUpload);
+router.post('/upload-direct', requireAudioEngineer, uploadFilesMiddleware, SessionController.uploadDirect);
+router.post('/:id/verify-integrity', requireAudioEngineer, SessionController.verifySession);
 
 // UC-12: AI Instrument Classification & Multi-Mic Pairing
-router.post('/:id/classify', SessionController.classifySession);
-router.post('/:id/pairs/ai', SessionController.classifySession);
-router.patch('/:id/tracks/:trackId/label', SessionController.updateTrackLabel);
-router.post('/:id/pairs', SessionController.createPair);
-router.delete('/:id/pairs/:pairId', SessionController.deletePair);
-router.post('/:id/finalize-classification', SessionController.finalizeClassification);
+router.post('/:id/classify', requireAudioEngineer, SessionController.classifySession);
+router.post('/:id/pairs/ai', requireAudioEngineer, SessionController.classifySession);
+router.patch('/:id/tracks/:trackId/label', requireAudioEngineer, SessionController.updateTrackLabel);
+router.post('/:id/pairs', requireAudioEngineer, SessionController.createPair);
+router.delete('/:id/pairs/:pairId', requireAudioEngineer, SessionController.deletePair);
+router.post('/:id/finalize-classification', requireAudioEngineer, SessionController.finalizeClassification);
 
 // UC-13: Core DSP Diagnostic Engine & Mix Health Score
-router.post('/:id/diagnose', SessionController.diagnoseSession);
+router.post('/:id/diagnose', requireAudioEngineer, SessionController.diagnoseSession);
 router.get('/:id/diagnostics', SessionController.getDiagnostics);
 
 // UC-14 & UC-15: DSP Audio Repair Engine
-router.post('/:id/repair-auto', SessionController.repairAuto);
-router.post('/:id/repair-custom', SessionController.repairCustom);
+router.post('/:id/repair-auto', requireAudioEngineer, SessionController.repairAuto);
+router.post('/:id/repair-custom', requireAudioEngineer, SessionController.repairCustom);
 
 // UC-16: A/B Multitrack Auditioning Player Audio Sources
 router.get('/:id/audio-sources', SessionController.getAudioSources);
