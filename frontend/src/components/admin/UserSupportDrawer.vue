@@ -37,9 +37,6 @@ const feedbackMessage = ref('')
 const errorMessage = ref('')
 
 // Action states
-const roleLoading = ref(false)
-const selectedRole = ref('AUDIO_ENGINEER')
-
 const statusLoading = ref(false)
 const showSuspendModal = ref(false)
 const suspendReason = ref('')
@@ -76,7 +73,6 @@ async function fetchUserDetail() {
   try {
     const res = await axios.get(`/api/v1/admin/users/${props.userId}`)
     userData.value = res.data.user
-    selectedRole.value = res.data.user.role
   } catch (err) {
     console.error('Failed to fetch user detail:', err)
     fetchError.value = err.response?.data?.error || 'Gagal memuat rincian pengguna'
@@ -86,27 +82,6 @@ async function fetchUserDetail() {
 }
 
 // Actions
-async function updateRole() {
-  if (isSelf.value) return
-  roleLoading.value = true
-  errorMessage.value = ''
-  feedbackMessage.value = ''
-  try {
-    const res = await axios.patch(`/api/v1/admin/users/${props.userId}/role`, {
-      role: selectedRole.value
-    })
-    if (userData.value) {
-      userData.value.role = res.data.user.role
-    }
-    feedbackMessage.value = res.data.message || 'Peran pengguna berhasil diperbarui'
-    emit('user-updated')
-  } catch (err) {
-    errorMessage.value = err.response?.data?.error || 'Gagal memperbarui peran pengguna'
-  } finally {
-    roleLoading.value = false
-  }
-}
-
 function openSuspendModal() {
   if (isSelf.value) return
   suspendReason.value = ''
@@ -429,43 +404,21 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <!-- 2. Role Management Section -->
+            <!-- 2. Role Information Section (Single Admin Policy) -->
             <div class="bg-paper-white border border-stone p-5 rounded-none space-y-3">
               <div class="flex items-center justify-between">
                 <div class="text-xs font-bold uppercase tracking-wider text-ink-black flex items-center gap-2">
                   <Shield class="w-4 h-4 text-slate" />
-                  <span>MANAJEMEN PERAN PENGGUNA</span>
+                  <span>PERAN PENGGUNA</span>
                 </div>
-                <span class="badge-pill-stamp px-2 py-0.5 text-[9px] rounded-full bg-bone text-ink-black border border-stone">
-                  {{ userData.role === 'ADMIN' ? 'Admin' : 'Engineer' }}
+                <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] font-mono-accent font-semibold rounded-full bg-bone text-ink-black border border-stone uppercase">
+                  {{ userData.role === 'ADMIN' ? 'System Administrator' : 'Audio Engineer' }}
                 </span>
               </div>
 
-              <p class="text-xs text-slate">
-                Ubah tingkat hak akses pengguna ke sistem administrasi atau operasional audio.
+              <p class="text-xs text-slate leading-relaxed">
+                Platform beroperasi di bawah kebijakan administrator tunggal. Penugasan peran dikunci secara permanen dan tidak dapat dimodifikasi demi kepatuhan audit keamanan.
               </p>
-
-              <div v-if="isSelf" class="p-2.5 bg-bone border border-stone text-xs text-slate font-mono-accent">
-                Perlindungan Akun: Anda tidak dapat mengubah peran akun Anda sendiri.
-              </div>
-
-              <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                <select 
-                  v-model="selectedRole" 
-                  :disabled="isSelf || roleLoading"
-                  class="flex-1 border border-stone bg-paper-white px-3 py-2 text-xs text-ink-black rounded-none focus:outline-none focus:border-ink-black cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                  <option value="AUDIO_ENGINEER">Audio Engineer (Standar)</option>
-                  <option value="ADMIN">System Administrator (Akses Penuh)</option>
-                </select>
-
-                <button 
-                  @click="updateRole" 
-                  :disabled="isSelf || roleLoading || selectedRole === userData.role"
-                  class="btn-ink-stamp px-4 py-2 text-xs font-bold border border-black cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
-                  <RotateCw v-if="roleLoading" class="w-3.5 h-3.5 animate-spin" />
-                  <span>SIMPAN PERAN</span>
-                </button>
-              </div>
             </div>
 
             <!-- 3. Account Status & Suspension Section -->

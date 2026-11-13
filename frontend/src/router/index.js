@@ -17,6 +17,13 @@ const routes = [
     component: () => import('../views/AdminUsersView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
+  {
+    path: '/admin/transactions',
+    name: 'AdminTransactions',
+    component: () => import('../views/AdminTransactionsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  { path: '/admin', redirect: '/admin/users' },
 ];
 
 const router = createRouter({
@@ -35,8 +42,18 @@ router.beforeEach((to, from, next) => {
     }
   }
 
+  // If user is ADMIN, prevent access to consumer studio workspace and billing
+  if (user && user.role === 'ADMIN') {
+    if (to.path === '/dashboard' || to.path.startsWith('/dashboard') || to.path === '/billing' || to.path === '/wallet') {
+      return next('/admin/users');
+    }
+  }
+
   // If already authenticated with a real permanent account, avoid login/register forms
   if ((to.path === '/login' || to.path === '/register') && token && !isGuest) {
+    if (user.role === 'ADMIN') {
+      return next('/admin/users');
+    }
     return next('/dashboard');
   }
 
@@ -44,4 +61,3 @@ router.beforeEach((to, from, next) => {
 });
 
 export default router;
-

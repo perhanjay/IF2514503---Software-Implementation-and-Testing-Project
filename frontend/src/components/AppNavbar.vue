@@ -149,7 +149,7 @@ function handleLogout() {
   <header class="sticky top-0 z-40 w-full border-b border-[#c1c0bc] bg-white transition-all">
     <div :class="isFluid ? 'w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12' : 'max-w-[1200px] mx-auto px-6'" class="h-18 flex items-center justify-between">
       <!-- Logo Branding -->
-      <router-link to="/" class="flex items-center gap-3 group">
+      <router-link :to="authStore.user?.role === 'ADMIN' ? '/admin/users' : '/'" class="flex items-center gap-3 group">
         <div class="w-9 h-9 rounded-none bg-black text-white flex items-center justify-center font-bold text-lg transition-transform group-hover:scale-105">
           <span>P</span>
         </div>
@@ -161,44 +161,63 @@ function handleLogout() {
 
       <!-- Center Desktop Navigation -->
       <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
-        <router-link 
-          to="/" 
-          :class="route.path === '/' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
-          class="transition-colors">
-          Beranda
-        </router-link>
-        <router-link 
-          to="/dashboard" 
-          :class="route.path === '/dashboard' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
-          class="transition-colors">
-          Studio Workspace
-        </router-link>
-        <router-link 
-          to="/billing" 
-          :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
-          class="transition-colors">
-          Dompet & Kuota
-        </router-link>
-        <router-link 
-          v-if="authStore.user?.role === 'ADMIN'"
-          to="/admin/users" 
-          :class="route.path.startsWith('/admin') ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
-          class="transition-colors">
-          Admin: Pengguna
-        </router-link>
+        <template v-if="authStore.user?.role === 'ADMIN'">
+          <router-link 
+            to="/admin/users" 
+            :class="route.path === '/admin/users' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            class="transition-colors">
+            Admin: Pengguna
+          </router-link>
+          <router-link 
+            to="/admin/transactions" 
+            :class="route.path === '/admin/transactions' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            class="transition-colors">
+            Audit Transaksi
+          </router-link>
+        </template>
+        <template v-else>
+          <router-link 
+            to="/" 
+            :class="route.path === '/' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            class="transition-colors">
+            Beranda
+          </router-link>
+          <router-link 
+            to="/dashboard" 
+            :class="route.path === '/dashboard' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            class="transition-colors">
+            Studio Workspace
+          </router-link>
+          <router-link 
+            to="/billing" 
+            :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            class="transition-colors">
+            Dompet & Kuota
+          </router-link>
+        </template>
       </nav>
 
       <!-- Right Actions & Token Pill -->
       <div class="flex items-center gap-3">
-        <!-- Saldo Token Badge -->
-        <router-link 
-          to="/billing"
-          title="Kelola saldo dan beli paket token"
-          class="flex items-center gap-2 bg-[#f1f0eb] hover:bg-[#e4d9cf] border border-[#c1c0bc] rounded-none px-3.5 py-2 transition-all">
-          <span class="w-2 h-2 rounded-full bg-black" />
-          <span class="font-mono-accent text-xs text-[#60605e]">Kuota:</span>
-          <span class="font-mono-accent text-xs font-bold text-black">{{ authStore.walletBalance }} Token</span>
-        </router-link>
+        <!-- If ADMIN: show ADMIN OPERATOR badge instead of Quota pill -->
+        <template v-if="authStore.user?.role === 'ADMIN'">
+          <div class="hidden sm:flex items-center gap-1.5 bg-[#f1f0eb] border border-[#c1c0bc] px-3 py-1.5 text-xs font-mono font-semibold text-black uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-rose-600 animate-none"></span>
+            ADMIN OPERATOR
+          </div>
+        </template>
+
+        <!-- Else: Saldo Token Badge -->
+        <template v-else>
+          <router-link 
+            to="/billing"
+            title="Kelola saldo dan beli paket token"
+            class="flex items-center gap-2 bg-[#f1f0eb] hover:bg-[#e4d9cf] border border-[#c1c0bc] rounded-none px-3.5 py-2 transition-all">
+            <span class="w-2 h-2 rounded-full bg-black" />
+            <span class="font-mono-accent text-xs text-[#60605e]">Kuota:</span>
+            <span class="font-mono-accent text-xs font-bold text-black">{{ authStore.walletBalance }} Token</span>
+          </router-link>
+        </template>
 
         <!-- Auth States (Desktop) -->
         <template v-if="authStore.isAuthenticated && !isGuest">
@@ -255,42 +274,54 @@ function handleLogout() {
 
     <!-- Mobile Drawer Menu (R-03) -->
     <div v-if="mobileMenuOpen" class="md:hidden border-t border-[#c1c0bc] bg-white px-6 py-4 space-y-2 animate-fade-in">
-      <router-link 
-        to="/" 
-        @click="mobileMenuOpen = false"
-        :class="route.path === '/' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
-        class="block px-3 py-2 rounded-none text-sm transition-colors">
-        Beranda
-      </router-link>
-      <router-link 
-        to="/dashboard" 
-        @click="mobileMenuOpen = false"
-        :class="route.path === '/dashboard' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
-        class="block px-3 py-2 rounded-none text-sm transition-colors">
-        Studio Workspace
-      </router-link>
-      <router-link 
-        to="/billing" 
-        @click="mobileMenuOpen = false"
-        :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
-        class="block px-3 py-2 rounded-none text-sm transition-colors">
-        Dompet & Kuota Token
-      </router-link>
-      <router-link 
-        v-if="authStore.user?.role === 'ADMIN'"
-        to="/admin/users" 
-        @click="mobileMenuOpen = false"
-        :class="route.path.startsWith('/admin') ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
-        class="block px-3 py-2 rounded-none text-sm transition-colors">
-        Admin: Pengguna
-      </router-link>
+      <template v-if="authStore.user?.role === 'ADMIN'">
+        <router-link 
+          to="/admin/users" 
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/admin/users' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors">
+          Admin: Pengguna
+        </router-link>
+        <router-link 
+          to="/admin/transactions" 
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/admin/transactions' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors">
+          Audit Transaksi
+        </router-link>
+      </template>
+      <template v-else>
+        <router-link 
+          to="/" 
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors">
+          Beranda
+        </router-link>
+        <router-link 
+          to="/dashboard" 
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/dashboard' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors">
+          Studio Workspace
+        </router-link>
+        <router-link 
+          to="/billing" 
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors">
+          Dompet & Kuota Token
+        </router-link>
+      </template>
 
       <div class="pt-3 border-t border-[#c1c0bc] flex flex-col gap-2">
         <template v-if="authStore.isAuthenticated && !isGuest">
           <div class="px-3 py-1 flex items-center justify-between">
             <div>
               <span class="block text-xs font-semibold text-black">{{ authStore.user?.name }}</span>
-              <span class="text-[10px] text-[#60605e] font-mono-accent">Pro Engineer</span>
+              <span class="text-[10px] text-[#60605e] font-mono-accent">
+                {{ authStore.user?.role === 'ADMIN' ? 'Admin Operator' : 'Pro Engineer' }}
+              </span>
             </div>
             <button 
               type="button"
