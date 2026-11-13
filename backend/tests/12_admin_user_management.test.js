@@ -498,48 +498,34 @@ describe('Admin User Management & Security Middlewares (Task 2)', () => {
       );
     });
 
-    it('ADM-ACT-01: Admin can promote AUDIO_ENGINEER to ADMIN', async () => {
+    it('ADM-ACT-01: Admin cannot promote AUDIO_ENGINEER under single-admin policy (400 Bad Request)', async () => {
       const res = await request(app)
         .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'ADMIN' });
 
-      assert.equal(res.status, 200);
-      assert.equal(res.body.message, 'Peran pengguna berhasil diperbarui');
-      assert.equal(res.body.user.role, 'ADMIN');
-
-      const updated = await prisma.user.findUnique({ where: { id: actionTargetUser.user.id } });
-      assert.equal(updated.role, 'ADMIN');
-
-      // Revert back to AUDIO_ENGINEER for subsequent tests
-      await prisma.user.update({
-        where: { id: actionTargetUser.user.id },
-        data: { role: 'AUDIO_ENGINEER' }
-      });
+      assert.equal(res.status, 400);
+      assert.match(res.body.error, /kebijakan akun admin tunggal/);
     });
 
-    it('ADM-ACT-02: Admin cannot demote themselves (400 Bad Request)', async () => {
+    it('ADM-ACT-02: Admin cannot demote under single-admin policy (400 Bad Request)', async () => {
       const res = await request(app)
         .patch(`/api/v1/admin/users/${adminFixture.user.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'AUDIO_ENGINEER' });
 
       assert.equal(res.status, 400);
-      assert.equal(res.body.error, 'Tidak dapat mengubah peran akun Anda sendiri');
-
-      // Verify admin role remains ADMIN in database
-      const adminInDb = await prisma.user.findUnique({ where: { id: adminFixture.user.id } });
-      assert.equal(adminInDb.role, 'ADMIN');
+      assert.match(res.body.error, /kebijakan akun admin tunggal/);
     });
 
-    it('ADM-ACT-03: Role change with invalid role returns 400 Bad Request', async () => {
+    it('ADM-ACT-03: Role change with invalid role returns 400 Bad Request under single-admin policy', async () => {
       const res = await request(app)
         .patch(`/api/v1/admin/users/${actionTargetUser.user.id}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'SUPER_ADMIN_INVALID' });
 
       assert.equal(res.status, 400);
-      assert.match(res.body.error, /Peran tidak valid/i);
+      assert.match(res.body.error, /kebijakan akun admin tunggal/);
     });
 
     it('ADM-ACT-04: Admin can suspend active user with reason and statusReason is saved', async () => {
@@ -778,8 +764,8 @@ describe('Admin User Management & Security Middlewares (Task 2)', () => {
         .patch(`/api/v1/admin/users/${ghostId}/role`)
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ role: 'ADMIN' });
-      assert.equal(roleRes.status, 404);
-      assert.match(roleRes.body.error, /tidak ditemukan/i);
+      assert.equal(roleRes.status, 400);
+      assert.match(roleRes.body.error, /kebijakan akun admin tunggal/);
 
       const statusRes = await request(app)
         .patch(`/api/v1/admin/users/${ghostId}/status`)

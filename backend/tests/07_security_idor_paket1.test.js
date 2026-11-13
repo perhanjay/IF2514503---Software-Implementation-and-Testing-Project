@@ -542,14 +542,13 @@ describe('Paket 1: Keamanan, Akses Kontrol & IDOR Integration Tests', () => {
       assert.match(res.body.error, /jumlah token tidak valid/i);
     });
 
-    it('TC-TOPUP-03: administrator internal dapat melakukan penyesuaian kuota token (200)', async () => {
+    it('TC-TOPUP-03: administrator dilarang melakukan self-topup di bawah Zero-Token Policy (403)', async () => {
       const res = await request(app)
         .post('/api/v1/wallet/top-up')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ amount: 20 });
 
-      assert.equal(res.status, 200);
-      assert.match(res.body.message, /berhasil ditambahkan/i);
+      assert.equal(res.status, 403);
     });
   });
 

@@ -18,6 +18,12 @@ describe('Admin Role Segregation & Read-Only Session Inspection', () => {
         data: { name: 'System Admin', email: 'admin@polaris.audio', passwordHash: 'hash', role: 'ADMIN', status: 'ACTIVE' }
       });
     }
+    // Ensure admin wallet balance is strictly 0 under zero-token policy
+    await prisma.wallet.upsert({
+      where: { userId: admin.id },
+      update: { balance: 0 },
+      create: { userId: admin.id, balance: 0 }
+    });
     adminToken = jwt.sign(
       { userId: admin.id, id: admin.id, email: admin.email, role: 'ADMIN' },
       JWT_SECRET
@@ -137,5 +143,37 @@ describe('Admin Role Segregation & Read-Only Session Inspection', () => {
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'], /application\/pdf/i);
     assert.ok(res.body);
+  });
+
+  test('ADM-SEG-09: Admin must be rejected with 403 Forbidden on daily token claim (/wallet/claim-daily)', async () => {
+    const res = await request(app)
+      .post('/api/v1/wallet/claim-daily')
+      .set('Authorization', `Bearer ${adminToken}`);
+    assert.equal(res.status, 403);
+  });
+
+  test('ADM-SEG-10: Admin must be rejected with 403 Forbidden on checkout (/payments/checkout)', async () => {
+    const res = await request(app)
+      .post('/api/v1/payments/checkout')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ packageId: 'STUDIO_PRO' });
+    assert.equal(res.status, 403);
+  });
+
+  test('ADM-SEG-11: Admin cannot promote or demote any account under single-admin policy (400 Bad Request)', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/admin/users/${engineerUser.id}/role`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ role: 'ADMIN' });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /kebijakan akun admin tunggal/);
+  });
+
+  test('ADM-SEG-12: Legacy internal top-up (/wallet/top-up) returns 403 Forbidden for admin', async () => {
+    const res = await request(app)
+      .post('/api/v1/wallet/top-up')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ amount: 10 });
+    assert.equal(res.status, 403);
   });
 });

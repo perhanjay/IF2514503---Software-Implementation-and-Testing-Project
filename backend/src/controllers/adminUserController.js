@@ -187,53 +187,12 @@ export class AdminUserController {
 
   /**
    * PATCH /api/v1/admin/users/:id/role
-   * Promotes or demotes user role between AUDIO_ENGINEER and ADMIN.
-   * Prevents self-demotion by current admin.
+   * Under single-admin policy, all role modification requests are strictly rejected.
    */
   static async updateRole(req, res, next) {
-    try {
-      const { id } = req.params;
-      const { role } = req.body;
-
-      if (!role || !['AUDIO_ENGINEER', 'ADMIN'].includes(role)) {
-        return res.status(400).json({ error: 'Peran tidak valid. Harus AUDIO_ENGINEER atau ADMIN' });
-      }
-
-      if (req.user.id === id && role !== 'ADMIN') {
-        return res.status(400).json({ error: 'Tidak dapat mengubah peran akun Anda sendiri' });
-      }
-
-      const existingUser = await prisma.user.findUnique({
-        where: { id },
-        select: { id: true }
-      });
-
-      if (!existingUser) {
-        return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
-      }
-
-      const updatedUser = await prisma.user.update({
-        where: { id },
-        data: { role },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          status: true,
-          statusReason: true,
-          createdAt: true,
-          updatedAt: true
-        }
-      });
-
-      return res.json({
-        message: 'Peran pengguna berhasil diperbarui',
-        user: updatedUser
-      });
-    } catch (err) {
-      next(err);
-    }
+    return res.status(400).json({
+      error: 'Sistem beroperasi dengan kebijakan akun admin tunggal. Perubahan peran tidak diizinkan.'
+    });
   }
 
   /**

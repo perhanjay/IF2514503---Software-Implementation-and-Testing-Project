@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { PaymentController } from '../controllers/paymentController.js';
-import { authenticate } from '../middlewares/auth.js';
+import { authenticate, requireAudioEngineer } from '../middlewares/auth.js';
 
 const router = Router();
 
@@ -10,6 +10,6 @@ router.get('/orders/:id/status', authenticate, PaymentController.getOrderStatus)
 
 // Endpoint Terotentikasi
 router.get('/packages', authenticate, PaymentController.getPackages);
-router.post('/checkout', authenticate, PaymentController.checkout);
+router.post('/checkout', authenticate, requireAudioEngineer, PaymentController.checkout);
 
 export default router;
