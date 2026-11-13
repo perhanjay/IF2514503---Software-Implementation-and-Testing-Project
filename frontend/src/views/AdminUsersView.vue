@@ -178,6 +178,20 @@ onMounted(() => {
         </button>
       </div>
 
+      <!-- Sub-navigation Tabs -->
+      <div class="flex items-center gap-6 border-b border-stone">
+        <router-link 
+          to="/admin/users" 
+          class="pb-3 text-sm font-semibold text-ink-black border-b-2 border-black -mb-px">
+          Pengguna
+        </router-link>
+        <router-link 
+          to="/admin/transactions" 
+          class="pb-3 text-sm font-medium text-slate hover:text-ink-black transition-colors">
+          Audit Transaksi
+        </router-link>
+      </div>
+
       <!-- Summary Stats Strip -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <!-- Total Users -->
