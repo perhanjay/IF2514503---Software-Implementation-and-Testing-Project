@@ -51,7 +51,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: polaris_backend
     restart: always
-    command: sh -c "npx prisma migrate deploy && npm run dev"
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
     environment:
       - NODE_ENV=development
       - PORT=5000
