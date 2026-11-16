@@ -85,26 +85,26 @@ async function startUpload() {
       <!-- Modal Header -->
       <div class="flex items-start justify-between border-b border-[#c1c0bc] pb-4">
         <div>
-          <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] bg-black text-white font-bold inline-block">INGESTION STUDIO</span>
-          <h3 id="modal-title" class="font-editorial text-2xl text-black font-extrabold mt-2">Unggah Sesi Multitrack</h3>
-          <p class="text-xs text-[#60605e] mt-0.5">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
+          <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] bg-black text-white font-medium inline-block">INGESTION STUDIO</span>
+          <h3 id="modal-title" class="text-xl sm:text-2xl text-black font-medium mt-2 tracking-tight">Unggah Sesi Multitrack</h3>
+          <p class="text-xs text-[#60605e] mt-0.5 font-normal">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
         </div>
         <button 
           @click="$emit('close')" 
           type="button"
           aria-label="Tutup Dialog"
-          class="text-black hover:opacity-60 cursor-pointer text-xl font-bold p-1">
+          class="text-black hover:opacity-60 cursor-pointer text-xl font-normal p-1">
           ✕
         </button>
       </div>
 
-      <div v-if="errorMsg" class="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-none">
+      <div v-if="errorMsg" class="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-none font-normal">
         {{ errorMsg }}
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-bold text-black uppercase tracking-wider mb-1.5 font-mono-accent">
+          <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1.5 font-mono-accent">
             JUDUL SESI / NAMA PROYEK
           </label>
           <input 
@@ -121,7 +121,7 @@ async function startUpload() {
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleDrop"
           :class="isDragging ? 'border-black bg-[#ff82c2]/20' : 'border-[#c1c0bc] bg-[#f1f0eb]/60'"
-          class="border-2 border-dashed rounded-none p-8 text-center cursor-pointer transition-all relative group">
+          class="border border-dashed rounded-none p-8 text-center cursor-pointer transition-all relative group">
           
           <input 
             type="file" 
@@ -133,21 +133,21 @@ async function startUpload() {
 
           <div class="w-12 h-12 rounded-none bg-black text-white flex items-center justify-center mx-auto mb-3">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
             </svg>
           </div>
 
-          <p class="text-sm font-bold text-black">
+          <p class="text-sm font-medium text-black">
             Tarik &amp; jatuhkan stem ke sini, atau <span class="underline">pilih berkas</span>
           </p>
-          <p class="text-xs text-[#60605e] mt-1 font-mono-accent">
+          <p class="text-xs text-[#60605e] mt-1 font-mono-accent font-normal">
             Maksimal 2 GB per sesi multitrack • Presisi 24/32-bit float terjaga
           </p>
         </div>
 
         <!-- File selection summary -->
         <div v-if="selectedFiles.length" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-          <span class="text-xs font-bold text-black block font-mono-accent uppercase tracking-wider">
+          <span class="text-xs font-medium text-black block font-mono-accent uppercase tracking-wider">
             {{ selectedFiles.length }} Berkas Siap Diunggah:
           </span>
           <div 
@@ -161,11 +161,11 @@ async function startUpload() {
 
         <!-- Ingestion Progress bar -->
         <div v-if="uploading" class="space-y-1.5 pt-2">
-          <div class="flex justify-between text-xs text-black font-mono-accent">
+          <div class="flex justify-between text-xs text-black font-mono-accent font-normal">
             <span>Mengunggah ke MinIO S3 Storage...</span>
-            <span class="font-bold">{{ uploadProgress }}%</span>
+            <span class="font-medium">{{ uploadProgress }}%</span>
           </div>
-          <div class="w-full h-2.5 bg-[#f1f0eb] border border-[#c1c0bc] rounded-none overflow-hidden">
+          <div class="w-full h-2 bg-[#f1f0eb] border border-[#c1c0bc] rounded-none overflow-hidden">
             <div class="h-full bg-black transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
           </div>
         </div>

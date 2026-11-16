@@ -11,13 +11,13 @@ const authStore = useAuthStore()
 const props = defineProps({
   fluid: {
     type: Boolean,
-    default: null
+    default: true
   }
 })
 
 const isFluid = computed(() => {
-  if (props.fluid !== null) return props.fluid
-  return route.path === '/dashboard' || route.path.startsWith('/dashboard') || route.path === '/billing' || route.path === '/wallet' || route.path.startsWith('/admin')
+  if (props.fluid !== null && props.fluid !== undefined) return props.fluid
+  return true
 })
 
 const mobileMenuOpen = ref(false)
@@ -147,30 +147,30 @@ function handleLogout() {
 
 <template>
   <header class="sticky top-0 z-40 w-full border-b border-[#c1c0bc] bg-white transition-all">
-    <div :class="isFluid ? 'w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12' : 'max-w-[1200px] mx-auto px-6'" class="h-18 flex items-center justify-between">
+    <div :class="isFluid ? 'w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12' : 'max-w-[1200px] mx-auto px-6'" class="h-16 flex items-center justify-between">
       <!-- Logo Branding -->
       <router-link :to="authStore.user?.role === 'ADMIN' ? '/admin/users' : '/'" class="flex items-center gap-3 group">
-        <div class="w-9 h-9 rounded-none bg-black text-white flex items-center justify-center font-bold text-lg transition-transform group-hover:scale-105">
+        <div class="w-8 h-8 rounded-none bg-black text-white flex items-center justify-center font-medium text-base transition-transform group-hover:scale-105">
           <span>P</span>
         </div>
         <div class="leading-tight">
-          <span class="font-editorial text-lg text-black tracking-tight block">Polaris Audio</span>
-          <span class="text-[10px] font-medium tracking-[0.1em] uppercase text-[#60605e] block">Session Prep Engine</span>
+          <span class="font-medium text-base text-black tracking-tight block">Polaris Audio</span>
+          <span class="text-[9px] font-mono-accent font-normal tracking-[0.14em] uppercase text-[#60605e] block">Session Prep Engine</span>
         </div>
       </router-link>
 
       <!-- Center Desktop Navigation -->
-      <nav class="hidden md:flex items-center gap-8 text-sm font-medium">
+      <nav class="hidden md:flex items-center gap-7 text-xs">
         <template v-if="authStore.user?.role === 'ADMIN'">
           <router-link 
             to="/admin/users" 
-            :class="route.path === '/admin/users' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            :class="route.path === '/admin/users' ? 'text-black font-medium border-b border-black pb-1' : 'text-[#60605e] hover:text-black font-normal'"
             class="transition-colors">
             Admin: Pengguna
           </router-link>
           <router-link 
             to="/admin/transactions" 
-            :class="route.path === '/admin/transactions' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            :class="route.path === '/admin/transactions' ? 'text-black font-medium border-b border-black pb-1' : 'text-[#60605e] hover:text-black font-normal'"
             class="transition-colors">
             Audit Transaksi
           </router-link>
@@ -178,19 +178,19 @@ function handleLogout() {
         <template v-else>
           <router-link 
             to="/" 
-            :class="route.path === '/' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            :class="route.path === '/' ? 'text-black font-medium border-b border-black pb-1' : 'text-[#60605e] hover:text-black font-normal'"
             class="transition-colors">
             Beranda
           </router-link>
           <router-link 
             to="/dashboard" 
-            :class="route.path === '/dashboard' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            :class="route.path === '/dashboard' ? 'text-black font-medium border-b border-black pb-1' : 'text-[#60605e] hover:text-black font-normal'"
             class="transition-colors">
             Studio Workspace
           </router-link>
           <router-link 
             to="/billing" 
-            :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold border-b-2 border-black pb-0.5' : 'text-[#60605e] hover:text-black'"
+            :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-medium border-b border-black pb-1' : 'text-[#60605e] hover:text-black font-normal'"
             class="transition-colors">
             Dompet & Kuota
           </router-link>
@@ -201,8 +201,8 @@ function handleLogout() {
       <div class="flex items-center gap-3">
         <!-- If ADMIN: show ADMIN OPERATOR badge instead of Quota pill -->
         <template v-if="authStore.user?.role === 'ADMIN'">
-          <div class="hidden sm:flex items-center gap-2 bg-[#f1f0eb] border border-[#c1c0bc] px-3.5 py-2 text-xs font-mono-accent font-semibold text-black uppercase tracking-wider">
-            <span class="w-2 h-2 rounded-full bg-black"></span>
+          <div class="hidden sm:flex items-center gap-2 bg-[#f1f0eb] border border-[#c1c0bc] px-3.5 py-1.5 text-xs font-mono-accent font-medium text-black uppercase tracking-wider">
+            <span class="w-1.5 h-1.5 rounded-full bg-black"></span>
             ADMIN OPERATOR
           </div>
         </template>
@@ -212,10 +212,10 @@ function handleLogout() {
           <router-link 
             to="/billing"
             title="Kelola saldo dan beli paket token"
-            class="flex items-center gap-2 bg-[#f1f0eb] hover:bg-[#e4d9cf] border border-[#c1c0bc] rounded-none px-3.5 py-2 transition-all">
-            <span class="w-2 h-2 rounded-full bg-black" />
-            <span class="font-mono-accent text-xs text-[#60605e]">Kuota:</span>
-            <span class="font-mono-accent text-xs font-bold text-black">{{ authStore.walletBalance }} Token</span>
+            class="flex items-center gap-2 bg-[#f1f0eb] hover:bg-[#e4d9cf] border border-[#c1c0bc] rounded-none px-3 py-1.5 transition-all">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+            <span class="font-mono-accent text-xs font-normal text-[#60605e]">Kuota:</span>
+            <span class="font-mono-accent text-xs font-medium text-black">{{ authStore.walletBalance }} Token</span>
           </router-link>
         </template>
 
@@ -225,19 +225,19 @@ function handleLogout() {
             type="button"
             @click="openSettingsModal('profile')"
             title="Buka Pengaturan Akun"
-            class="hidden sm:flex flex-col gap-0.5 text-right cursor-pointer group px-2.5 py-1.5 rounded-none hover:bg-[#f1f0eb] transition-colors">
-            <span class="text-xs font-semibold text-black group-hover:underline transition-colors flex items-center gap-1 justify-end">
+            class="hidden sm:flex flex-col gap-0.5 text-right cursor-pointer group px-2.5 py-1 rounded-none hover:bg-[#f1f0eb] transition-colors">
+            <span class="text-xs font-medium text-black group-hover:underline transition-colors flex items-center gap-1 justify-end">
               <span>{{ authStore.user?.name }}</span>
               <svg class="w-3 h-3 text-[#60605e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </span>
-            <span class="text-[10px] text-[#60605e] font-mono-accent">Pengaturan Akun</span>
+            <span class="text-[10px] text-[#60605e] font-mono-accent font-normal">Pengaturan Akun</span>
           </button>
           <button 
             @click="handleLogout"
-            class="hidden sm:inline-flex text-xs font-medium text-[#60605e] hover:text-rose-600 px-3 py-2 rounded-none hover:bg-rose-50 transition-colors cursor-pointer">
+            class="hidden sm:inline-flex text-xs font-normal text-[#60605e] hover:text-rose-600 px-3 py-1.5 rounded-none hover:bg-rose-50 transition-colors cursor-pointer">
             Keluar
           </button>
         </template>
@@ -245,12 +245,12 @@ function handleLogout() {
         <template v-else>
           <router-link 
             to="/login"
-            class="hidden sm:inline-flex text-xs font-semibold uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] px-4 py-2.5 rounded-none transition-colors">
+            class="hidden sm:inline-flex text-xs font-medium uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] px-3.5 py-1.5 rounded-none transition-colors">
             Masuk
           </router-link>
           <router-link 
             to="/register"
-            class="hidden sm:inline-flex items-center justify-center text-xs font-semibold uppercase tracking-[0.1em] text-white px-5 py-2.5 rounded-none bg-black hover:bg-[#292c33] transition-all cursor-pointer">
+            class="hidden sm:inline-flex items-center justify-center text-xs font-medium uppercase tracking-[0.08em] text-white px-4 py-1.5 rounded-none bg-black hover:bg-[#292c33] transition-all cursor-pointer">
             Daftar Akun
           </router-link>
         </template>
@@ -278,14 +278,14 @@ function handleLogout() {
         <router-link 
           to="/admin/users" 
           @click="mobileMenuOpen = false"
-          :class="route.path === '/admin/users' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          :class="route.path === '/admin/users' ? 'text-black font-medium bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
           class="block px-3 py-2 rounded-none text-sm transition-colors">
           Admin: Pengguna
         </router-link>
         <router-link 
           to="/admin/transactions" 
           @click="mobileMenuOpen = false"
-          :class="route.path === '/admin/transactions' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          :class="route.path === '/admin/transactions' ? 'text-black font-medium bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
           class="block px-3 py-2 rounded-none text-sm transition-colors">
           Audit Transaksi
         </router-link>
@@ -294,21 +294,21 @@ function handleLogout() {
         <router-link 
           to="/" 
           @click="mobileMenuOpen = false"
-          :class="route.path === '/' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          :class="route.path === '/' ? 'text-black font-medium bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
           class="block px-3 py-2 rounded-none text-sm transition-colors">
           Beranda
         </router-link>
         <router-link 
           to="/dashboard" 
           @click="mobileMenuOpen = false"
-          :class="route.path === '/dashboard' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          :class="route.path === '/dashboard' ? 'text-black font-medium bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
           class="block px-3 py-2 rounded-none text-sm transition-colors">
           Studio Workspace
         </router-link>
         <router-link 
           to="/billing" 
           @click="mobileMenuOpen = false"
-          :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
+          :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-medium bg-[#f1f0eb]' : 'text-[#60605e] hover:bg-[#f1f0eb]/60'"
           class="block px-3 py-2 rounded-none text-sm transition-colors">
           Dompet & Kuota Token
         </router-link>
@@ -318,7 +318,7 @@ function handleLogout() {
         <template v-if="authStore.isAuthenticated && !isGuest">
           <div class="px-3 py-1 flex items-center justify-between">
             <div>
-              <span class="block text-xs font-semibold text-black">{{ authStore.user?.name }}</span>
+              <span class="block text-xs font-medium text-black">{{ authStore.user?.name }}</span>
               <span class="text-[10px] text-[#60605e] font-mono-accent">
                 {{ authStore.user?.role === 'ADMIN' ? 'Admin Operator' : 'Pro Engineer' }}
               </span>
@@ -326,13 +326,13 @@ function handleLogout() {
             <button 
               type="button"
               @click="openSettingsModal('profile')"
-              class="text-xs text-black font-semibold underline cursor-pointer">
+              class="text-xs text-black font-medium underline cursor-pointer">
               Pengaturan Akun
             </button>
           </div>
           <button 
             @click="handleLogout"
-            class="text-left w-full text-xs font-medium text-rose-600 px-3 py-2 rounded-none hover:bg-rose-50 transition-colors">
+            class="text-left w-full text-xs font-normal text-rose-600 px-3 py-2 rounded-none hover:bg-rose-50 transition-colors">
             Keluar Akun
           </button>
         </template>
@@ -340,13 +340,13 @@ function handleLogout() {
           <router-link 
             to="/login"
             @click="mobileMenuOpen = false"
-            class="block px-3 py-2 rounded-none text-sm text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] font-semibold uppercase tracking-[0.05em]">
+            class="block px-3 py-2 rounded-none text-sm text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] font-medium uppercase tracking-[0.05em]">
             Masuk ke Studio
           </router-link>
           <router-link 
             to="/register"
             @click="mobileMenuOpen = false"
-            class="block text-center px-4 py-2.5 rounded-none text-sm font-semibold uppercase tracking-[0.1em] text-white bg-black hover:bg-[#292c33]">
+            class="block text-center px-4 py-2.5 rounded-none text-sm font-medium uppercase tracking-[0.1em] text-white bg-black hover:bg-[#292c33]">
             Daftar Akun Baru
           </router-link>
         </template>
@@ -367,13 +367,13 @@ function handleLogout() {
         <!-- Modal Header -->
         <div class="flex items-center justify-between pb-4 border-b border-[#c1c0bc] mb-5">
           <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-none bg-[#f1f0eb] text-black flex items-center justify-center font-bold text-sm shrink-0">
+            <div class="w-8 h-8 rounded-none bg-[#f1f0eb] text-black flex items-center justify-center font-medium text-sm shrink-0">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
             <div>
-              <h3 class="font-display text-lg font-bold text-black">Pengaturan Akun</h3>
+              <h3 class="font-display text-base font-medium text-black">Pengaturan Akun</h3>
               <p class="text-xs text-[#60605e]">Kelola identitas dan keamanan akun engineer Anda</p>
             </div>
           </div>
@@ -393,14 +393,14 @@ function handleLogout() {
           <button 
             type="button"
             @click="settingsTab = 'profile'"
-            class="flex-1 py-2 text-xs font-semibold rounded-none uppercase tracking-[0.05em] text-center transition-all cursor-pointer"
+            class="flex-1 py-2 text-xs font-medium rounded-none uppercase tracking-[0.05em] text-center transition-all cursor-pointer"
             :class="settingsTab === 'profile' ? 'bg-black text-white' : 'bg-[#f1f0eb] text-[#60605e] hover:bg-[#e4d9cf] hover:text-black'">
             Profil Akun
           </button>
           <button 
             type="button"
             @click="settingsTab = 'security'"
-            class="flex-1 py-2 text-xs font-semibold rounded-none uppercase tracking-[0.05em] text-center transition-all cursor-pointer"
+            class="flex-1 py-2 text-xs font-medium rounded-none uppercase tracking-[0.05em] text-center transition-all cursor-pointer"
             :class="settingsTab === 'security' ? 'bg-black text-white' : 'bg-[#f1f0eb] text-[#60605e] hover:bg-[#e4d9cf] hover:text-black'">
             Ubah Kata Sandi
           </button>
@@ -423,18 +423,18 @@ function handleLogout() {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-black uppercase tracking-wider mb-1.5">Alamat Email</label>
+            <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1.5">Alamat Email</label>
             <input 
               :value="authStore.user?.email" 
               type="email" 
               disabled 
               class="w-full bg-[#f1f0eb] border border-[#c1c0bc] rounded-none px-4 py-2.5 text-xs text-[#60605e] cursor-not-allowed font-mono-accent"
             />
-            <p class="text-[10px] text-[#60605e] mt-1">Alamat email terdaftar bersifat permanen.</p>
+            <p class="text-[10px] text-[#60605e] mt-1 font-normal">Alamat email terdaftar bersifat permanen.</p>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-black uppercase tracking-wider mb-1.5">Nama Lengkap / Tampilan</label>
+            <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1.5">Nama Lengkap / Tampilan</label>
             <input 
               v-model="profileName" 
               type="text" 
@@ -448,13 +448,13 @@ function handleLogout() {
             <button 
               type="button"
               @click="closeSettingsModal"
-              class="px-4 py-2 rounded-none text-xs font-semibold uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] transition-colors cursor-pointer">
+              class="px-4 py-2 rounded-none text-xs font-medium uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] transition-colors cursor-pointer">
               Tutup
             </button>
             <button 
               type="submit" 
               :disabled="profileLoading"
-              class="px-5 py-2.5 rounded-none bg-black hover:bg-[#292c33] disabled:opacity-50 text-white font-semibold text-xs uppercase tracking-[0.1em] transition-all cursor-pointer flex items-center gap-2">
+              class="px-5 py-2.5 rounded-none bg-black hover:bg-[#292c33] disabled:opacity-50 text-white font-medium text-xs uppercase tracking-[0.1em] transition-all cursor-pointer flex items-center gap-2">
               <svg v-if="profileLoading" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -481,7 +481,7 @@ function handleLogout() {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-black uppercase tracking-wider mb-1">Kata Sandi Saat Ini</label>
+            <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1">Kata Sandi Saat Ini</label>
             <input 
               v-model="currentPassword" 
               type="password" 
@@ -492,7 +492,7 @@ function handleLogout() {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-black uppercase tracking-wider mb-1">Kata Sandi Baru</label>
+            <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1">Kata Sandi Baru</label>
             <input 
               v-model="newPassword" 
               type="password" 
@@ -503,7 +503,7 @@ function handleLogout() {
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-black uppercase tracking-wider mb-1">Konfirmasi Kata Sandi Baru</label>
+            <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1">Konfirmasi Kata Sandi Baru</label>
             <input 
               v-model="confirmPassword" 
               type="password" 
@@ -517,13 +517,13 @@ function handleLogout() {
             <button 
               type="button"
               @click="closeSettingsModal"
-              class="px-4 py-2 rounded-none text-xs font-semibold uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] transition-colors cursor-pointer">
+              class="px-4 py-2 rounded-none text-xs font-medium uppercase tracking-[0.05em] text-black bg-[#f1f0eb] hover:bg-[#e4d9cf] transition-colors cursor-pointer">
               Tutup
             </button>
             <button 
               type="submit" 
               :disabled="securityLoading"
-              class="px-5 py-2.5 rounded-none bg-black hover:bg-[#292c33] disabled:opacity-50 text-white font-semibold text-xs uppercase tracking-[0.1em] transition-all cursor-pointer flex items-center gap-2">
+              class="px-5 py-2.5 rounded-none bg-black hover:bg-[#292c33] disabled:opacity-50 text-white font-medium text-xs uppercase tracking-[0.1em] transition-all cursor-pointer flex items-center gap-2">
               <svg v-if="securityLoading" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>

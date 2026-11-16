@@ -640,19 +640,19 @@ onUnmounted(() => {
         role="status" 
         aria-live="polite"
         :class="[
-          'p-4 border-2 flex items-center justify-between gap-3 text-xs font-semibold font-mono-accent transition-all',
+          'p-3.5 border flex items-center justify-between gap-3 text-xs font-medium font-mono-accent transition-all',
           notification.type === 'error' ? 'bg-[#FFF1F2] border-[#FDA4AF] text-rose-950' :
           notification.type === 'success' ? 'bg-[#ECFDF5] border-[#6EE7B7] text-emerald-950' :
-          'bg-paper-white border-ink-black text-ink-black'
+          'bg-paper-white border-stone text-ink-black'
         ]">
         <div class="flex items-center gap-2.5">
-          <svg v-if="notification.type === 'error'" class="w-4 h-4 text-rose-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-if="notification.type === 'error'" class="w-4 h-4 text-rose-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else-if="notification.type === 'success'" class="w-4 h-4 text-emerald-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <svg v-else class="w-4 h-4 text-ink-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg v-else class="w-4 h-4 text-ink-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>{{ notification.message }}</span>
@@ -661,7 +661,7 @@ onUnmounted(() => {
           @click="dismissNotification"
           class="text-stone hover:text-ink-black p-1 transition-colors cursor-pointer"
           aria-label="Tutup pemberitahuan">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -670,80 +670,85 @@ onUnmounted(() => {
       <!-- Studio Header / Banner (Seamless, blends into background) -->
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2 px-1">
         <div>
-          <h1 class="font-editorial text-2xl sm:text-3xl font-bold text-ink-black tracking-tight">
+          <h1 class="text-2xl sm:text-3xl font-medium text-ink-black tracking-tight">
             Studio Workspace
           </h1>
+          <p class="text-xs text-slate mt-0.5 font-normal">
+            Multitrack Preparation &amp; DSP Diagnostics
+          </p>
         </div>
 
         <div class="flex items-center gap-2.5 shrink-0">
           <router-link
             v-if="authStore.user?.role === 'ADMIN'"
             to="/admin/users"
-            class="text-xs font-semibold uppercase tracking-wider text-slate hover:text-ink-black transition-colors"
+            class="text-xs font-medium uppercase tracking-wider text-slate hover:text-ink-black transition-colors"
           >
             Admin: Users
           </router-link>
           <button 
             @click="showUploadModal = true"
-            class="btn-ink-stamp h-10 px-5 text-xs font-semibold flex items-center justify-center gap-2 whitespace-nowrap shrink-0">
-            <span class="text-base leading-none font-bold">+</span>
+            class="h-9 px-4 text-xs font-medium tracking-wider uppercase bg-ink-black text-paper-white hover:bg-charcoal transition-colors flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer">
+            <span class="text-sm font-normal leading-none">+</span>
             <span>Unggah Sesi Baru</span>
           </button>
         </div>
       </div>
 
       <!-- Guest Upgrade Banner Warning (jika masih akun tamu) -->
-      <div v-if="isGuest" class="bg-paper-white border-2 border-stone p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-        <div class="flex items-center gap-2.5 text-ink-black">
-          <svg class="w-4 h-4 text-[#0052FF] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <div v-if="isGuest" class="bg-bone/50 border border-stone/80 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2.5 text-slate">
+          <svg class="w-4 h-4 text-signal-blue shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span>Anda menggunakan <strong>Sesi Studio Instan</strong> (Jatah 3 Token Demo). Daftar akun gratis untuk menyimpan riwayat sesi secara permanen dan top-up kuota besar.</span>
+          <span class="font-normal text-slate">
+            Anda menggunakan <span class="font-medium text-ink-black">Sesi Studio Instan</span> (Jatah 3 Token Demo). Daftar akun gratis untuk menyimpan riwayat sesi secara permanen dan top-up kuota besar.
+          </span>
         </div>
-        <router-link to="/register" class="font-bold text-ink-black underline underline-offset-4 hover:text-[#0052FF] whitespace-nowrap font-mono-accent">
+        <router-link to="/register" class="font-medium text-ink-black underline underline-offset-4 hover:text-slate whitespace-nowrap font-mono-accent text-xs transition-colors">
           Daftar Akun Permanen →
         </router-link>
       </div>
 
       <!-- Notifikasi Claim Feedback -->
-      <div v-if="claimMsg" class="bg-[#ECFDF5] border border-[#6EE7B7] text-emerald-950 text-xs p-3.5 font-semibold font-mono-accent">
+      <div v-if="claimMsg" class="bg-[#ECFDF5] border border-[#6EE7B7] text-emerald-950 text-xs p-3 font-medium font-mono-accent">
         {{ claimMsg }}
       </div>
-      <div v-if="claimError" class="bg-amber-50 border border-amber-300 text-amber-950 text-xs p-3.5 font-semibold font-mono-accent">
+      <div v-if="claimError" class="bg-amber-50 border border-amber-300 text-amber-950 text-xs p-3 font-medium font-mono-accent">
         {{ claimError }}
       </div>
 
       <!-- Sesi Multitrack Toolbar -->
       <div class="flex items-center justify-between px-1 pt-2">
         <div class="flex items-center gap-2.5">
-          <h2 class="font-editorial text-xl font-bold text-ink-black tracking-tight">Sesi Multitrack</h2>
-          <span class="font-mono-accent text-[11px] px-2 py-0.5 border border-stone bg-paper-white text-ink-black font-semibold">
+          <h2 class="text-lg sm:text-xl font-medium text-ink-black tracking-tight">Sesi Multitrack</h2>
+          <span class="font-mono-accent text-[11px] px-2 py-0.5 border border-stone/70 bg-paper-white text-slate font-normal">
             {{ sessions.length }} Sesi
           </span>
         </div>
         <button 
           @click="loadSessions"
-          class="text-xs font-mono-accent font-bold text-ink-black hover:underline cursor-pointer">
+          class="text-xs font-mono-accent font-medium text-slate hover:text-ink-black transition-colors cursor-pointer">
           Segarkan
         </button>
       </div>
 
       <!-- Empty State -->
-      <div v-if="!sessions.length" class="border-2 border-dashed border-stone bg-paper-white p-12 text-center flex flex-col items-center justify-center space-y-4">
-        <div class="w-14 h-14 bg-bone border border-stone text-ink-black flex items-center justify-center">
-          <svg class="w-7 h-7 text-ink-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+      <div v-if="!sessions.length" class="border border-dashed border-stone/80 bg-bone/20 p-12 sm:p-16 text-center flex flex-col items-center justify-center space-y-4">
+        <div class="w-12 h-12 bg-paper-white border border-stone/80 text-ink-black flex items-center justify-center">
+          <svg class="w-5 h-5 text-slate" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
           </svg>
         </div>
         <div class="space-y-1">
-          <h3 class="font-editorial text-lg font-bold text-ink-black">Belum ada sesi multitrack</h3>
-          <p class="text-xs text-stone max-w-sm">
+          <h3 class="text-base sm:text-lg font-medium text-ink-black tracking-tight">Belum ada sesi multitrack</h3>
+          <p class="text-xs sm:text-sm text-slate max-w-md font-normal leading-relaxed">
             Tarik berkas stem WAV atau ZIP rekaman DAW Anda untuk memulai proses verifikasi fasa otomatis.
           </p>
         </div>
         <button 
           @click="showUploadModal = true"
-          class="btn-ink-stamp px-6 py-2.5 text-xs font-semibold cursor-pointer transition-all mt-2">
+          class="h-9 px-5 text-xs font-medium tracking-wider uppercase bg-ink-black text-paper-white hover:bg-charcoal cursor-pointer transition-colors mt-2 flex items-center justify-center gap-2">
           Unggah Stem Pertama
         </button>
       </div>
@@ -768,7 +773,7 @@ onUnmounted(() => {
                   @keydown.enter="saveRename(s.id)"
                   @keydown.esc="cancelRename"
                   autofocus
-                  class="font-editorial text-base sm:text-lg font-bold text-ink-black bg-paper-white border-2 border-ink-black px-2.5 py-1 focus:outline-none w-full max-w-xs"
+                  class="text-base sm:text-lg font-medium text-ink-black bg-paper-white border border-ink-black px-2.5 py-1 focus:outline-none w-full max-w-xs"
                   placeholder="Nama judul sesi..."
                 />
                 <button 
@@ -776,7 +781,7 @@ onUnmounted(() => {
                   :disabled="isSavingTitle"
                   class="p-2 bg-ink-black hover:bg-slate text-paper-white transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                   title="Simpan Judul">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </button>
@@ -784,18 +789,18 @@ onUnmounted(() => {
                   @click="cancelRename"
                   class="p-2 border border-stone hover:bg-bone text-stone transition-colors cursor-pointer shrink-0"
                   title="Batal">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
               <div v-else class="flex items-center gap-2 group">
-                <h3 class="font-editorial text-lg sm:text-xl font-bold text-ink-black tracking-tight">{{ s.title }}</h3>
+                <h3 class="text-base sm:text-lg font-medium text-ink-black tracking-tight">{{ s.title }}</h3>
                 <button 
                   @click.stop="startRename(s)"
                   class="text-stone hover:text-ink-black p-1 transition-colors cursor-pointer opacity-75 group-hover:opacity-100"
                   title="Ubah judul sesi">
-                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                   </svg>
                 </button>
@@ -805,16 +810,16 @@ onUnmounted(() => {
             <div class="flex flex-wrap items-center gap-2">
               <button 
                 @click.stop="toggleSession(s.id)"
-                class="inline-flex items-center gap-1.5 px-3 py-2 bg-bone hover:bg-stone/20 text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-bone hover:bg-stone/20 text-ink-black border border-stone text-xs font-medium transition-all cursor-pointer font-mono-accent">
                 <span>{{ isSessionExpanded(s.id) ? 'Tutup Sesi' : 'Buka Sesi' }}</span>
                 <span class="text-[10px]">{{ isSessionExpanded(s.id) ? '▲' : '▼' }}</span>
               </button>
 
               <button 
                 @click.stop="confirmDeleteSession(s)"
-                class="inline-flex items-center gap-1.5 px-3 py-2 bg-paper-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-stone hover:border-rose-400 text-xs font-semibold transition-all cursor-pointer font-mono-accent"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-paper-white hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-stone hover:border-rose-400 text-xs font-medium transition-all cursor-pointer font-mono-accent"
                 title="Hapus Sesi Multitrack">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 <span>Hapus Sesi</span>
@@ -830,10 +835,10 @@ onUnmounted(() => {
                   v-if="verificationResult && verificationResult.sessionId === s.id"
                   class="p-4 bg-bone text-ink-black border border-stone space-y-2 animate-fade-in">
                   <div class="flex items-center justify-between">
-                    <span class="font-mono-accent text-[11px] uppercase tracking-wider text-ink-black font-bold">
+                    <span class="font-mono-accent text-[11px] uppercase tracking-wider text-ink-black font-medium">
                       Integritas Sesi: {{ verificationResult.status }}
                     </span>
-                    <span class="font-mono-accent text-[10px] text-stone font-semibold">
+                    <span class="font-mono-accent text-[10px] text-slate font-normal">
                       {{ verificationResult.sampleRateConsistency }}
                     </span>
                   </div>
@@ -854,12 +859,12 @@ onUnmounted(() => {
                       s.tracks?.some(t => t.detectedLabel) ? 'cursor-pointer hover:bg-bone/40 transition-colors' : ''
                     ]">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-medium text-xs shrink-0 font-mono-accent">
                         1
                       </div>
                       <div>
-                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
-                          Klasifikasi Stem & Deteksi Pasangan
+                        <h4 class="text-sm sm:text-base font-medium text-ink-black tracking-tight">
+                          Klasifikasi Stem &amp; Deteksi Pasangan
                         </h4>
                       </div>
                     </div>
@@ -868,7 +873,7 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2 shrink-0">
                       <span 
                         v-if="!s.tracks?.some(t => t.detectedLabel)" 
-                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-stone border border-stone font-medium">
+                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-slate border border-stone font-normal">
                         Belum Dijalankan
                       </span>
 
@@ -877,7 +882,7 @@ onUnmounted(() => {
                         v-if="!s.tracks?.some(t => t.detectedLabel)"
                         @click.stop="handleClassify(s)"
                         :disabled="classifyingSessionId === s.id"
-                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent">
+                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent font-medium">
                         <svg v-if="classifyingSessionId === s.id" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -889,7 +894,7 @@ onUnmounted(() => {
                       <button 
                         v-else
                         @click.stop="toggleClassificationDetails(s.id)"
-                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
                         <span>{{ isClassificationDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
                         <span class="text-[10px]">{{ isClassificationDetailsOpen(s.id) ? '▲' : '▼' }}</span>
                       </button>
@@ -904,15 +909,15 @@ onUnmounted(() => {
                       </svg>
                     </div>
                     <div class="space-y-0.5 max-w-md">
-                      <p class="text-xs font-bold text-ink-black font-editorial">Klasifikasi AI & Pasangan Belum Dijalankan</p>
-                      <p class="text-[11px] text-stone font-normal">
+                      <p class="text-xs font-medium text-ink-black">Klasifikasi AI &amp; Pasangan Belum Dijalankan</p>
+                      <p class="text-[11px] text-slate font-normal">
                         Model deep learning kami akan memprediksi kategori instrumen untuk tiap stem dan secara otomatis menghubungkan pasangan mikrofon yang rentan degradasi fasa.
                       </p>
                     </div>
                     <button 
                       @click="handleClassify(s)"
                       :disabled="classifyingSessionId === s.id"
-                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent">
+                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent font-medium">
                       {{ classifyingSessionId === s.id ? 'Sedang Menganalisis Audio...' : 'Mulai Deteksi AI Sekarang' }}
                     </button>
                   </div>
@@ -937,7 +942,7 @@ onUnmounted(() => {
                     <!-- Manual Pairing Form (Seamless, Borderless) -->
                     <div class="pt-2 space-y-2">
                       <div class="flex items-center gap-2">
-                        <span class="font-bold text-xs text-ink-black font-editorial">Hubungkan Pasangan Mikrofon Secara Manual</span>
+                        <span class="font-medium text-xs text-ink-black">Hubungkan Pasangan Mikrofon Secara Manual</span>
                       </div>
                       <div class="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                         <select 
@@ -963,7 +968,7 @@ onUnmounted(() => {
                         <button 
                           @click="handleCreatePair(s.id)"
                           :disabled="isPairing || !pairTrackA || !pairTrackB"
-                          class="btn-ink-stamp text-xs py-2 px-3 flex items-center justify-center font-mono-accent disabled:opacity-50">
+                          class="btn-ink-stamp text-xs py-2 px-3 flex items-center justify-center font-mono-accent font-medium disabled:opacity-50">
                           <span>Hubungkan</span>
                         </button>
                       </div>
@@ -996,12 +1001,12 @@ onUnmounted(() => {
                       !(s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)) ? 'cursor-pointer hover:bg-bone/40 transition-colors' : ''
                     ]">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-medium text-xs shrink-0 font-mono-accent">
                         2
                       </div>
                       <div>
-                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
-                          Audit Diagnostik DSP & Kesehatan Sesi
+                        <h4 class="text-sm sm:text-base font-medium text-ink-black tracking-tight">
+                          Audit Diagnostik DSP &amp; Kesehatan Sesi
                         </h4>
                       </div>
                     </div>
@@ -1010,7 +1015,7 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2 shrink-0">
                       <span 
                         v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)" 
-                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-stone border border-stone font-medium">
+                        class="font-mono-accent text-[11px] px-2.5 py-1 bg-bone text-slate border border-stone font-normal">
                         Belum Diaudit
                       </span>
 
@@ -1019,7 +1024,7 @@ onUnmounted(() => {
                         v-if="s.healthScore === null && !s.tracks?.some(t => t.diagnosticResult)"
                         @click.stop="handleDiagnose(s)"
                         :disabled="diagnosingSessionId === s.id"
-                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent">
+                        class="btn-ink-stamp text-xs px-3 py-1.5 flex items-center gap-1.5 font-mono-accent font-medium">
                         <svg v-if="diagnosingSessionId === s.id" class="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -1031,7 +1036,7 @@ onUnmounted(() => {
                       <button 
                         v-else
                         @click.stop="toggleDiagnosticDetails(s.id)"
-                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
                         <span>{{ isDiagnosticDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
                         <span class="text-[10px]">{{ isDiagnosticDetailsOpen(s.id) ? '▲' : '▼' }}</span>
                       </button>
@@ -1046,15 +1051,15 @@ onUnmounted(() => {
                       </svg>
                     </div>
                     <div class="space-y-0.5 max-w-md">
-                      <p class="text-xs font-bold text-ink-black font-editorial">Audit DSP & Fasa Belum Dilakukan</p>
-                      <p class="text-[11px] text-stone font-normal">
+                      <p class="text-xs font-medium text-ink-black">Audit DSP &amp; Fasa Belum Dilakukan</p>
+                      <p class="text-[11px] text-slate font-normal">
                         Jalankan audit diagnostik untuk mengidentifikasi pembatalan fasa multi-mikrofon, penumpukan frekuensi rendah (mud), dan true-peak clipping sebelum mixing.
                       </p>
                     </div>
                     <button 
                       @click="handleDiagnose(s)"
                       :disabled="diagnosingSessionId === s.id"
-                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent">
+                      class="btn-ink-stamp text-xs px-4 py-2 mt-1 font-mono-accent font-medium">
                       {{ diagnosingSessionId === s.id ? 'Sedang Memindai Audio...' : 'Jalankan Audit DSP Sekarang' }}
                     </button>
                   </div>
@@ -1093,21 +1098,21 @@ onUnmounted(() => {
                       class="pt-3 border-t border-stone/60 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                       <div class="space-y-1">
                         <div class="flex items-center gap-2">
-                          <span class="w-6 h-6 bg-emerald-700 text-white flex items-center justify-center text-xs font-bold font-mono-accent">✓</span>
-                          <h5 class="font-editorial text-sm font-bold text-ink-black">Perbaikan DSP Selesai Diterapkan</h5>
+                          <span class="w-6 h-6 bg-emerald-700 text-white flex items-center justify-center text-xs font-medium font-mono-accent">✓</span>
+                          <h5 class="text-sm font-medium text-ink-black">Perbaikan DSP Selesai Diterapkan</h5>
                         </div>
                       </div>
 
                       <div class="flex items-center gap-2 shrink-0">
                         <button 
                           @click="openCustomRepairModal(s)"
-                          class="px-3 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+                          class="px-3 py-1.5 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-medium transition-all cursor-pointer font-mono-accent">
                           Sesuaikan Ulang
                         </button>
                         <button 
                           @click="openAuditionSection(s)"
-                          class="px-3.5 py-2 bg-ink-black hover:bg-slate text-paper-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent border border-ink-black">
-                          <svg class="w-3.5 h-3.5 text-paper-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          class="px-3.5 py-1.5 bg-ink-black hover:bg-slate text-paper-white text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent border border-ink-black">
+                          <svg class="w-3.5 h-3.5 text-paper-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
@@ -1122,14 +1127,14 @@ onUnmounted(() => {
                       <button 
                         @click="openCustomRepairModal(s)"
                         :disabled="repairingSessionId === s.id"
-                        class="px-3.5 py-2.5 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+                        class="px-3.5 py-2 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-medium transition-all cursor-pointer font-mono-accent">
                         Kustomisasi Perbaikan
                       </button>
 
                       <button 
                         @click="handleRepairAuto(s)"
                         :disabled="repairingSessionId === s.id"
-                        class="btn-ink-stamp text-xs px-5 py-2.5 flex items-center justify-center gap-2 font-mono-accent">
+                        class="btn-ink-stamp text-xs px-5 py-2 flex items-center justify-center gap-2 font-mono-accent font-medium">
                         <svg v-if="repairingSessionId === s.id" class="animate-spin w-3.5 h-3.5 text-paper-white" viewBox="0 0 24 24" fill="none">
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -1151,12 +1156,12 @@ onUnmounted(() => {
                     class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:bg-bone/40 transition-colors"
                     :class="{'border-b border-stone/60': isAuditionDetailsOpen(s.id)}">
                     <div class="flex items-center gap-2.5">
-                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-bold text-xs shrink-0 font-mono-accent">
+                      <div class="w-6 h-6 bg-ink-black text-paper-white flex items-center justify-center font-medium text-xs shrink-0 font-mono-accent">
                         3
                       </div>
                       <div>
-                        <h4 class="font-editorial text-base font-bold text-ink-black tracking-tight">
-                          Studio Audisi Multitrack A/B & Analisis Fase
+                        <h4 class="text-sm sm:text-base font-medium text-ink-black tracking-tight">
+                          Studio Audisi Multitrack A/B &amp; Analisis Fase
                         </h4>
                       </div>
                     </div>
@@ -1165,7 +1170,7 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2 shrink-0">
                       <button 
                         @click.stop="toggleAuditionDetails(s.id)"
-                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
+                        class="px-3 py-1.5 border border-stone hover:border-ink-black bg-paper-white text-ink-black text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 font-mono-accent">
                         <span>{{ isAuditionDetailsOpen(s.id) ? 'Tutup' : 'Buka' }}</span>
                         <span class="text-[10px]">{{ isAuditionDetailsOpen(s.id) ? '▲' : '▼' }}</span>
                       </button>
@@ -1183,9 +1188,9 @@ onUnmounted(() => {
                   <button 
                     @click="handleDownloadReport(s)"
                     :disabled="downloadingPdfId === s.id"
-                    class="px-4 py-2.5 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent"
+                    class="px-4 py-2 border border-stone hover:border-ink-black hover:bg-bone bg-paper-white text-ink-black text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent"
                     title="Unduh ringkasan audit audio DSP dalam format dokumen PDF">
-                    <svg class="w-3.5 h-3.5 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="w-3.5 h-3.5 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     <span>{{ downloadingPdfId === s.id ? 'Membuat...' : 'Unduh Laporan PDF' }}</span>
@@ -1195,13 +1200,13 @@ onUnmounted(() => {
                     v-if="s.status === 'REPAIRED'"
                     @click="handleDownloadZip(s)"
                     :disabled="downloadingZipId === s.id"
-                    class="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent border border-emerald-800"
+                    class="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-2 font-mono-accent border border-emerald-800"
                     title="Unduh seluruh audio stem perbaikan dalam arsip ZIP lossless">
                     <svg v-if="downloadingZipId === s.id" class="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                     </svg>
-                    <svg v-else class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg v-else class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     <span>{{ downloadingZipId === s.id ? 'Mengemas ZIP...' : 'Unduh Paket ZIP (Lossless)' }}</span>
@@ -1225,31 +1230,31 @@ onUnmounted(() => {
       v-if="sessionToDelete" 
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-black/60 backdrop-blur-xs animate-fade-in"
       @click.self="sessionToDelete = null">
-      <div class="bg-paper-white border-2 border-ink-black max-w-sm w-full p-6 space-y-4">
+      <div class="bg-paper-white border border-ink-black max-w-sm w-full p-6 space-y-4">
         <div class="space-y-1">
-          <h3 class="font-editorial text-lg font-bold text-ink-black tracking-tight">
+          <h3 class="text-base font-medium text-ink-black tracking-tight">
             Apakah Anda Yakin
           </h3>
-          <p class="text-xs text-stone font-normal">
+          <p class="text-xs text-slate font-normal">
             Tindakan Ini Tidak Dapat Diulang
           </p>
         </div>
 
         <p class="text-xs text-ink-black leading-relaxed font-normal">
-          Sesi <span class="font-bold text-ink-black font-mono-accent">{{ sessionToDelete.title || sessionToDelete.name }}</span> beserta seluruh trek stem dan hasil analisisnya akan dihapus permanen.
+          Sesi <span class="font-medium text-ink-black font-mono-accent">{{ sessionToDelete.title || sessionToDelete.name }}</span> beserta seluruh trek stem dan hasil analisisnya akan dihapus permanen.
         </p>
 
         <div class="flex items-center justify-end gap-2.5 pt-2">
           <button 
             @click="sessionToDelete = null"
             :disabled="isDeletingSession"
-            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-medium transition-all cursor-pointer font-mono-accent">
             Batal
           </button>
           <button 
             @click="handleDeleteSession"
             :disabled="isDeletingSession"
-            class="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 font-mono-accent border border-rose-800">
+            class="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 font-mono-accent border border-rose-800">
             <svg v-if="isDeletingSession" class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -1265,19 +1270,19 @@ onUnmounted(() => {
       v-if="showCustomRepairModal && activeRepairSession" 
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-black/60 backdrop-blur-xs animate-fade-in"
       @click.self="showCustomRepairModal = false">
-      <div class="bg-paper-white border-2 border-ink-black max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+      <div class="bg-paper-white border border-ink-black max-w-2xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-stone/60 pb-3">
           <div>
-            <h3 class="font-editorial text-xl font-bold text-ink-black tracking-tight">
+            <h3 class="text-lg font-medium text-ink-black tracking-tight">
               Kustomisasi Modul Perbaikan DSP
             </h3>
-            <p class="text-xs text-stone font-normal">
+            <p class="text-xs text-slate font-normal">
               Aktifkan atau nonaktifkan perbaikan spesifik per-track sesuai kebutuhan artistik mixing.
             </p>
           </div>
           <button 
             @click="showCustomRepairModal = false"
-            class="text-stone hover:text-ink-black text-base font-bold p-1 cursor-pointer font-mono-accent">
+            class="text-stone hover:text-ink-black text-sm font-normal p-1 cursor-pointer font-mono-accent">
             ✕
           </button>
         </div>
@@ -1288,14 +1293,14 @@ onUnmounted(() => {
             :key="'custom-' + track.id"
             class="p-4 border border-stone bg-bone space-y-3">
             <div class="flex items-center justify-between">
-              <span class="font-mono-accent text-xs font-bold text-ink-black">{{ track.fileName }}</span>
-              <span class="text-[11px] px-2 py-0.5 border border-stone bg-paper-white text-ink-black font-semibold font-mono-accent">
+              <span class="font-mono-accent text-xs font-medium text-ink-black">{{ track.fileName }}</span>
+              <span class="text-[11px] px-2 py-0.5 border border-stone bg-paper-white text-ink-black font-normal font-mono-accent">
                 {{ track.instrumentLabel || track.detectedLabel || 'Other' }}
               </span>
             </div>
 
             <div v-if="customRepairSettings[track.id]" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].flipPolarity"
@@ -1303,7 +1308,7 @@ onUnmounted(() => {
                 <span>Invert Polaritas (180°)</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].alignDelay"
@@ -1311,7 +1316,7 @@ onUnmounted(() => {
                 <span>Micro-Delay Align</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].fixFakeStereo"
@@ -1319,7 +1324,7 @@ onUnmounted(() => {
                 <span>True Mono (Fake Stereo)</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].removeDcOffset"
@@ -1327,7 +1332,7 @@ onUnmounted(() => {
                 <span>Buang DC Offset</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].filterSubRumble"
@@ -1335,7 +1340,7 @@ onUnmounted(() => {
                 <span>Filter Sub-Rumble</span>
               </label>
 
-              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-medium">
+              <label class="flex items-center gap-2 text-xs text-ink-black cursor-pointer font-mono-accent font-normal">
                 <input 
                   type="checkbox" 
                   v-model="customRepairSettings[track.id].gainStaging"
@@ -1349,13 +1354,13 @@ onUnmounted(() => {
         <div class="flex items-center justify-end gap-3 pt-3 border-t border-stone/60">
           <button 
             @click="showCustomRepairModal = false"
-            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-semibold transition-all cursor-pointer font-mono-accent">
+            class="px-4 py-2 bg-paper-white hover:bg-bone text-ink-black border border-stone text-xs font-medium transition-all cursor-pointer font-mono-accent">
             Batal
           </button>
           <button 
             @click="handleRepairCustom"
             :disabled="repairingSessionId === activeRepairSession.id"
-            class="btn-ink-stamp text-xs px-5 py-2.5 flex items-center justify-center gap-2 disabled:opacity-50 font-mono-accent">
+            class="btn-ink-stamp text-xs px-5 py-2 flex items-center justify-center gap-2 disabled:opacity-50 font-mono-accent font-medium">
             <svg v-if="repairingSessionId === activeRepairSession.id" class="animate-spin w-3.5 h-3.5 text-paper-white" viewBox="0 0 24 24" fill="none">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>

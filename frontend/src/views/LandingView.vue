@@ -71,8 +71,8 @@ onMounted(async () => {
     <!-- ANNOUNCEMENT BAR (Full-bleed Hot Pink #ff82c2) -->
     <aside 
       v-if="showAnnouncement" 
-      class="w-full bg-[#ff82c2] text-black px-6 py-2.5 transition-all border-b border-black flex items-center justify-between text-xs sm:text-sm font-medium">
-      <div class="max-w-[1200px] mx-auto w-full flex items-center justify-between gap-4">
+      class="w-full bg-[#ff82c2] text-black px-4 sm:px-6 md:px-8 lg:px-12 py-2.5 transition-all border-b border-black flex items-center justify-between text-xs sm:text-sm font-medium">
+      <div class="w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto flex items-center justify-between gap-4">
         <div class="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap">
           <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] shrink-0 bg-black text-white">
             BARU
@@ -95,7 +95,7 @@ onMounted(async () => {
       </div>
     </aside>
 
-    <AppNavbar />
+    <AppNavbar :fluid="true" />
 
     <!-- HERO SECTION (Editorial Typographic Focus) -->
     <section class="relative pt-14 pb-20 md:pt-24 md:pb-28 bg-white border-b border-[#c1c0bc]">

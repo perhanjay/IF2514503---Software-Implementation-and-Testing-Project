@@ -46,20 +46,6 @@
   --text-display-xl: 80px;
   --leading-display-xl: 1;
   --tracking-display-xl: -3.2px;
-
-  /* Spacing */
-  --spacing-8: 8px;
-  --spacing-16: 16px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-64: 64px;
-  --spacing-72: 72px;
-  --spacing-80: 80px;
-  --spacing-128: 128px;
-  --spacing-144: 144px;
-  --spacing-240: 240px;
 }
 
 @layer base {
@@ -99,20 +85,21 @@
 /* Typography Roles (Plus Jakarta Sans Display & Telemetry) */
 .font-display {
   font-family: var(--font-sans);
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 .font-editorial {
   font-family: var(--font-sans);
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  font-weight: 500;
+  letter-spacing: -0.025em;
 }
 
 /* Reserved strictly for audio telemetry and numeric readings */
 .font-mono-accent {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-weight: 400;
 }
 
 @layer components {
@@ -121,8 +108,8 @@
     background-color: #000000;
     color: #ffffff;
     border-radius: 0px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     transition: background-color 0.15s ease-in-out;
   }
@@ -133,9 +120,10 @@
   .btn-bone-secondary {
     background-color: #f1f0eb;
     color: #000000;
+    border: 1px solid #c1c0bc;
     border-radius: 0px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    font-weight: 500;
+    letter-spacing: 0.04em;
     transition: background-color 0.15s ease-in-out;
   }
   .btn-bone-secondary:hover {
@@ -147,9 +135,9 @@
     border-radius: 9999px;
     background-color: #000000;
     color: #ffffff;
-    font-weight: 700;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
   }
 
   /* Subtle Functional Border for Cards without artificial drop-shadows */
