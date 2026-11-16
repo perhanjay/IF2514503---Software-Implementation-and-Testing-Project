@@ -201,8 +201,8 @@ function handleLogout() {
       <div class="flex items-center gap-3">
         <!-- If ADMIN: show ADMIN OPERATOR badge instead of Quota pill -->
         <template v-if="authStore.user?.role === 'ADMIN'">
-          <div class="hidden sm:flex items-center gap-1.5 bg-[#f1f0eb] border border-[#c1c0bc] px-3 py-1.5 text-xs font-mono font-semibold text-black uppercase tracking-wider">
-            <span class="w-2 h-2 rounded-full bg-rose-600 animate-none"></span>
+          <div class="hidden sm:flex items-center gap-2 bg-[#f1f0eb] border border-[#c1c0bc] px-3.5 py-2 text-xs font-mono-accent font-semibold text-black uppercase tracking-wider">
+            <span class="w-2 h-2 rounded-full bg-black"></span>
             ADMIN OPERATOR
           </div>
         </template>
@@ -225,7 +225,7 @@ function handleLogout() {
             type="button"
             @click="openSettingsModal('profile')"
             title="Buka Pengaturan Akun"
-            class="hidden sm:flex flex-col text-right leading-tight cursor-pointer group px-2 py-1 rounded-none hover:bg-[#f1f0eb] transition-colors">
+            class="hidden sm:flex flex-col gap-0.5 text-right cursor-pointer group px-2.5 py-1.5 rounded-none hover:bg-[#f1f0eb] transition-colors">
             <span class="text-xs font-semibold text-black group-hover:underline transition-colors flex items-center gap-1 justify-end">
               <span>{{ authStore.user?.name }}</span>
               <svg class="w-3 h-3 text-[#60605e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

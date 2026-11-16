@@ -189,7 +189,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bone text-ink-black flex flex-col selection:bg-hot-pink selection:text-ink-black font-editorial">
+  <div class="min-h-screen bg-paper-white text-ink-black flex flex-col selection:bg-hot-pink selection:text-ink-black">
     <AppNavbar :fluid="true" />
 
     <main class="flex-1 w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-6 md:py-8 space-y-6">
@@ -216,18 +216,13 @@ onMounted(() => {
       </div>
 
       <!-- Header Section -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2 px-1">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-5 border-b border-stone">
         <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate bg-paper-white px-2 py-0.5 border border-stone">
-              System Administration
-            </span>
-          </div>
-          <h1 class="font-editorial font-bold text-2xl tracking-tight text-ink-black">
+          <h1 class="font-editorial font-bold text-2xl sm:text-3xl tracking-tight text-ink-black">
             Audit Transaksi Token
           </h1>
-          <p class="text-xs text-slate mt-0.5">
-            Rekam jejak mutasi token dan peredaran kredit platform real-time.
+          <p class="text-xs sm:text-sm text-slate mt-1">
+            Rekam jejak mutasi token dan peredaran kredit platform secara real-time.
           </p>
         </div>
 
@@ -242,96 +237,78 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- Sub-navigation Tabs -->
-      <div class="flex items-center gap-6 border-b border-stone">
-        <router-link 
-          to="/admin/users" 
-          class="pb-3 text-sm font-medium text-slate hover:text-ink-black transition-colors">
-          Pengguna
-        </router-link>
-        <router-link 
-          to="/admin/transactions" 
-          class="pb-3 text-sm font-semibold text-ink-black border-b-2 border-black -mb-px">
-          Audit Transaksi
-        </router-link>
-      </div>
-
-      <!-- Macro Metric Cards Ribbon (Grid of 4) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Macro Metric Cards Ribbon (Unified Flat Bone Strip) -->
+      <div class="bg-bone border border-stone rounded-none grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-stone">
         <!-- 1. Total Beredar -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none flex flex-col justify-between">
+        <div class="p-5 flex flex-col justify-between">
           <div>
-            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5 flex items-center justify-between">
-              <span>TOTAL BEREDAR</span>
-              <span class="inline-block w-2 h-2 rounded-full bg-[#20AFFF]"></span>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+              Total Beredar
             </div>
             <div class="font-mono-accent text-2xl font-bold text-ink-black tracking-tight">
               {{ formatNumber(metrics.totalInCirculation) }}
               <span class="text-xs font-semibold text-slate font-sans ml-1">Token</span>
             </div>
           </div>
-          <div class="text-[11px] text-slate mt-2 font-mono-accent">
+          <div class="text-xs text-slate mt-1.5">
             Saldo dompet aktif seluruh engineer
           </div>
         </div>
 
         <!-- 2. Total Pembelian (Top-Up) -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none flex flex-col justify-between">
+        <div class="p-5 flex flex-col justify-between">
           <div>
-            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5 flex items-center justify-between">
-              <span>TOTAL PEMBELIAN</span>
-              <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+              Total Pembelian
             </div>
             <div class="font-mono-accent text-2xl font-bold text-ink-black tracking-tight">
               {{ formatNumber(metrics.totalPurchased) }}
               <span class="text-xs font-semibold text-slate font-sans ml-1">Token</span>
             </div>
           </div>
-          <div class="text-[11px] text-slate mt-2 font-mono-accent">
+          <div class="text-xs text-slate mt-1.5">
             Akumulasi top-up via Midtrans &amp; Admin
           </div>
         </div>
 
         <!-- 3. Total Konsumsi DSP -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none flex flex-col justify-between">
+        <div class="p-5 flex flex-col justify-between">
           <div>
-            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5 flex items-center justify-between">
-              <span>TOTAL KONSUMSI DSP</span>
-              <span class="inline-block w-2 h-2 rounded-full bg-rose-500"></span>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+              Total Konsumsi DSP
             </div>
             <div class="font-mono-accent text-2xl font-bold text-ink-black tracking-tight">
               {{ formatNumber(metrics.totalBurned) }}
               <span class="text-xs font-semibold text-slate font-sans ml-1">Token</span>
             </div>
           </div>
-          <div class="text-[11px] text-slate mt-2 font-mono-accent">
+          <div class="text-xs text-slate mt-1.5">
             Token terpakai untuk isolasi &amp; repair stem
           </div>
         </div>
 
         <!-- 4. Total Hibah Gratis -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none flex flex-col justify-between">
+        <div class="p-5 flex flex-col justify-between">
           <div>
-            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5 flex items-center justify-between">
-              <span>TOTAL HIBAH GRATIS</span>
-              <span class="inline-block w-2 h-2 rounded-full bg-[#FF82C2]"></span>
+            <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+              Total Hibah Gratis
             </div>
             <div class="font-mono-accent text-2xl font-bold text-ink-black tracking-tight">
               {{ formatNumber(metrics.totalGrants) }}
               <span class="text-xs font-semibold text-slate font-sans ml-1">Token</span>
             </div>
           </div>
-          <div class="text-[11px] text-slate mt-2 font-mono-accent">
+          <div class="text-xs text-slate mt-1.5">
             Bonus sambutan pendaftaran akun engineer
           </div>
         </div>
       </div>
 
-      <!-- Search & Filter Controls Strip -->
-      <div class="bg-paper-white border border-stone p-4 rounded-none flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+      <!-- Search & Filter Controls (Borderless Open Row) -->
+      <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
         <!-- Search Input -->
         <div class="relative flex-1">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
             <svg class="w-4 h-4 text-slate" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -340,7 +317,7 @@ onMounted(() => {
             v-model="searchQuery" 
             type="text" 
             placeholder="Cari nama, email, deskripsi, ID order/sesi..." 
-            class="w-full pl-9 pr-9 py-2 text-xs text-ink-black bg-paper-white border border-stone rounded-none focus:outline-none focus:border-ink-black focus:ring-1 focus:ring-ink-black placeholder:text-slate"
+            class="w-full h-10 pl-10 pr-9 text-xs sm:text-sm text-ink-black bg-paper-white border border-stone rounded-none focus:outline-none focus:border-ink-black focus:ring-1 focus:ring-ink-black placeholder:text-slate/70"
           />
           <button 
             v-if="searchQuery"
@@ -355,7 +332,7 @@ onMounted(() => {
 
         <!-- Type Filter Tabs/Pills -->
         <div class="flex flex-wrap items-center gap-1.5">
-          <span class="text-[10px] font-semibold uppercase tracking-wider text-slate mr-1">
+          <span class="text-xs font-semibold text-slate mr-1">
             Filter Tipe:
           </span>
           <button 
@@ -364,8 +341,8 @@ onMounted(() => {
             @click="selectType(opt.id)"
             :class="selectedType === opt.id 
               ? 'bg-ink-black text-white border-ink-black font-bold' 
-              : 'bg-paper-white text-slate border-stone hover:text-ink-black hover:border-slate font-medium'"
-            class="px-3 py-1.5 text-xs rounded-none border transition-colors cursor-pointer">
+              : 'bg-paper-white text-slate border-stone hover:text-ink-black hover:border-ink-black font-medium'"
+            class="h-10 px-3 text-xs rounded-none border transition-colors cursor-pointer">
             {{ opt.label }}
           </button>
         </div>

@@ -128,7 +128,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-bone text-ink-black flex flex-col selection:bg-hot-pink selection:text-ink-black font-editorial">
+  <div class="min-h-screen bg-paper-white text-ink-black flex flex-col selection:bg-hot-pink selection:text-ink-black">
     <AppNavbar :fluid="true" />
 
     <main class="flex-1 w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-6 md:py-8 space-y-6">
@@ -155,16 +155,14 @@ onMounted(() => {
       </div>
 
       <!-- Header Section -->
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 py-2 px-1">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-5 border-b border-stone">
         <div>
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate bg-paper-white px-2 py-0.5 border border-stone">
-              System Administration
-            </span>
-          </div>
-          <h1 class="font-editorial font-bold text-2xl tracking-tight text-ink-black">
-            USERS MANAGEMENT
+          <h1 class="font-editorial font-bold text-2xl sm:text-3xl tracking-tight text-ink-black">
+            Manajemen Pengguna
           </h1>
+          <p class="text-xs sm:text-sm text-slate mt-1">
+            Kelola akun audio engineer, peran akses, serta penyesuaian kuota token studio.
+          </p>
         </div>
 
         <button 
@@ -178,69 +176,55 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- Sub-navigation Tabs -->
-      <div class="flex items-center gap-6 border-b border-stone">
-        <router-link 
-          to="/admin/users" 
-          class="pb-3 text-sm font-semibold text-ink-black border-b-2 border-black -mb-px">
-          Pengguna
-        </router-link>
-        <router-link 
-          to="/admin/transactions" 
-          class="pb-3 text-sm font-medium text-slate hover:text-ink-black transition-colors">
-          Audit Transaksi
-        </router-link>
-      </div>
-
-      <!-- Summary Stats Strip -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <!-- Summary Stats Strip (Unified Flat Bone Strip) -->
+      <div class="bg-bone border border-stone rounded-none grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-stone">
         <!-- Total Users -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none">
-          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5">
-            TOTAL USERS
+        <div class="p-5">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+            Total Pengguna
           </div>
           <div class="font-mono-accent text-3xl font-bold text-ink-black tracking-tight">
             {{ formatNumber(stats.totalUsers) }}
           </div>
-          <div class="text-[11px] text-slate mt-1 font-mono-accent">
-            Akun terdaftar dalam database
+          <div class="text-xs text-slate mt-1">
+            Akun terdaftar dalam sistem
           </div>
         </div>
 
         <!-- Active Engineers -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none">
-          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5">
-            ACTIVE ENGINEERS
+        <div class="p-5">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+            Engineer Aktif
           </div>
-          <div class="font-mono-accent text-3xl font-bold text-ink-black tracking-tight flex items-baseline gap-2">
-            <span>{{ formatNumber(stats.activeEngineers) }}</span>
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mb-1"></span>
+          <div class="font-mono-accent text-3xl font-bold text-ink-black tracking-tight">
+            {{ formatNumber(stats.activeEngineers) }}
           </div>
-          <div class="text-[11px] text-slate mt-1 font-mono-accent">
+          <div class="text-xs text-slate mt-1">
             Audio engineer berstatus aktif
           </div>
         </div>
 
         <!-- Suspended Accounts -->
-        <div class="bg-paper-white border border-stone p-5 rounded-none">
-          <div class="text-[10px] font-semibold uppercase tracking-wider text-slate mb-1.5">
-            SUSPENDED
+        <div class="p-5">
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-slate mb-1.5">
+            Ditangguhkan
           </div>
-          <div class="font-mono-accent text-3xl font-bold text-rose-600 tracking-tight flex items-baseline gap-2">
-            <span>{{ formatNumber(stats.suspendedAccounts) }}</span>
-            <span v-if="stats.suspendedAccounts > 0" class="inline-block w-2 h-2 rounded-full bg-rose-500 mb-1"></span>
+          <div 
+            :class="stats.suspendedAccounts > 0 ? 'text-rose-600' : 'text-ink-black'"
+            class="font-mono-accent text-3xl font-bold tracking-tight">
+            {{ formatNumber(stats.suspendedAccounts) }}
           </div>
-          <div class="text-[11px] text-slate mt-1 font-mono-accent">
-            Akun ditangguhkan oleh admin
+          <div class="text-xs text-slate mt-1">
+            Akun ditangguhkan admin
           </div>
         </div>
       </div>
 
-      <!-- Filter Controls Strip -->
-      <div class="bg-paper-white border border-stone p-4 rounded-none flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+      <!-- Filter Controls (Borderless Open Row) -->
+      <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
         <!-- Search Input -->
         <div class="relative flex-1">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
             <svg class="w-4 h-4 text-slate" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -249,19 +233,19 @@ onMounted(() => {
             v-model="searchQuery" 
             type="text" 
             placeholder="Cari nama atau email pengguna..." 
-            class="w-full pl-9 pr-4 py-2 text-xs text-ink-black bg-paper-white border border-stone rounded-none focus:outline-none focus:border-ink-black focus:ring-1 focus:ring-ink-black placeholder:text-slate"
+            class="w-full h-10 pl-10 pr-4 text-xs sm:text-sm text-ink-black bg-paper-white border border-stone rounded-none focus:outline-none focus:border-ink-black focus:ring-1 focus:ring-ink-black placeholder:text-slate/70"
           />
         </div>
 
         <!-- Role & Status Dropdowns -->
         <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
           <div class="flex items-center gap-2">
-            <label class="text-[10px] font-semibold uppercase tracking-wider text-slate whitespace-nowrap">
+            <label class="text-xs font-semibold text-slate whitespace-nowrap">
               Peran:
             </label>
             <select 
               v-model="selectedRole" 
-              class="border border-stone bg-paper-white px-3 py-2 text-xs text-ink-black rounded-none focus:outline-none focus:border-ink-black cursor-pointer">
+              class="h-10 border border-stone bg-paper-white px-3 text-xs font-medium text-ink-black rounded-none focus:outline-none focus:border-ink-black cursor-pointer">
               <option value="ALL">Semua Peran</option>
               <option value="AUDIO_ENGINEER">Audio Engineer</option>
               <option value="ADMIN">Admin</option>
@@ -269,12 +253,12 @@ onMounted(() => {
           </div>
 
           <div class="flex items-center gap-2">
-            <label class="text-[10px] font-semibold uppercase tracking-wider text-slate whitespace-nowrap">
+            <label class="text-xs font-semibold text-slate whitespace-nowrap">
               Status:
             </label>
             <select 
               v-model="selectedStatus" 
-              class="border border-stone bg-paper-white px-3 py-2 text-xs text-ink-black rounded-none focus:outline-none focus:border-ink-black cursor-pointer">
+              class="h-10 border border-stone bg-paper-white px-3 text-xs font-medium text-ink-black rounded-none focus:outline-none focus:border-ink-black cursor-pointer">
               <option value="ALL">Semua Status</option>
               <option value="ACTIVE">Aktif</option>
               <option value="SUSPENDED">Ditangguhkan</option>
@@ -289,15 +273,15 @@ onMounted(() => {
           <table class="w-full text-left border-collapse">
             <thead>
               <tr class="bg-bone border-b border-stone text-[11px] font-semibold uppercase tracking-wider text-slate">
-                <th class="py-3 px-4">NAME &amp; EMAIL</th>
-                <th class="py-3 px-4">ROLE</th>
-                <th class="py-3 px-4">STATUS</th>
-                <th class="py-3 px-4">TOKENS</th>
-                <th class="py-3 px-4">JOINED</th>
-                <th class="py-3 px-4 text-right">ACTIONS</th>
+                <th class="py-3.5 px-4">Pengguna</th>
+                <th class="py-3.5 px-4">Peran</th>
+                <th class="py-3.5 px-4">Status</th>
+                <th class="py-3.5 px-4">Kuota</th>
+                <th class="py-3.5 px-4">Bergabung</th>
+                <th class="py-3.5 px-4 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-stone bg-paper-white text-xs">
+            <tbody class="divide-y divide-stone/60 bg-paper-white text-xs">
               <!-- Loading Skeleton -->
               <tr v-if="loading && users.length === 0">
                 <td colspan="6" class="py-12 text-center text-slate font-mono-accent text-xs">
@@ -319,17 +303,21 @@ onMounted(() => {
                 class="hover:bg-bone/40 transition-colors">
                 <!-- Name & Email -->
                 <td class="py-3.5 px-4">
-                  <div class="font-semibold text-ink-black leading-tight">
+                  <div class="font-semibold text-sm text-ink-black leading-snug">
                     {{ user.name }}
                   </div>
-                  <div class="font-mono-accent text-[11px] text-slate mt-0.5">
+                  <div class="font-mono-accent text-xs text-slate mt-0.5">
                     {{ user.email }}
                   </div>
                 </td>
 
                 <!-- Role -->
                 <td class="py-3.5 px-4 whitespace-nowrap">
-                  <span class="badge-pill-stamp inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-bone text-ink-black border border-stone">
+                  <span 
+                    :class="user.role === 'ADMIN' 
+                      ? 'bg-ink-black text-paper-white border-ink-black' 
+                      : 'bg-bone text-ink-black border-stone'"
+                    class="badge-pill-stamp inline-flex items-center px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full border">
                     {{ user.role === 'ADMIN' ? 'Admin' : 'Engineer' }}
                   </span>
                 </td>
@@ -340,26 +328,26 @@ onMounted(() => {
                     v-if="user.status === 'ACTIVE'"
                     class="badge-pill-stamp inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                    ACTIVE
+                    Aktif
                   </span>
                   <span 
                     v-else
                     class="badge-pill-stamp inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-rose-50 text-rose-800 border border-rose-300">
                     <span class="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
-                    SUSPENDED
+                    Ditangguhkan
                   </span>
                 </td>
 
                 <!-- Tokens -->
                 <td class="py-3.5 px-4 whitespace-nowrap">
-                  <span class="font-mono-accent font-bold text-ink-black">
+                  <span class="font-mono-accent font-bold text-sm text-ink-black">
                     {{ formatNumber(user.wallet?.balance ?? 0) }}
                   </span>
-                  <span class="font-mono-accent text-[11px] text-slate ml-1">Token</span>
+                  <span class="font-mono-accent text-xs text-slate ml-1">Token</span>
                 </td>
 
                 <!-- Joined -->
-                <td class="py-3.5 px-4 whitespace-nowrap font-mono-accent text-[11px] text-slate">
+                <td class="py-3.5 px-4 whitespace-nowrap font-mono-accent text-xs text-slate">
                   {{ formatDate(user.createdAt) }}
                 </td>
 
@@ -367,8 +355,8 @@ onMounted(() => {
                 <td class="py-3.5 px-4 text-right whitespace-nowrap">
                   <button 
                     @click="openManageUser(user.id)" 
-                    class="btn-bone-secondary border border-stone px-3 py-1.5 text-xs font-semibold hover:border-ink-black transition-colors cursor-pointer">
-                    MANAGE
+                    class="btn-bone-secondary border border-stone px-3.5 py-1.5 text-xs font-semibold hover:border-ink-black transition-colors cursor-pointer">
+                    Kelola
                   </button>
                 </td>
               </tr>
@@ -378,12 +366,12 @@ onMounted(() => {
 
         <!-- Pagination Controls Footer -->
         <div class="bg-bone border-t border-stone px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-          <div class="font-mono-accent text-slate text-[11px]">
+          <div class="font-mono-accent text-slate text-xs">
             Menampilkan <span class="font-semibold text-ink-black">{{ users.length }}</span> dari <span class="font-semibold text-ink-black">{{ pagination.total }}</span> pengguna
           </div>
 
           <div class="flex items-center gap-3">
-            <span class="font-mono-accent text-slate text-[11px]">
+            <span class="font-mono-accent text-slate text-xs">
               Halaman {{ pagination.page }} dari {{ pagination.totalPages }}
             </span>
 
@@ -392,13 +380,13 @@ onMounted(() => {
                 @click="goToPage(currentPage - 1)" 
                 :disabled="currentPage <= 1 || loading"
                 class="btn-bone-secondary border border-stone px-3 py-1.5 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:border-ink-black transition-colors cursor-pointer">
-                Previous
+                Sebelumnya
               </button>
               <button 
                 @click="goToPage(currentPage + 1)" 
                 :disabled="currentPage >= pagination.totalPages || loading"
                 class="btn-bone-secondary border border-stone px-3 py-1.5 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:border-ink-black transition-colors cursor-pointer">
-                Next
+                Berikutnya
               </button>
             </div>
           </div>

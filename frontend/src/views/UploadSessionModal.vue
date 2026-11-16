@@ -75,53 +75,53 @@ async function startUpload() {
 <template>
   <div 
     @click.self="$emit('close')"
-    class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
     <div 
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      class="bg-white border border-slate-200 max-w-xl w-full rounded-2xl p-7 shadow-xl space-y-6 animate-fade-in">
+      class="bg-white border-2 border-black max-w-xl w-full rounded-none p-7 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-6 animate-fade-in">
       
       <!-- Modal Header -->
-      <div class="flex items-start justify-between border-b border-slate-100 pb-4">
+      <div class="flex items-start justify-between border-b border-[#c1c0bc] pb-4">
         <div>
-          <span class="text-xs font-semibold text-[#0052FF] bg-blue-50 px-2 py-0.5 rounded">Ingestion Studio</span>
-          <h3 id="modal-title" class="font-display text-2xl text-slate-900 mt-2">Unggah Sesi Multitrack</h3>
-          <p class="text-xs text-slate-500 mt-0.5">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
+          <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] bg-black text-white font-bold inline-block">INGESTION STUDIO</span>
+          <h3 id="modal-title" class="font-editorial text-2xl text-black font-extrabold mt-2">Unggah Sesi Multitrack</h3>
+          <p class="text-xs text-[#60605e] mt-0.5">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
         </div>
         <button 
           @click="$emit('close')" 
           type="button"
           aria-label="Tutup Dialog"
-          class="text-slate-400 hover:text-slate-700 cursor-pointer text-xl font-bold p-1">
+          class="text-black hover:opacity-60 cursor-pointer text-xl font-bold p-1">
           ✕
         </button>
       </div>
 
-      <div v-if="errorMsg" class="bg-rose-50 border border-rose-200 text-rose-700 text-xs p-3.5 rounded-xl">
+      <div v-if="errorMsg" class="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-none">
         {{ errorMsg }}
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1.5 font-mono-accent">
+          <label class="block text-xs font-bold text-black uppercase tracking-wider mb-1.5 font-mono-accent">
             JUDUL SESI / NAMA PROYEK
           </label>
           <input 
             v-model="sessionTitle" 
             type="text" 
             placeholder="Contoh: Echoes in the Night (Multitrack 24-bit)"
-            class="w-full bg-[#FAFAFA] border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] transition-all"
+            class="w-full bg-[#f1f0eb] border border-[#c1c0bc] rounded-none px-4 py-3 text-sm text-black placeholder-[#60605e] focus:outline-none focus:border-black focus:bg-white transition-colors"
           />
         </div>
 
-        <!-- Dropzone Area with SVG Icon -->
+        <!-- Dropzone Area -->
         <div 
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleDrop"
-          :class="isDragging ? 'border-[#0052FF] bg-blue-50/30' : 'border-slate-300 bg-[#FAFAFA]'"
-          class="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all relative group">
+          :class="isDragging ? 'border-black bg-[#ff82c2]/20' : 'border-[#c1c0bc] bg-[#f1f0eb]/60'"
+          class="border-2 border-dashed rounded-none p-8 text-center cursor-pointer transition-all relative group">
           
           <input 
             type="file" 
@@ -131,58 +131,58 @@ async function startUpload() {
             class="absolute inset-0 opacity-0 cursor-pointer"
           />
 
-          <div class="w-12 h-12 rounded-xl bg-blue-50 text-[#0052FF] border border-blue-200 flex items-center justify-center mx-auto mb-3">
+          <div class="w-12 h-12 rounded-none bg-black text-white flex items-center justify-center mx-auto mb-3">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
             </svg>
           </div>
 
-          <p class="text-sm font-semibold text-slate-800">
-            Tarik &amp; jatuhkan stem ke sini, atau <span class="text-[#0052FF] underline">pilih berkas</span>
+          <p class="text-sm font-bold text-black">
+            Tarik &amp; jatuhkan stem ke sini, atau <span class="underline">pilih berkas</span>
           </p>
-          <p class="text-xs text-slate-500 mt-1">
-            Maksimal 2 GB per sesi multitrack • Bit-depth 24/32-bit float terjaga
+          <p class="text-xs text-[#60605e] mt-1 font-mono-accent">
+            Maksimal 2 GB per sesi multitrack • Presisi 24/32-bit float terjaga
           </p>
         </div>
 
         <!-- File selection summary -->
         <div v-if="selectedFiles.length" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-          <span class="text-xs font-semibold text-slate-600 block font-mono-accent">
+          <span class="text-xs font-bold text-black block font-mono-accent uppercase tracking-wider">
             {{ selectedFiles.length }} Berkas Siap Diunggah:
           </span>
           <div 
             v-for="(f, i) in selectedFiles" 
             :key="i" 
-            class="flex items-center justify-between bg-[#F1F5F9] border border-slate-200 px-3 py-2 rounded-lg text-xs text-slate-700">
+            class="flex items-center justify-between bg-[#f1f0eb] border border-[#c1c0bc] rounded-none px-3 py-2 text-xs text-black">
             <span class="truncate max-w-xs font-mono-accent text-[11px]">{{ f.name }}</span>
-            <span class="text-slate-500 font-mono text-[10px]">{{ (f.size / (1024 * 1024)).toFixed(2) }} MB</span>
+            <span class="text-[#60605e] font-mono text-[10px]">{{ (f.size / (1024 * 1024)).toFixed(2) }} MB</span>
           </div>
         </div>
 
         <!-- Ingestion Progress bar -->
         <div v-if="uploading" class="space-y-1.5 pt-2">
-          <div class="flex justify-between text-xs text-slate-600 font-mono-accent">
+          <div class="flex justify-between text-xs text-black font-mono-accent">
             <span>Mengunggah ke MinIO S3 Storage...</span>
-            <span class="font-bold text-[#0052FF]">{{ uploadProgress }}%</span>
+            <span class="font-bold">{{ uploadProgress }}%</span>
           </div>
-          <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full bg-[#0052FF] transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
+          <div class="w-full h-2.5 bg-[#f1f0eb] border border-[#c1c0bc] rounded-none overflow-hidden">
+            <div class="h-full bg-black transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
           </div>
         </div>
       </div>
 
       <!-- Action buttons -->
-      <div class="flex justify-end gap-3 pt-3 border-t border-slate-100">
+      <div class="flex justify-end gap-3 pt-3 border-t border-[#c1c0bc]">
         <button 
           @click="$emit('close')" 
           :disabled="uploading"
-          class="px-5 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer">
+          class="btn-bone-secondary px-5 py-2.5 rounded-none border border-[#c1c0bc] text-xs uppercase tracking-wider cursor-pointer">
           Batal
         </button>
         <button 
           @click="startUpload" 
           :disabled="uploading || !selectedFiles.length"
-          class="px-6 py-2.5 bg-[#0052FF] hover:bg-[#0043D6] disabled:opacity-50 text-white text-xs font-bold rounded-xl cursor-pointer shadow-accent transition-all">
+          class="btn-ink-stamp px-6 py-2.5 rounded-none text-xs uppercase tracking-[0.1em] cursor-pointer disabled:opacity-50 transition-all">
           {{ uploading ? 'Mengunggah & Mengekstrak...' : 'Mulai Transmisi Audio' }}
         </button>
       </div>
