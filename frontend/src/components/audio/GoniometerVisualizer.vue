@@ -197,59 +197,57 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col items-center bg-white p-2.5 rounded-xl border border-slate-200/90 shadow-2xs select-none">
+  <div class="flex flex-col items-center select-none w-full max-w-[200px]">
     <!-- Visualizer Canvas -->
     <div class="relative">
       <canvas 
         ref="canvasRef" 
         :width="size" 
         :height="size" 
-        class="rounded-lg bg-slate-950 border border-slate-800 shadow-[inset_0_0_12px_rgba(0,0,0,0.8)]"
+        class="rounded-none bg-[#0F172A] border border-black shadow-2xs"
       />
-      <!-- Scope CRT Glass Overlay Glare -->
-      <div class="pointer-events-none absolute inset-0 rounded-lg bg-radial from-transparent via-transparent to-black/30" />
     </div>
 
-    <!-- Telemetry Correlation Bar -->
-    <div class="w-full mt-2.5 pt-2 border-t border-slate-100 space-y-1">
+    <!-- Telemetry Correlation Bar (Flat, Seamless) -->
+    <div class="w-full mt-2.5 pt-2 border-t border-stone/60 space-y-1.5">
       <div class="flex items-center justify-between text-[10px] font-mono-accent">
-        <span class="text-slate-600 font-semibold tracking-wider uppercase">Fase Korelasi</span>
+        <span class="text-ink-black font-bold uppercase tracking-wider">Fase Korelasi</span>
         <span 
-          class="font-bold text-[11px] px-1.5 py-0.5 rounded border"
+          class="font-bold text-[11px] px-1.5 py-0.5 border"
           :class="correlationValue >= 0.5 
-            ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+            ? 'text-emerald-800 bg-emerald-50 border-emerald-300' 
             : correlationValue >= 0 
-              ? 'text-sky-700 bg-sky-50 border-sky-200' 
-              : 'text-rose-700 bg-rose-50 border-rose-200 animate-pulse'">
+              ? 'text-ink-black bg-bone border-stone' 
+              : 'text-rose-800 bg-rose-50 border-rose-300 font-extrabold'">
           {{ correlationValue >= 0 ? '+' : '' }}{{ correlationValue.toFixed(2) }}
         </span>
       </div>
 
       <!-- Meter Visual Bar [-1 to +1] -->
-      <div class="relative h-1.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 flex">
+      <div class="relative h-2 w-full bg-bone overflow-hidden border border-stone flex">
         <!-- Negative Zone (-1 to 0) -->
-        <div class="w-1/2 h-full flex justify-end bg-rose-50 border-r border-slate-300">
+        <div class="w-1/2 h-full flex justify-end bg-rose-100 border-r border-stone">
           <div 
             v-if="correlationValue < 0" 
-            class="h-full bg-rose-500 rounded-l transition-all duration-75"
+            class="h-full bg-rose-600 transition-all duration-75"
             :style="{ width: `${Math.min(100, Math.abs(correlationValue) * 100)}%` }"
           />
         </div>
         <!-- Positive Zone (0 to +1) -->
-        <div class="w-1/2 h-full flex justify-start bg-emerald-50">
+        <div class="w-1/2 h-full flex justify-start bg-emerald-100">
           <div 
             v-if="correlationValue >= 0" 
-            class="h-full rounded-r transition-all duration-75"
-            :class="correlationValue >= 0.5 ? 'bg-emerald-500' : 'bg-sky-500'"
+            class="h-full transition-all duration-75"
+            :class="correlationValue >= 0.5 ? 'bg-emerald-600' : 'bg-ink-black'"
             :style="{ width: `${Math.min(100, correlationValue * 100)}%` }"
           />
         </div>
       </div>
 
-      <div class="flex justify-between text-[8px] font-mono-accent text-slate-400 px-0.5 leading-none">
-        <span class="text-rose-500 font-semibold">-1 (Out Phase)</span>
+      <div class="flex justify-between text-[8px] font-mono-accent text-slate px-0.5 leading-none">
+        <span class="text-rose-700 font-bold">-1 (Out Phase)</span>
         <span>0</span>
-        <span class="text-emerald-600 font-semibold">+1 (Mono)</span>
+        <span class="text-emerald-800 font-bold">+1 (Mono)</span>
       </div>
     </div>
   </div>

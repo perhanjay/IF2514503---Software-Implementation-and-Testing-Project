@@ -57,18 +57,18 @@ const segments = computed(() => {
     :aria-label="`True Peak Level: ${value !== null ? value.toFixed(1) : '-'} dBFS`">
     
     <!-- LED Segment Bar -->
-    <div class="flex items-center gap-[2px] h-2 w-full bg-slate-100/90 p-[2px] rounded border border-slate-200/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+    <div class="flex items-center gap-[2px] h-2.5 w-full bg-[#0F172A] p-[2px] rounded-none border border-black">
       <div 
         v-for="(seg, idx) in segments" 
         :key="idx"
-        class="h-full flex-1 rounded-[1px] transition-colors duration-150"
-        :class="seg.isLit ? seg.activeClass : seg.inactiveClass"
+        class="h-full flex-1 rounded-none transition-colors duration-150"
+        :class="seg.isLit ? seg.activeClass : 'bg-slate-800'"
         :title="`${seg.threshold} dBFS`"
       />
     </div>
 
     <!-- Tick Scale Labels -->
-    <div class="flex justify-between items-center text-[8px] font-mono-accent text-slate-400 px-0.5 leading-none">
+    <div class="flex justify-between items-center text-[8px] font-mono-accent text-[#60605e] px-0.5 leading-none">
       <span>-36</span>
       <span>-18</span>
       <span>-6</span>
