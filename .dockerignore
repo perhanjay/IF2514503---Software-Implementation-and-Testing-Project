@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+**/dist
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+sample-stems
+docs
+.gemini
+*.log

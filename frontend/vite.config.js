@@ -11,14 +11,18 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
+    watch: {
+      usePolling: true,
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:5000',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:5000',
         ws: true,
       },
     },
