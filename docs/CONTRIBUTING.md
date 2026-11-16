@@ -49,7 +49,7 @@ Ensure you have the following installed locally:
 
 ### Frontend (Vue 3 / Web Audio)
 - Use Vue 3 Composition API with `<script setup>`.
-- Follow the design system defined in `DESIGN.md` (Polaris Electric Blue `#0052FF`, slate contrast, Inter & JetBrains Mono typography).
+- Follow the design system defined in `DESIGN.md` (Editorial Boutique standard: Paper White `#FFFFFF`, Bone `#F1F0EB`, Stone `#C1C0BC`, Ink Black `#000000`, 0px border-radius, Plus Jakarta Sans & JetBrains Mono typography).
 - Ensure Web Audio API nodes are properly disconnected and disposed on component unmount to prevent audio memory leaks.
 - Avoid generic UI cliches or decorative emojis; maintain a professional audio workstation feel.
 

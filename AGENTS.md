@@ -19,19 +19,36 @@
 
 ## ⚡ Essential Commands
 
-### 1. Infrastructure (Docker)
+### 1. Full Stack via Docker (All-in-One: Infra, Backend, & Frontend)
 ```bash
-# Start all supporting services (PostgreSQL on :5434, Redis on :6379, MinIO on :9000/:9001)
+# Start all services (Postgres, Redis, MinIO, Backend with Python DSP engine, Frontend Vite)
 docker compose up -d
 
-# Check service status & health
+# Rebuild containers after Dockerfile or dependency updates
+docker compose up -d --build
+
+# Check service status & healthchecks
 docker compose ps
 
-# Stop containers
+# View live container logs
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Stop all containers
 docker compose down
 ```
 
-### 2. Backend (Node.js & Prisma)
+> **Direct URLs when running via Docker:**
+> - Frontend Studio UI: `http://localhost:5173`
+> - Backend REST API: `http://localhost:5000` (and `http://localhost:5173/api`)
+> - MinIO Console: `http://localhost:9001` (User: `minioadmin`, Pass: `minioadmin`)
+> - PostgreSQL: `localhost:5434`
+> - Redis: `localhost:6379`
+
+### 2. Manual Local Development (Optional)
+Jika ingin menjalankan service secara langsung di lingkungan host machine:
+
+#### A. Backend (Node.js & Prisma)
 ```bash
 cd backend
 
@@ -157,8 +174,10 @@ python scripts/generate_sample_stems.py
 ### Frontend & Web Audio
 - **Vue 3 Composition API**: Use `<script setup>` exclusively.
 - **Design System (`DESIGN.md`)**:
-  - Palette: `#FAFAFA` canvas, `#0F172A` deep slate text, `#0052FF` Polaris Electric Blue accent.
-  - Typography: `Inter` for interface display, `JetBrains Mono` strictly for telemetry readouts (dBFS, Hz, %, ms).
+  - Aesthetic: "Boutique liner notes on sunlit paper" with tactile editorial print direction.
+  - Geometry: Strict `0px border-radius` (`rounded-none`) across all cards, panels, inputs, and buttons (`.btn-ink-stamp`, `.btn-bone-secondary`). Only pill status badges use `rounded-full` (`9999px`).
+  - Palette: `#FFFFFF` Paper White canvas, `#F1F0EB` Bone surface, `#C1C0BC` Stone hairline border, `#000000` Ink Black contrast & primary CTA, with deliberate editorial accents (`#FF82C2` Hot Pink & `#20AFFF` Signal Blue).
+  - Typography: `Plus Jakarta Sans` for interface display & body (`font-editorial font-bold` for display headings), `JetBrains Mono` strictly for numeric audio telemetry (dBFS, Hz, %, ms, timestamps).
   - No generic AI-slop: Avoid floating orbs, decorative unicode emojis in buttons/chips, and perpetual pulsing dots on idle components.
   - UI clean from internal labeling: Do NOT display `UC-[NUMBER]` codes in visible user-facing text.
 - **Web Audio Lifecycle**: Always disconnect and stop `AudioBufferSourceNode`, `GainNode`, and `AnalyserNode` when components unmount to prevent browser audio context memory leaks.
