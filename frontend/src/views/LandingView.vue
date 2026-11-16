@@ -9,7 +9,6 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isLaunching = ref(false)
-const showAnnouncement = ref(true)
 
 const packages = ref([
   { id: 'PKG-10', name: 'Paket Starter', tokens: 10, priceIdr: 25000, description: 'Cocok untuk persiapan 1 single atau EP mini proyek studio.' },
@@ -67,34 +66,6 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-white text-black flex flex-col font-sans selection:bg-[#ff82c2] selection:text-black">
-    
-    <!-- ANNOUNCEMENT BAR (Full-bleed Hot Pink #ff82c2) -->
-    <aside 
-      v-if="showAnnouncement" 
-      class="w-full bg-[#ff82c2] text-black px-4 sm:px-6 md:px-8 lg:px-12 py-2.5 transition-all border-b border-black flex items-center justify-between text-xs sm:text-sm font-medium">
-      <div class="w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3 overflow-hidden text-ellipsis whitespace-nowrap">
-          <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] shrink-0 bg-black text-white">
-            BARU
-          </span>
-          <span class="truncate">
-            Mesin DSP Polaris v2.4 dirilis: Deteksi otomatis pasangan mikrofon &amp; normalisasi ITU-R BS.1770-4.
-          </span>
-          <button 
-            @click="launchStudioInstantly" 
-            class="hidden md:inline underline font-semibold hover:opacity-80 cursor-pointer shrink-0">
-            Coba di Studio &rarr;
-          </button>
-        </div>
-        <button 
-          @click="showAnnouncement = false" 
-          aria-label="Tutup Pengumuman"
-          class="text-black hover:opacity-60 text-base font-bold px-1 cursor-pointer shrink-0">
-          &times;
-        </button>
-      </div>
-    </aside>
-
     <AppNavbar :fluid="true" />
 
     <!-- HERO SECTION (Editorial Typographic Focus) -->
