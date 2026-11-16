@@ -1,63 +1,166 @@
 @import "tailwindcss";
 
+@theme {
+  /* Colors */
+  --color-hot-pink: #ff82c2;
+  --color-sun-yellow: #ffda40;
+  --color-signal-blue: #20afff;
+  --color-ember-orange: #ff6138;
+  --color-leaf-green: #5ad363;
+  --color-ink-black: #000000;
+  --color-charcoal: #292c33;
+  --color-slate: #60605e;
+  --color-bone: #f1f0eb;
+  --color-paper-white: #ffffff;
+  --color-mist: #efefef;
+  --color-stone: #c1c0bc;
+  --color-sand: #e4d9cf;
+  --color-frost: #cfd6e5;
+
+  /* Typography */
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Typography — Scale */
+  --text-caption: 10px;
+  --leading-caption: 1;
+  --tracking-caption: 1px;
+  --text-body: 16px;
+  --leading-body: 1.56;
+  --tracking-body: 0px;
+  --text-subheading: 18px;
+  --leading-subheading: 1.6;
+  --tracking-subheading: 0px;
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 1.33;
+  --tracking-heading-sm: 0px;
+  --text-heading: 40px;
+  --leading-heading: 1.2;
+  --tracking-heading: -0.8px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1.13;
+  --tracking-heading-lg: -1.44px;
+  --text-display: 64px;
+  --leading-display: 1.06;
+  --tracking-display: -2.56px;
+  --text-display-xl: 80px;
+  --leading-display-xl: 1;
+  --tracking-display-xl: -3.2px;
+
+  /* Spacing */
+  --spacing-8: 8px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-48: 48px;
+  --spacing-56: 56px;
+  --spacing-64: 64px;
+  --spacing-72: 72px;
+  --spacing-80: 80px;
+  --spacing-128: 128px;
+  --spacing-144: 144px;
+  --spacing-240: 240px;
+}
+
 @layer base {
   :root {
-    /* R-31 Token Rationale: Neutral canvas prevents fatigue during long studio diagnostics */
-    --bg-canvas: #FAFAFA;
-    /* R-31 Token Rationale: High contrast deep slate text ensuring WCAG AA compliance (>12:1) */
-    --fg-text: #0F172A;
-    /* R-31 Token Rationale: Studio Electric Blue reserved as the single deliberate focal accent */
-    --accent: #0052FF;
-    --accent-hover: #0043D6;
-    --accent-subtle: rgba(0, 82, 255, 0.08);
-    --muted-surf: #F1F5F9;
-    --muted-fg: #64748B;
-    --border-color: #E2E8F0;
-    --card-bg: #FFFFFF;
+    /* Editorial Theme Variables (Paper White canvas & Ink Black contrast) */
+    --bg-canvas: #ffffff;
+    --fg-text: #000000;
+    --accent: #000000;
+    --accent-hover: #292c33;
+    --accent-subtle: rgba(0, 0, 0, 0.05);
+    --muted-surf: #f1f0eb;
+    --muted-fg: #60605e;
+    --border-color: #c1c0bc;
+    --card-bg: #ffffff;
+
+    /* Editorial Accent Tokens */
+    --color-hot-pink: #ff82c2;
+    --color-bone: #f1f0eb;
+    --color-signal-blue: #20afff;
+    --color-sun-yellow: #ffda40;
+    --color-mist: #efefef;
+    --color-stone: #c1c0bc;
+    --color-ink-black: #000000;
+    --color-slate: #60605e;
   }
 
   body {
     margin: 0;
     background-color: var(--bg-canvas);
     color: var(--fg-text);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
 
-/* Typography Roles (R-06 & R-20): High-precision technical display sans-serif */
+/* Typography Roles (Plus Jakarta Sans Display & Telemetry) */
 .font-display {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-weight: 700;
   letter-spacing: -0.025em;
 }
 
-/* Reserved strictly for audio telemetry and numeric readings (R-06) */
+.font-editorial {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+/* Reserved strictly for audio telemetry and numeric readings */
 .font-mono-accent {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
-/* Accent Brand Headline Highlight */
-.accent-headline {
-  color: var(--accent);
+@layer components {
+  /* Editorial Ink Stamp Buttons */
+  .btn-ink-stamp {
+    background-color: #000000;
+    color: #ffffff;
+    border-radius: 0px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .btn-ink-stamp:hover {
+    background-color: #292c33;
+  }
+
+  .btn-bone-secondary {
+    background-color: #f1f0eb;
+    color: #000000;
+    border-radius: 0px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .btn-bone-secondary:hover {
+    background-color: #e5e3dc;
+  }
+
+  /* Editorial Sticker Badge */
+  .badge-pill-stamp {
+    border-radius: 9999px;
+    background-color: #000000;
+    color: #ffffff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* Subtle Functional Border for Cards without artificial drop-shadows */
+  .editorial-card {
+    border: 1px solid #c1c0bc;
+    border-radius: 0px;
+    background-color: #ffffff;
+  }
 }
 
-/* Subtle Functional Border for Emphasized Cards (R-14) */
-.featured-card {
-  border: 2px solid var(--accent);
-  border-radius: 1rem;
-}
-
-/* Tactile Button Focus & Elevation (R-12) */
-.shadow-accent {
-  box-shadow: 0 2px 8px rgba(0, 82, 255, 0.2);
-}
-.shadow-accent-lg {
-  box-shadow: 0 4px 14px rgba(0, 82, 255, 0.3);
-}
-
-/* Purposeful UI Transitions (MOTION 1: Hover & State Change Only) */
+/* Purposeful UI Transitions */
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
@@ -65,4 +168,63 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom Editorial Range Sliders for Cross-Browser Consistency (WebKit & Gecko) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]:focus {
+  outline: none;
+}
+
+/* WebKit (Chrome, Edge, Safari) */
+input[type="range"]::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(193, 192, 188, 0.45);
+  border: 1px solid rgba(193, 192, 188, 0.8);
+  border-radius: 0px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 14px;
+  background-color: #000000;
+  border: none;
+  border-radius: 0px;
+  margin-top: -5px;
+  cursor: pointer;
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  background-color: #ffda40;
+}
+
+/* Firefox */
+input[type="range"]::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(193, 192, 188, 0.45);
+  border: 1px solid rgba(193, 192, 188, 0.8);
+  border-radius: 0px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 14px;
+  background-color: #000000;
+  border: none;
+  border-radius: 0px;
+  cursor: pointer;
+}
+
+input[type="range"]:active::-moz-range-thumb {
+  background-color: #ffda40;
 }
