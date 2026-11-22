@@ -6,7 +6,10 @@ import {
   formatDateTimeId,
   getAdminTxMeta,
   getRoleBadgeMeta,
-  getStatusBadgeMeta
+  getStatusBadgeMeta,
+  isTxDebit,
+  getTxAmountClass,
+  formatTxSignedAmount
 } from '../src/utils/adminFormatters.js'
 
 test('formatNumberId memformat angka lokal Indonesia dan fallback 0', () => {
@@ -61,4 +64,24 @@ test('getRoleBadgeMeta dan getStatusBadgeMeta memetakan peran dan status dengan 
     label: 'Ditangguhkan',
     badgeClass: 'bg-[#ffcae6] text-[#111111]'
   })
+})
+
+test('isTxDebit, getTxAmountClass, dan formatTxSignedAmount menangani debit, kredit, dan nol secara konsisten', () => {
+  assert.equal(isTxDebit({ type: 'DEDUCTION', amount: -10 }), true)
+  assert.equal(isTxDebit({ type: 'DEDUCTION', amount: 10 }), true)
+  assert.equal(isTxDebit({ type: 'REFUND', amount: -5 }), true)
+  assert.equal(isTxDebit({ type: 'TOPUP', amount: 25 }), false)
+  assert.equal(isTxDebit({ type: 'TOPUP', amount: 0 }), false)
+  assert.equal(isTxDebit(null), false)
+
+  assert.equal(getTxAmountClass({ type: 'TOPUP', amount: 25 }), 'text-[#15803d]')
+  assert.equal(getTxAmountClass({ type: 'DEDUCTION', amount: -10 }), 'text-[#be123c]')
+  assert.equal(getTxAmountClass({ type: 'TOPUP', amount: 0 }), 'text-[#60605e]')
+  assert.equal(getTxAmountClass({ type: 'DEDUCTION', amount: 0 }), 'text-[#60605e]')
+
+  assert.equal(formatTxSignedAmount({ type: 'TOPUP', amount: 1250 }), '+1.250')
+  assert.equal(formatTxSignedAmount({ type: 'DEDUCTION', amount: -10 }), '-10')
+  assert.equal(formatTxSignedAmount({ type: 'DEDUCTION', amount: 10 }), '-10')
+  assert.equal(formatTxSignedAmount({ type: 'TOPUP', amount: 0 }), '0')
+  assert.equal(formatTxSignedAmount({ type: 'DEDUCTION', amount: 0 }), '0')
 })

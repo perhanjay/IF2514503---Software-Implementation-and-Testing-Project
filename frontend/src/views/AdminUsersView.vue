@@ -31,14 +31,17 @@ const currentPage = ref(1)
 const selectedUserId = ref(null)
 const isDrawerOpen = ref(false)
 let searchTimeout = null
+let skipNextSearchWatch = false
+let fetchRequestId = 0
 
 const kpiCards = computed(() => [
   { key: 'total', label: 'Total Pengguna', value: stats.value.totalUsers, icon: Users, iconBg: 'bg-[#87d7ff]', valueClass: 'text-[#111111]' },
   { key: 'engineers', label: 'Engineer Aktif', value: stats.value.activeEngineers, icon: AudioLines, iconBg: 'bg-[#d8f3dc]', valueClass: 'text-[#111111]' },
-  { key: 'suspended', label: 'Akun Ditangguhkan', value: stats.value.suspendedAccounts, icon: Ban, iconBg: 'bg-[#ffcae6]', valueClass: stats.value.suspendedAccounts > 0 ? 'text-[#be123c]' : 'text-[#111111]' }
+  { key: 'suspended', label: 'Akun Ditangguhkan', value: stats.value.suspendedAccounts, icon: Ban, iconBg: stats.value.suspendedAccounts > 0 ? 'bg-[#ffcae6]' : 'bg-[#f5f3eb]', valueClass: stats.value.suspendedAccounts > 0 ? 'text-[#be123c]' : 'text-[#111111]' }
 ])
 
 async function fetchUsers() {
+  const reqId = ++fetchRequestId
   loading.value = true
   error.value = ''
   try {
@@ -47,39 +50,58 @@ async function fetchUsers() {
     if (selectedRole.value !== 'ALL') params.role = selectedRole.value
     if (selectedStatus.value !== 'ALL') params.status = selectedStatus.value
     const res = await axios.get('/api/v1/admin/users', { params })
+    if (reqId !== fetchRequestId) return
     users.value = res.data.users || []
     pagination.value = res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 }
     stats.value = res.data.stats || { totalUsers: 0, activeEngineers: 0, suspendedAccounts: 0 }
   } catch (err) {
+    if (reqId !== fetchRequestId) return
     console.error('Failed to fetch admin users:', err)
     error.value = err.response?.data?.error || 'Gagal memuat direktori pengguna'
   } finally {
-    loading.value = false
+    if (reqId === fetchRequestId) loading.value = false
   }
 }
 
-function resetAndFetch() {
-  if (currentPage.value !== 1) currentPage.value = 1
-  else fetchUsers()
+watch(searchQuery, () => {
+  if (skipNextSearchWatch) { skipNextSearchWatch = false; return }
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => { currentPage.value = 1; fetchUsers() }, 300)
+})
+
+function selectRole(role) {
+  if (selectedRole.value === role) return
+  clearTimeout(searchTimeout)
+  selectedRole.value = role
+  currentPage.value = 1
+  fetchUsers()
 }
 
-watch(searchQuery, () => {
+function selectStatus(status) {
+  if (selectedStatus.value === status) return
   clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(resetAndFetch, 300)
-})
-watch([selectedRole, selectedStatus], resetAndFetch)
-watch(currentPage, fetchUsers)
+  selectedStatus.value = status
+  currentPage.value = 1
+  fetchUsers()
+}
 
 function goToPage(page) {
-  if (page >= 1 && page <= (pagination.value.totalPages || 1)) currentPage.value = page
+  if (page >= 1 && page <= (pagination.value.totalPages || 1) && page !== currentPage.value) {
+    currentPage.value = page
+    fetchUsers()
+  }
 }
 
 function clearFilters() {
   clearTimeout(searchTimeout)
+  const hadSearch = searchQuery.value !== ''
+  if (!hadSearch && selectedRole.value === 'ALL' && selectedStatus.value === 'ALL' && currentPage.value === 1) return
+  if (hadSearch) skipNextSearchWatch = true
   searchQuery.value = ''
   selectedRole.value = 'ALL'
   selectedStatus.value = 'ALL'
-  resetAndFetch()
+  currentPage.value = 1
+  fetchUsers()
 }
 
 function openManageUser(userId) {
@@ -164,8 +186,8 @@ onBeforeUnmount(() => clearTimeout(searchTimeout))
         </div>
 
         <div class="flex flex-wrap sm:flex-nowrap items-center gap-3">
-          <RetroSelect v-model="selectedRole" :options="ROLE_OPTIONS" aria-label="Filter peran pengguna" :compact="true" />
-          <RetroSelect v-model="selectedStatus" :options="STATUS_OPTIONS" aria-label="Filter status pengguna" :compact="true" />
+          <RetroSelect :model-value="selectedRole" @update:model-value="selectRole" :options="ROLE_OPTIONS" aria-label="Filter peran pengguna" :compact="true" />
+          <RetroSelect :model-value="selectedStatus" @update:model-value="selectStatus" :options="STATUS_OPTIONS" aria-label="Filter status pengguna" :compact="true" />
         </div>
       </div>
 
@@ -175,6 +197,7 @@ onBeforeUnmount(() => clearTimeout(searchTimeout))
         :error="error"
         :pagination="pagination"
         :current-page="currentPage"
+        :has-active-filters="Boolean(searchQuery || selectedRole !== 'ALL' || selectedStatus !== 'ALL')"
         @manage-user="openManageUser"
         @page-change="goToPage"
         @retry="fetchUsers"

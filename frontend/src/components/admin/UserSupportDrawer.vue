@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import axios from 'axios'
 import { X, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
+import { useDialogFocus } from '../../composables/useDialogFocus'
+import { useUserSupportActions } from '../../composables/useUserSupportActions'
 import AdminUserOverviewCard from './AdminUserOverviewCard.vue'
 import AdminTokenAdjustmentForm from './AdminTokenAdjustmentForm.vue'
 import AdminUserLedgerSection from './AdminUserLedgerSection.vue'
@@ -16,139 +17,88 @@ const props = defineProps({
 const emit = defineEmits(['close', 'user-updated'])
 const authStore = useAuthStore()
 
-const userData = ref(null)
-const loading = ref(false)
-const fetchError = ref('')
-const notice = ref(null)
-const statusLoading = ref(false)
-const tokenLoading = ref(false)
-const revokeLoading = ref(false)
 const showSuspendModal = ref(false)
 const showRevokeModal = ref(false)
 const suspendReason = ref('')
-const adjustmentFormRef = ref(null)
+const drawerRef = ref(null)
+
+const {
+  userData, loading, fetchError, notice, modalError,
+  statusLoading, tokenLoading, revokeLoading, adjustmentFormRef,
+  fetchUserDetail, confirmSuspend, reactivateAccount, adjustTokens,
+  confirmRevokeSessions, invalidateRequests
+} = useUserSupportActions(props, emit, {
+  onSuspendSuccess: () => setSuspendModal(false),
+  onRevokeSuccess: () => setRevokeModal(false)
+})
 
 const isSelf = computed(() => !!authStore.user?.id && authStore.user.id === userData.value?.id)
+const isMutating = computed(() => statusLoading.value || revokeLoading.value || tokenLoading.value)
 
-async function fetchUserDetail({ clearNotice = true } = {}) {
-  if (!props.userId) return
-  loading.value = true
-  fetchError.value = ''
-  if (clearNotice) notice.value = null
-  try {
-    const res = await axios.get(`/api/v1/admin/users/${props.userId}`)
-    userData.value = res.data.user
-  } catch (err) {
-    fetchError.value = err.response?.data?.error || 'Gagal memuat rincian pengguna'
-  } finally {
-    loading.value = false
-  }
+useDialogFocus(() => props.isOpen, drawerRef)
+
+function closeModals() {
+  showSuspendModal.value = false
+  showRevokeModal.value = false
+  modalError.value = ''
 }
 
-async function runAction(loadingRef, fallbackErr, fn) {
-  loadingRef.value = true
-  notice.value = null
-  try {
-    await fn()
-    emit('user-updated')
-  } catch (err) {
-    notice.value = { isError: true, text: err.response?.data?.error || fallbackErr }
-  } finally {
-    loadingRef.value = false
-  }
+function setSuspendModal(open) {
+  if (open && (isSelf.value || isMutating.value)) return
+  modalError.value = ''
+  if (open) suspendReason.value = ''
+  showSuspendModal.value = open
 }
 
-function openSuspendModal() {
+function setRevokeModal(open) {
+  if (open && isMutating.value) return
+  modalError.value = ''
+  showRevokeModal.value = open
+}
+
+function handleConfirmSuspend() {
   if (isSelf.value) return
-  suspendReason.value = ''
-  showSuspendModal.value = true
+  return confirmSuspend(suspendReason.value)
 }
 
-function confirmSuspend() {
-  if (isSelf.value) return
-  return runAction(statusLoading, 'Gagal menangguhkan akun pengguna', async () => {
-    const res = await axios.patch(`/api/v1/admin/users/${props.userId}/status`, {
-      status: 'SUSPENDED',
-      reason: suspendReason.value.trim() || undefined
-    })
-    if (userData.value) Object.assign(userData.value, { status: res.data.user.status, statusReason: res.data.user.statusReason })
-    showSuspendModal.value = false
-    notice.value = { isError: false, text: res.data.message || 'Akun pengguna berhasil ditangguhkan' }
-  })
-}
-
-function reactivateAccount() {
-  return runAction(statusLoading, 'Gagal mengaktifkan kembali akun pengguna', async () => {
-    const res = await axios.patch(`/api/v1/admin/users/${props.userId}/status`, { status: 'ACTIVE' })
-    if (userData.value) Object.assign(userData.value, { status: res.data.user.status, statusReason: null })
-    notice.value = { isError: false, text: res.data.message || 'Akun pengguna berhasil diaktifkan kembali' }
-  })
-}
-
-function adjustTokens(payload) {
-  return runAction(tokenLoading, 'Gagal memproses penyesuaian token', async () => {
-    const res = await axios.post(`/api/v1/admin/users/${props.userId}/tokens`, payload)
-    adjustmentFormRef.value?.resetForm()
-    await fetchUserDetail({ clearNotice: false })
-    notice.value = { isError: false, text: res.data.message || 'Penyesuaian token berhasil diproses' }
-  })
-}
-
-function confirmRevokeSessions() {
-  return runAction(revokeLoading, 'Gagal mencabut sesi aktif pengguna', async () => {
-    const res = await axios.post(`/api/v1/admin/users/${props.userId}/revoke-sessions`)
-    showRevokeModal.value = false
-    notice.value = { isError: false, text: res.data.message || 'Semua sesi pengguna telah berhasil dicabut' }
-  })
-}
-
-function handleBackdropClick() {
-  if (statusLoading.value || revokeLoading.value) return
-  emit('close')
+function requestClose() {
+  if (!isMutating.value) emit('close')
 }
 
 function handleKeyDown(e) {
   if (e.key !== 'Escape') return
-  if (showSuspendModal.value) {
-    if (!statusLoading.value) showSuspendModal.value = false
-  } else if (showRevokeModal.value) {
-    if (!revokeLoading.value) showRevokeModal.value = false
-  } else if (props.isOpen && !statusLoading.value && !revokeLoading.value) {
-    emit('close')
-  }
+  if (showSuspendModal.value) { if (!statusLoading.value) setSuspendModal(false) }
+  else if (showRevokeModal.value) { if (!revokeLoading.value) setRevokeModal(false) }
+  else if (props.isOpen && !isMutating.value) emit('close')
 }
 
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    window.addEventListener('keydown', handleKeyDown)
+function resetDrawerState() {
+  window.removeEventListener('keydown', handleKeyDown)
+  closeModals()
+  invalidateRequests({ clearData: true })
+}
+
+watch(() => [props.isOpen, props.userId], ([open, id], [prevOpen, prevId] = [false, null]) => {
+  if (!open) { if (prevOpen) resetDrawerState(); return }
+  if (!prevOpen) window.addEventListener('keydown', handleKeyDown)
+  if (!id) { invalidateRequests(); userData.value = null; return }
+  if (!prevOpen || id !== prevId) {
+    if (id !== prevId) { closeModals(); userData.value = null }
     fetchUserDetail()
-  } else {
-    window.removeEventListener('keydown', handleKeyDown)
-    showSuspendModal.value = false
-    showRevokeModal.value = false
-    notice.value = null
-    fetchError.value = ''
-    userData.value = null
   }
 })
 
-watch(() => props.userId, (newId) => {
-  if (props.isOpen && newId) fetchUserDetail()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown)
-})
+onUnmounted(() => window.removeEventListener('keydown', handleKeyDown))
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="isOpen" class="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="drawer-headline">
-      <div class="fixed inset-0 bg-[#111111]/45 backdrop-blur-xs transition-opacity cursor-pointer" aria-hidden="true" @click="handleBackdropClick" />
-      <aside class="fixed inset-y-0 right-0 w-full max-w-xl bg-[#fcfcfb] border-l-2 border-[#111111] shadow-[-6px_0_0_rgba(17,17,17,0.12)] z-50 overflow-y-auto flex flex-col font-sans selection:bg-[#ff82c2] selection:text-[#111111]">
+      <div class="fixed inset-0 bg-[#111111]/45 backdrop-blur-xs transition-opacity cursor-pointer" aria-hidden="true" @click="requestClose" />
+      <aside ref="drawerRef" tabindex="-1" class="fixed inset-y-0 right-0 w-full max-w-xl bg-[#fcfcfb] border-l-2 border-[#111111] shadow-[-6px_0_0_rgba(17,17,17,0.12)] z-50 overflow-y-auto flex flex-col font-sans selection:bg-[#ff82c2] selection:text-[#111111] focus:outline-none">
         <header class="sticky top-0 z-10 bg-[#f5f3eb] border-b-2 border-[#111111] px-6 py-4 flex items-center justify-between gap-3">
           <h2 id="drawer-headline" class="font-editorial font-bold text-lg tracking-tight text-[#111111]">Kelola Pengguna</h2>
-          <button type="button" title="Tutup (Esc)" aria-label="Tutup panel" @click="emit('close')" class="btn-keycap btn-keycap-mini btn-keycap-white w-8 h-8 shrink-0">
+          <button type="button" title="Tutup (Esc)" aria-label="Tutup panel" :disabled="isMutating" @click="requestClose" class="btn-keycap btn-keycap-mini btn-keycap-white w-8 h-8 shrink-0">
             <X class="w-4 h-4 text-[#111111]" :stroke-width="2.2" />
           </button>
         </header>
@@ -182,16 +132,16 @@ onUnmounted(() => {
             <AdminUserOverviewCard :user="userData" />
             <AdminTokenAdjustmentForm ref="adjustmentFormRef" :balance="userData.wallet?.balance ?? 0" :loading="tokenLoading" @submit="adjustTokens" />
             <AdminUserLedgerSection :transactions="userData.transactions || []" />
-            <AdminAccountSecurityCard :status="userData.status" :status-reason="userData.statusReason || ''" :is-self="isSelf" :status-loading="statusLoading" :revoke-loading="revokeLoading" @request-suspend="openSuspendModal" @reactivate="reactivateAccount" @request-revoke="showRevokeModal = true" />
+            <AdminAccountSecurityCard :status="userData.status" :status-reason="userData.statusReason || ''" :is-self="isSelf" :status-loading="statusLoading" :revoke-loading="revokeLoading" @request-suspend="setSuspendModal(true)" @reactivate="reactivateAccount" @request-revoke="setRevokeModal(true)" />
           </template>
         </div>
 
         <footer class="sticky bottom-0 z-10 bg-[#f5f3eb] border-t-2 border-[#111111] px-6 py-3 flex items-center justify-end">
-          <button type="button" @click="emit('close')" class="btn-keycap btn-keycap-mini btn-keycap-white px-4 py-1.5 text-xs">Tutup</button>
+          <button type="button" :disabled="isMutating" @click="requestClose" class="btn-keycap btn-keycap-mini btn-keycap-white px-4 py-1.5 text-xs">Tutup</button>
         </footer>
       </aside>
     </div>
   </Teleport>
 
-  <AdminSecurityConfirmModals v-model:show-suspend="showSuspendModal" v-model:show-revoke="showRevokeModal" v-model:suspend-reason="suspendReason" :user-name="userData?.name || ''" :status-loading="statusLoading" :revoke-loading="revokeLoading" @confirm-suspend="confirmSuspend" @confirm-revoke="confirmRevokeSessions" />
+  <AdminSecurityConfirmModals :show-suspend="showSuspendModal" :show-revoke="showRevokeModal" v-model:suspend-reason="suspendReason" :user-name="userData?.name || ''" :status-loading="statusLoading" :revoke-loading="revokeLoading" :modal-error="modalError" @update:show-suspend="setSuspendModal" @update:show-revoke="setRevokeModal" @confirm-suspend="handleConfirmSuspend" @confirm-revoke="confirmRevokeSessions" />
 </template>

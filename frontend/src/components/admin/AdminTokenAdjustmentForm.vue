@@ -134,7 +134,7 @@ defineExpose({ resetForm })
         <span>Saldo saat ini tidak mencukupi untuk pemotongan sebesar {{ formatNumberId(parsedAmount) }} Token.</span>
       </div>
 
-      <button type="submit" :disabled="!canSubmit" class="btn-keycap btn-keycap-sm btn-keycap-yellow w-full py-2.5 px-4 text-xs">
+      <button type="submit" :disabled="!canSubmit" class="btn-keycap btn-keycap-sm btn-keycap-blue w-full py-2.5 px-4 text-xs">
         <RotateCw v-if="loading" class="w-3.5 h-3.5 animate-spin text-[#111111]" :stroke-width="2.2" />
         <span>Terapkan Penyesuaian Token</span>
       </button>

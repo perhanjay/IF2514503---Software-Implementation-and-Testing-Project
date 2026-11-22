@@ -130,3 +130,29 @@ export function getRoleBadgeMeta(role) {
 export function getStatusBadgeMeta(status) {
   return resolveBadgeMeta(STATUS_META_MAP, status)
 }
+
+/**
+ * Determine whether a token transaction represents a debit/outflow.
+ */
+export function isTxDebit(tx) {
+  return Boolean(tx && (tx.type === 'DEDUCTION' || Number(tx.amount || 0) < 0))
+}
+
+/**
+ * Return high-contrast text color class for a transaction amount (neutral slate for 0).
+ */
+export function getTxAmountClass(tx) {
+  const raw = Number(tx?.amount || 0)
+  if (!Number.isFinite(raw) || raw === 0) return 'text-[#60605e]'
+  return isTxDebit(tx) ? 'text-[#be123c]' : 'text-[#15803d]'
+}
+
+/**
+ * Format a transaction amount with sign ('+'/'-') or '0' without sign when zero.
+ */
+export function formatTxSignedAmount(tx) {
+  const raw = Number(tx?.amount || 0)
+  if (!Number.isFinite(raw) || raw === 0) return '0'
+  const sign = isTxDebit(tx) ? '-' : (getAdminTxMeta(tx?.type).amountPrefix || '+')
+  return `${sign}${formatNumberId(Math.abs(raw))}`
+}

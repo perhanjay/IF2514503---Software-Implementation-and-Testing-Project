@@ -27,6 +27,7 @@ const selectedUserId = ref(null)
 const isDrawerOpen = ref(false)
 let searchTimeout = null
 let skipNextSearchWatch = false
+let fetchRequestId = 0
 
 const kpiCards = computed(() => [
   { key: 'circulation', label: 'Total Beredar', value: metrics.value.totalInCirculation, icon: Coins, iconBg: 'bg-[#87d7ff]' },
@@ -36,6 +37,7 @@ const kpiCards = computed(() => [
 ])
 
 async function fetchTransactions() {
+  const reqId = ++fetchRequestId
   loading.value = true
   error.value = ''
   try {
@@ -43,14 +45,16 @@ async function fetchTransactions() {
     if (searchQuery.value.trim()) params.q = searchQuery.value.trim()
     if (selectedType.value !== 'ALL') params.type = selectedType.value
     const res = await axios.get('/api/v1/admin/transactions', { params })
+    if (reqId !== fetchRequestId) return
     transactions.value = res.data.transactions || []
     pagination.value = res.data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 }
     metrics.value = res.data.metrics || { totalInCirculation: 0, totalPurchased: 0, totalBurned: 0, totalGrants: 0 }
   } catch (err) {
+    if (reqId !== fetchRequestId) return
     console.error('Failed to fetch admin transactions:', err)
     error.value = err.response?.data?.error || 'Gagal memuat rekam jejak transaksi token'
   } finally {
-    loading.value = false
+    if (reqId === fetchRequestId) loading.value = false
   }
 }
 
@@ -62,6 +66,7 @@ watch(searchQuery, () => {
 
 function selectType(typeId) {
   if (selectedType.value === typeId) return
+  clearTimeout(searchTimeout)
   selectedType.value = typeId
   currentPage.value = 1
   fetchTransactions()
@@ -176,13 +181,14 @@ onBeforeUnmount(() => clearTimeout(searchTimeout))
             :aria-pressed="selectedType === opt.id"
             @click="selectType(opt.id)"
             :class="selectedType === opt.id ? 'bg-[#111111] text-white' : 'bg-white text-[#111111] hover:bg-[#f5f3eb]'"
-            class="h-10 px-3.5 rounded-full border-[1.5px] border-[#111111] shadow-[1.5px_2px_0_#111111] text-xs font-bold transition-colors cursor-pointer"
+            class="h-10 px-3.5 rounded-full border-[1.5px] border-[#111111] shadow-[1.5px_2px_0_#111111] text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[#111111] focus-visible:outline-offset-2"
           >{{ opt.label }}</button>
         </div>
       </div>
 
       <AdminTransactionsDirectory
         :transactions="transactions" :loading="loading" :error="error" :pagination="pagination" :current-page="currentPage"
+        :has-active-filters="Boolean(searchQuery || selectedType !== 'ALL')"
         @open-user="openUserDrawer" @page-change="goToPage" @retry="fetchTransactions" @clear-filters="clearFilters"
       />
     </main>

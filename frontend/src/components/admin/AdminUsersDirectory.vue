@@ -7,7 +7,8 @@ defineProps({
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   pagination: { type: Object, default: () => ({ page: 1, limit: 20, total: 0, totalPages: 1 }) },
-  currentPage: { type: Number, default: 1 }
+  currentPage: { type: Number, default: 1 },
+  hasActiveFilters: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['manage-user', 'page-change', 'retry', 'clear-filters'])
@@ -36,7 +37,7 @@ const PILL_CLS = 'inline-flex items-center gap-1 rounded-full border-[1.5px] bor
         <SearchX class="w-5 h-5 text-[#111111]" :stroke-width="2.2" />
       </div>
       <p class="text-sm font-bold text-[#111111]">Tidak ada pengguna ditemukan</p>
-      <button type="button" @click="emit('clear-filters')" class="btn-keycap btn-keycap-sm btn-keycap-yellow px-4 py-2 text-xs">
+      <button v-if="hasActiveFilters" type="button" @click="emit('clear-filters')" class="btn-keycap btn-keycap-sm btn-keycap-yellow px-4 py-2 text-xs">
         <span>Reset Filter</span>
       </button>
     </div>
@@ -126,7 +127,7 @@ const PILL_CLS = 'inline-flex items-center gap-1 rounded-full border-[1.5px] bor
         </div>
         <div class="flex items-center gap-3">
           <span class="font-medium text-[#60605e] tabular-nums">
-            Halaman <strong class="text-[#111111]">{{ pagination.page }}</strong> dari <strong class="text-[#111111]">{{ pagination.totalPages }}</strong>
+            Halaman <strong class="text-[#111111]">{{ formatNumberId(pagination.page || 1) }}</strong> dari <strong class="text-[#111111]">{{ formatNumberId(pagination.totalPages || 1) }}</strong>
           </span>
           <div class="flex items-center gap-2">
             <button type="button" @click="emit('page-change', currentPage - 1)" :disabled="currentPage <= 1 || loading" class="btn-keycap btn-keycap-mini btn-keycap-white px-3 py-1.5 text-xs">

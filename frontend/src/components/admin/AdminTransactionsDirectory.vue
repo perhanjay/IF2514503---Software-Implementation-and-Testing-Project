@@ -1,13 +1,14 @@
 <script setup>
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, Coins, Gift, RotateCcw, RotateCw, SearchX } from 'lucide-vue-next'
-import { formatDateTimeId, formatNumberId, getAdminTxMeta } from '../../utils/adminFormatters'
+import { formatDateTimeId, formatNumberId, formatTxSignedAmount, getAdminTxMeta, getTxAmountClass } from '../../utils/adminFormatters'
 
 defineProps({
   transactions: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   error: { type: String, default: '' },
   pagination: { type: Object, default: () => ({ page: 1, limit: 20, total: 0, totalPages: 1 }) },
-  currentPage: { type: Number, default: 1 }
+  currentPage: { type: Number, default: 1 },
+  hasActiveFilters: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['open-user', 'page-change', 'retry', 'clear-filters'])
@@ -17,22 +18,6 @@ const TX_ICON_MAP = { TOPUP: ArrowDownLeft, DEDUCTION: ArrowUpRight, WELCOME_GRA
 
 function resolveTxIcon(type) {
   return (type && Object.hasOwn(TX_ICON_MAP, type)) ? TX_ICON_MAP[type] : Coins
-}
-
-function isDebit(tx) {
-  return tx?.type === 'DEDUCTION' || Number(tx?.amount || 0) < 0
-}
-
-function amountColorClass(tx) {
-  const raw = Number(tx?.amount || 0)
-  if (raw === 0) return 'text-[#60605e]'
-  return isDebit(tx) ? 'text-[#be123c]' : 'text-[#15803d]'
-}
-
-function formatAmount(tx) {
-  const raw = Number(tx?.amount || 0)
-  if (raw === 0) return '0'
-  return `${isDebit(tx) ? '-' : '+'}${formatNumberId(Math.abs(raw))}`
 }
 </script>
 
@@ -58,7 +43,7 @@ function formatAmount(tx) {
         <SearchX class="w-5 h-5 text-[#111111]" :stroke-width="2.2" />
       </div>
       <p class="text-sm font-bold text-[#111111]">Tidak ada transaksi ditemukan</p>
-      <button type="button" @click="emit('clear-filters')" class="btn-keycap btn-keycap-sm btn-keycap-yellow px-4 py-2 text-xs">
+      <button v-if="hasActiveFilters" type="button" @click="emit('clear-filters')" class="btn-keycap btn-keycap-sm btn-keycap-yellow px-4 py-2 text-xs">
         <span>Reset Filter</span>
       </button>
     </div>
@@ -101,7 +86,7 @@ function formatAmount(tx) {
                 </span>
               </td>
               <td class="py-3.5 px-4 whitespace-nowrap">
-                <span :class="amountColorClass(tx)" class="font-bold text-sm tabular-nums">{{ formatAmount(tx) }}</span>
+                <span :class="getTxAmountClass(tx)" class="font-bold text-sm tabular-nums">{{ formatTxSignedAmount(tx) }}</span>
                 <span class="text-xs font-medium text-[#60605e] ml-1">Token</span>
               </td>
               <td class="py-3.5 px-4 text-xs font-medium text-[#111111] max-w-xs break-words">
@@ -140,14 +125,14 @@ function formatAmount(tx) {
               v-if="tx.user"
               type="button"
               @click="emit('open-user', tx.user.id)"
-              class="min-w-0 text-left group cursor-pointer focus:outline-none"
+              class="min-w-0 text-left group cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20afff] rounded-[8px]"
             >
               <div class="font-bold text-sm text-[#111111] group-hover:underline truncate">{{ tx.user.name }}</div>
               <div class="text-xs font-medium text-[#60605e] truncate">{{ tx.user.email }}</div>
             </button>
             <span v-else class="text-xs italic font-medium text-[#60605e]">Pengguna Tidak Tersedia</span>
             <div class="text-right shrink-0 whitespace-nowrap">
-              <span :class="amountColorClass(tx)" class="font-bold text-sm tabular-nums">{{ formatAmount(tx) }}</span>
+              <span :class="getTxAmountClass(tx)" class="font-bold text-sm tabular-nums">{{ formatTxSignedAmount(tx) }}</span>
               <span class="text-xs font-medium text-[#60605e] ml-1">Token</span>
             </div>
           </div>
@@ -189,7 +174,7 @@ function formatAmount(tx) {
         </div>
         <div class="flex items-center gap-3">
           <span class="font-medium text-[#60605e] tabular-nums">
-            Halaman <strong class="text-[#111111]">{{ pagination.page }}</strong> dari <strong class="text-[#111111]">{{ pagination.totalPages || 1 }}</strong>
+            Halaman <strong class="text-[#111111]">{{ formatNumberId(pagination.page || 1) }}</strong> dari <strong class="text-[#111111]">{{ formatNumberId(pagination.totalPages || 1) }}</strong>
           </span>
           <div class="flex items-center gap-2">
             <button type="button" @click="emit('page-change', currentPage - 1)" :disabled="currentPage <= 1 || loading" class="btn-keycap btn-keycap-mini btn-keycap-white px-3 py-1.5 text-xs">

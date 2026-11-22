@@ -1,7 +1,12 @@
 <script setup>
 import { computed } from 'vue'
 import { History, ArrowDownLeft, ArrowUpRight, Gift, RotateCcw, Coins } from 'lucide-vue-next'
-import { getAdminTxMeta, formatDateTimeId, formatNumberId } from '../../utils/adminFormatters'
+import {
+  getAdminTxMeta,
+  formatDateTimeId,
+  getTxAmountClass,
+  formatTxSignedAmount
+} from '../../utils/adminFormatters'
 
 const props = defineProps({
   transactions: { type: Array, default: () => [] }
@@ -20,17 +25,6 @@ const visibleTransactions = computed(() => {
 
 function resolveTxIcon(type) {
   return (type && Object.hasOwn(TX_ICON_MAP, type)) ? TX_ICON_MAP[type] : Coins
-}
-
-function isDebit(tx) {
-  return tx?.type === 'DEDUCTION' || Number(tx?.amount || 0) < 0
-}
-
-function formatSignedAmount(tx) {
-  const meta = getAdminTxMeta(tx?.type)
-  const raw = Number(tx?.amount || 0)
-  const sign = isDebit(tx) ? '-' : (meta.amountPrefix || '+')
-  return `${sign}${formatNumberId(Math.abs(raw))} Token`
 }
 </script>
 
@@ -75,14 +69,15 @@ function formatSignedAmount(tx) {
 
             <span
               v-if="tx.referenceId"
+              :title="tx.referenceId"
               class="rounded-md border border-[#111111]/20 bg-[#eaeef4] px-1.5 py-0.5 text-[10px] font-semibold text-[#111111] tabular-nums truncate max-w-[140px]"
             >
               {{ tx.referenceId }}
             </span>
           </div>
 
-          <span :class="isDebit(tx) ? 'text-[#be123c]' : 'text-[#15803d]'" class="text-xs font-bold tabular-nums shrink-0">
-            {{ formatSignedAmount(tx) }}
+          <span :class="getTxAmountClass(tx)" class="text-xs font-bold tabular-nums shrink-0">
+            {{ formatTxSignedAmount(tx) }} Token
           </span>
         </div>
 
