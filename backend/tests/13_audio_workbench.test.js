@@ -213,6 +213,14 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         .set('Authorization', `Bearer ${tokenA}`)
         .attach('audio', Buffer.from('not-a-real-wav-payload'), 'corrupt.wav');
       assert.equal(resCorruptTrim.status, 400);
+
+      const oversizedBuf = Buffer.alloc(100 * 1024 * 1024 + 1);
+      const resOversized = await request(app)
+        .post('/api/v1/workbench/separate')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .attach('audio', oversizedBuf, 'oversized.wav');
+      assert.equal(resOversized.status, 400);
+      assert.match(resOversized.body.error, /100 MB/i);
     });
   });
 
@@ -262,6 +270,25 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
 
       assert.equal(res.status, 400);
       assert.match(res.body.error, /hening/i);
+    });
+
+    it('rejects invalid manual trim bounds (manualStartSec >= manualEndSec) with 400', async () => {
+      const wav = makeWavBuffer({
+        sampleRate: 48000,
+        durationSec: 1.2,
+        freq: 440,
+        amp: 0.5
+      });
+
+      const res = await request(app)
+        .post('/api/v1/workbench/trim')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('manualStartSec', '0.9')
+        .field('manualEndSec', '0.4')
+        .attach('audio', wav, 'invalid_bounds.wav');
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.error, /tidak valid/i);
     });
   });
 
@@ -350,6 +377,43 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         .set('Authorization', `Bearer ${tokenB}`)
         .send({ title: 'Stolen Session' });
       assert.equal(resSend.status, 403);
+    });
+
+    it('trims a single job stem without altering job.stems in Redis when syncAllStems is false', async () => {
+      const beforeRes = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(beforeRes.status, 200);
+      const beforeStems = beforeRes.body.stems;
+
+      const resTrim = await request(app)
+        .post('/api/v1/workbench/trim')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          jobId: job1Id,
+          stemName: 'vocals',
+          syncAllStems: false,
+          thresholdDb: -40,
+          padMs: 50,
+          fadeMs: 15
+        });
+
+      assert.equal(resTrim.status, 200);
+      assert.ok(resTrim.body.storageKey.startsWith('workbench/'));
+      assert.ok(resTrim.body.audioUrl);
+      assert.match(resTrim.body.audioUrl, /X-Amz-Signature=/);
+      assert.ok(resTrim.body.trimmedDurationSec < resTrim.body.originalDurationSec);
+      assert.equal(resTrim.body.updatedJobStems, undefined);
+
+      const afterRes = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(afterRes.status, 200);
+      for (let i = 0; i < beforeStems.length; i++) {
+        assert.equal(afterRes.body.stems[i].storageKey, beforeStems[i].storageKey);
+        assert.equal(afterRes.body.stems[i].durationSec, beforeStems[i].durationSec);
+        assert.equal(afterRes.body.stems[i].isTrimmed, false);
+      }
     });
 
     it('performs synced 4-stem trim and updates all 4 stems in Redis with equal durationSec', async () => {

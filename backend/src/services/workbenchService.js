@@ -236,7 +236,8 @@ export class WorkbenchService {
     await ensureBucketExists();
 
     const jobId = crypto.randomUUID();
-    const safeName = sanitizeFileName(file.originalname);
+    const originalFileName = file.originalname;
+    const safeName = sanitizeFileName(originalFileName);
     const sourceStorageKey = `workbench/${userId}/${jobId}/source/${safeName}`;
 
     await s3Client.send(
@@ -251,7 +252,7 @@ export class WorkbenchService {
     const initialJob = {
       jobId,
       userId,
-      fileName: file.originalname,
+      fileName: originalFileName,
       sourceStorageKey,
       status: 'QUEUED',
       progress: 0,
@@ -276,7 +277,7 @@ export class WorkbenchService {
           {
             jobId,
             userId,
-            fileName: file.originalname,
+            fileName: originalFileName,
             sourceStorageKey,
             redisKey
           },
@@ -313,7 +314,7 @@ export class WorkbenchService {
     return {
       jobId,
       status: 'QUEUED',
-      fileName: file.originalname
+      fileName: originalFileName
     };
   }
 
