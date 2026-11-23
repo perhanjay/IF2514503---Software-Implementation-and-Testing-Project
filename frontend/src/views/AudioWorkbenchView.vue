@@ -4,7 +4,7 @@ import axios from 'axios'
 import { AlertTriangle, ArrowRight, X } from 'lucide-vue-next'
 import AppNavbar from '../components/AppNavbar.vue'
 import StemSeparatorTab from '../components/workbench/StemSeparatorTab.vue'
-import SilenceTrimmerTab from '../components/workbench/SilenceTrimmerTab.vue'
+import AssetSplitterTab from '../components/workbench/AssetSplitterTab.vue'
 import { useAuthStore } from '../stores/auth'
 import { useWorkbenchStore } from '../stores/workbench'
 
@@ -12,7 +12,7 @@ const authStore = useAuthStore()
 const workbenchStore = useWorkbenchStore()
 
 const separatorTabRef = ref(null)
-const trimmerTabRef = ref(null)
+const splitterTabRef = ref(null)
 const errorBannerRef = ref(null)
 
 watch(
@@ -33,9 +33,9 @@ const folderTabs = [
     glassBg: 'rgba(32, 175, 255, 0.86)'
   },
   {
-    id: 'trimmer',
+    id: 'splitter',
     num: '02',
-    label: 'Smart Silence Trimmer',
+    label: 'Asset Splitter',
     glassBg: 'rgba(255, 218, 64, 0.90)'
   }
 ]
@@ -47,7 +47,7 @@ const activeTabMeta = computed(() => {
 function selectTab(tabId) {
   if (tabId === workbenchStore.activeTab) return
   separatorTabRef.value?.stopPlayback?.()
-  trimmerTabRef.value?.stopPlayback?.()
+  splitterTabRef.value?.stopPlayback?.()
   workbenchStore.setActiveTab(tabId)
 }
 
@@ -93,7 +93,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   separatorTabRef.value?.stopPlayback?.()
-  trimmerTabRef.value?.stopPlayback?.()
+  splitterTabRef.value?.stopPlayback?.()
   workbenchStore.stopPolling()
 })
 </script>
@@ -151,7 +151,7 @@ onUnmounted(() => {
         <div aria-hidden="true" class="hidden sm:block mx-6 h-2.5 rounded-t-[10px] bg-[#ff82c2]/50 backdrop-blur-sm border-t border-x border-white/60"></div>
         <div aria-hidden="true" class="hidden sm:block mx-8 h-1 bg-white/85 backdrop-blur-xs"></div>
 
-        <!-- Folder Tab Pills (01 AI Stem Separator · 02 Smart Silence Trimmer) -->
+        <!-- Folder Tab Pills (01 AI Stem Separator · 02 Asset Splitter) -->
         <div
           role="tablist"
           aria-label="Alat Audio Workbench"
@@ -214,9 +214,9 @@ onUnmounted(() => {
               v-show="workbenchStore.activeTab === 'separator'"
               ref="separatorTabRef"
             />
-            <SilenceTrimmerTab
-              v-show="workbenchStore.activeTab === 'trimmer'"
-              ref="trimmerTabRef"
+            <AssetSplitterTab
+              v-show="workbenchStore.activeTab === 'splitter'"
+              ref="splitterTabRef"
             />
           </div>
         </div>

@@ -400,7 +400,7 @@ watch(
   () => [
     workbenchStore.job?.jobId,
     workbenchStore.job?.status,
-    (workbenchStore.job?.stems || []).map((s) => `${s.name}:${s.storageKey}:${s.isTrimmed}`).join('|')
+    (workbenchStore.job?.stems || []).map((s) => `${s.name}:${s.storageKey}`).join('|')
   ],
   ([jobId, status]) => {
     if (jobId && status === 'COMPLETED' && stems.value.length > 0) {
@@ -422,9 +422,9 @@ watch(
   }
 )
 
-function handleOpenInTrimmer(stem) {
+function handleOpenInSplitter(stem) {
   stopPlayback(false)
-  workbenchStore.openStemInTrimmer(stem)
+  workbenchStore.openStemInSplitter(stem)
 }
 
 async function handleDownloadSingleStem(stem) {
@@ -686,12 +686,6 @@ defineExpose({
                 <h3 class="font-editorial font-bold text-base sm:text-lg text-[#111111]">
                   {{ STEM_DISPLAY_NAMES[stem.name] || stem.name }}
                 </h3>
-                <span
-                  v-if="stem.isTrimmed"
-                  class="px-2.5 py-0.5 rounded-full bg-[#5ad363] text-[#111111] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] text-[10px] font-bold leading-tight"
-                >
-                  Tersinkron (Trimmed)
-                </span>
               </div>
               <p class="text-xs text-[#60605e] truncate">
                 {{ stem.label || STEM_DISPLAY_NAMES[stem.name] || stem.name }}
@@ -731,11 +725,11 @@ defineExpose({
             <div class="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                @click="handleOpenInTrimmer(stem)"
+                @click="handleOpenInSplitter(stem)"
                 class="btn-keycap btn-keycap-mini btn-keycap-white px-3 py-1.5 text-xs"
               >
                 <Scissors class="w-3.5 h-3.5" :stroke-width="2" />
-                <span>Buka di Trimmer</span>
+                <span>Pecah di Splitter</span>
               </button>
 
               <button
