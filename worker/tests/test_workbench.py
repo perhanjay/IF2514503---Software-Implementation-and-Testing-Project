@@ -274,3 +274,30 @@ def test_decode_audio_bytes_ffmpeg_mp3_fallback():
     assert decoded.ndim == 2 and decoded.shape[1] == 2
     assert decoded.dtype == np.float32
     assert decoded.shape[0] > 20000
+
+
+def test_decode_with_ffmpeg_timeout_raises_value_error_and_cleans_temp_files():
+    import subprocess
+    import tempfile
+    from workbench import silence_trimmer as st_mod
+
+    created_paths = []
+    real_ntf = tempfile.NamedTemporaryFile
+
+    def tracking_ntf(*args, **kwargs):
+        tmp = real_ntf(*args, **kwargs)
+        created_paths.append(tmp.name)
+        return tmp
+
+    def fake_run(cmd, **kwargs):
+        assert kwargs.get("timeout") == 60
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=60)
+
+    with patch.object(st_mod.tempfile, "NamedTemporaryFile", side_effect=tracking_ntf), \
+         patch.object(st_mod.subprocess, "run", side_effect=fake_run):
+        with pytest.raises(ValueError, match="rusak|tidak didukung"):
+            st_mod._decode_with_ffmpeg(b"corrupt-mp3-bytes", "hung.mp3")
+
+    assert len(created_paths) == 2
+    for path in created_paths:
+        assert not os.path.exists(path)

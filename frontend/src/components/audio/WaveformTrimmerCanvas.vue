@@ -428,14 +428,22 @@ function hitTestHandle(x, y) {
   const distStart = Math.abs(x - startX)
   const distEnd = Math.abs(x - endX)
 
-  if (hitStartTab && hitEndTab) {
+  const pickTie = () => {
+    if (Math.abs(startX - endX) < 0.5) {
+      if (x !== startX) return x > startX ? 'end' : 'start'
+      return startX < width * 0.5 ? 'end' : 'start'
+    }
     return distStart <= distEnd ? 'start' : 'end'
+  }
+
+  if (hitStartTab && hitEndTab) {
+    return pickTie()
   }
   if (hitStartTab) return 'start'
   if (hitEndTab) return 'end'
 
   if (distStart <= lineRadius && distEnd <= lineRadius) {
-    return distStart <= distEnd ? 'start' : 'end'
+    return pickTie()
   }
   if (distStart <= lineRadius) return 'start'
   if (distEnd <= lineRadius) return 'end'
@@ -513,8 +521,14 @@ function updateCanvasSize() {
 }
 
 watch(
+  () => [props.peaks, props.peaks?.length],
+  () => {
+    scheduleRender()
+  }
+)
+
+watch(
   () => [
-    props.peaks,
     props.durationSec,
     props.thresholdDb,
     props.padMs,
@@ -526,8 +540,7 @@ watch(
   ],
   () => {
     scheduleRender()
-  },
-  { deep: true }
+  }
 )
 
 onMounted(() => {

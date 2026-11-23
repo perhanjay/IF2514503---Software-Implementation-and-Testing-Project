@@ -508,7 +508,7 @@ defineExpose({
         @dragleave.prevent="isDragging = false"
         @drop.prevent="handleDrop"
         :class="isDragging ? 'border-[#20afff] bg-[#20afff]/12' : 'border-[#111111]/30 bg-white/80 hover:border-[#111111]/55'"
-        class="relative border-2 border-dashed rounded-[16px] p-6 sm:p-8 text-center transition-colors cursor-pointer"
+        class="relative border-2 border-dashed rounded-[16px] p-6 sm:p-8 text-center transition-colors cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#111111] has-[:focus-visible]:outline-offset-2"
       >
         <input
           ref="fileInputRef"

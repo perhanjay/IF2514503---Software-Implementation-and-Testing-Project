@@ -636,7 +636,7 @@ defineExpose({
             </div>
           </div>
 
-          <label class="btn-keycap btn-keycap-sm btn-keycap-white px-3.5 py-2 text-xs shrink-0">
+          <label class="btn-keycap btn-keycap-sm btn-keycap-white px-3.5 py-2 text-xs shrink-0 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#111111] has-[:focus-visible]:outline-offset-2">
             <Upload class="w-3.5 h-3.5" :stroke-width="2" />
             <span>Ganti Berkas Lokal</span>
             <input
@@ -648,7 +648,7 @@ defineExpose({
           </label>
         </div>
 
-        <label v-else class="flex flex-col items-center justify-center text-center py-5 cursor-pointer">
+        <label v-else class="flex flex-col items-center justify-center text-center py-5 cursor-pointer rounded-[10px] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#111111] has-[:focus-visible]:outline-offset-2">
           <input
             type="file"
             accept=".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg"
@@ -857,11 +857,11 @@ defineExpose({
             <input
               v-model="syncAllStems"
               type="checkbox"
-              class="sr-only"
+              class="sr-only peer"
             />
             <span
               :class="syncAllStems ? 'bg-[#5ad363] text-[#111111]' : 'bg-white text-transparent'"
-              class="w-5 h-5 rounded-[6px] border-2 border-[#111111] shadow-[1.5px_2px_0_#111111] flex items-center justify-center shrink-0 transition-colors"
+              class="w-5 h-5 rounded-[6px] border-2 border-[#111111] shadow-[1.5px_2px_0_#111111] flex items-center justify-center shrink-0 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#111111] peer-focus-visible:ring-offset-2"
             >
               <Check class="w-3.5 h-3.5" :stroke-width="3" />
             </span>

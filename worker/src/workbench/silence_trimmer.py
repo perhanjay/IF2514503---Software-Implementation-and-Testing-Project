@@ -67,12 +67,15 @@ def _decode_with_ffmpeg(raw_bytes: bytes, file_name: str) -> tuple[np.ndarray, i
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
+            timeout=60,
         )
         if proc.returncode != 0:
             raise ValueError(_CORRUPT_AUDIO_MSG)
 
         audio, sr = sf.read(out_path, dtype="float32", always_2d=True)
         return audio, int(sr)
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(_CORRUPT_AUDIO_MSG) from exc
     except FileNotFoundError as exc:
         raise ValueError(_CORRUPT_AUDIO_MSG) from exc
     except ValueError:

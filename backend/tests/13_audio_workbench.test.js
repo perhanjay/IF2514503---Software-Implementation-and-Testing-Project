@@ -133,6 +133,11 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       }
     }
     await cleanupTestData();
+    if (redis.status === 'ready' || redis.status === 'connecting') {
+      await redis.quit();
+    }
+    await prisma.$disconnect();
+    s3Client.destroy();
   });
 
   describe('1. Auth & Role Guards', () => {
@@ -350,6 +355,8 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       for (const stem of job1.stems) {
         assert.ok(stem.storageKey.startsWith('workbench/'));
         assert.match(stem.audioUrl, /X-Amz-Signature=/);
+        assert.equal(stem.originalAudioUrl, stem.audioUrl);
+        assert.equal(stem.originalDurationSec, stem.durationSec);
         assert.equal(stem.isTrimmed, false);
         assert.ok(stem.durationSec > 1.0);
       }
@@ -434,6 +441,14 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       assert.ok(resTrim.body.trimmedDurationSec < resTrim.body.originalDurationSec);
       assert.ok(Array.isArray(resTrim.body.updatedJobStems));
       assert.equal(resTrim.body.updatedJobStems.length, 4);
+      for (const stem of resTrim.body.updatedJobStems) {
+        assert.equal(stem.isTrimmed, true);
+        assert.ok(stem.originalAudioUrl);
+        assert.match(stem.originalAudioUrl, /X-Amz-Signature=/);
+        assert.notEqual(stem.originalAudioUrl, stem.audioUrl);
+        assert.ok(Math.abs(stem.originalDurationSec - resTrim.body.originalDurationSec) < 0.001);
+        assert.ok(stem.originalDurationSec > stem.durationSec);
+      }
 
       const resJob = await request(app)
         .get(`/api/v1/workbench/jobs/${job1Id}`)
@@ -446,6 +461,11 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       for (const stem of resJob.body.stems) {
         assert.equal(stem.isTrimmed, true);
         assert.ok(stem.audioUrl);
+        assert.ok(stem.originalAudioUrl);
+        assert.match(stem.originalAudioUrl, /X-Amz-Signature=/);
+        assert.notEqual(stem.originalAudioUrl, stem.audioUrl);
+        assert.ok(Math.abs(stem.originalDurationSec - resTrim.body.originalDurationSec) < 0.001);
+        assert.ok(stem.originalDurationSec > stem.durationSec);
       }
     });
 

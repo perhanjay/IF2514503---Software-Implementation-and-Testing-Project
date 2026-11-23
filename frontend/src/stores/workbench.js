@@ -7,6 +7,7 @@ const MAX_CONSECUTIVE_POLL_ERRORS = 5;
 let pollTimer = null;
 let isPollingRequest = false;
 let consecutivePollErrors = 0;
+let activePollToken = 0;
 
 function createEmptyTrimmerSource() {
   return {
@@ -77,6 +78,7 @@ export const useWorkbenchStore = defineStore('workbench', {
     },
 
     stopPolling() {
+      activePollToken += 1;
       if (pollTimer !== null) {
         clearInterval(pollTimer);
         pollTimer = null;
@@ -127,16 +129,15 @@ export const useWorkbenchStore = defineStore('workbench', {
 
     async fetchJobStatus(jobId) {
       if (!jobId || isPollingRequest) return null;
+      const token = activePollToken;
       isPollingRequest = true;
 
       try {
         const res = await axios.get(`/api/v1/workbench/jobs/${jobId}`);
-        consecutivePollErrors = 0;
-
-        // Ignore stale response if a different job was started
-        if (this.job && this.job.jobId !== jobId) {
+        if (token !== activePollToken || !this.job || this.job.jobId !== jobId) {
           return null;
         }
+        consecutivePollErrors = 0;
 
         const data = res.data;
         this.job = {
@@ -158,6 +159,9 @@ export const useWorkbenchStore = defineStore('workbench', {
 
         return this.job;
       } catch (err) {
+        if (token !== activePollToken || !this.job || this.job.jobId !== jobId) {
+          return null;
+        }
         consecutivePollErrors += 1;
         const status = err.response?.status;
         if (status === 401 || status === 403 || status === 404 || consecutivePollErrors >= MAX_CONSECUTIVE_POLL_ERRORS) {
@@ -166,13 +170,16 @@ export const useWorkbenchStore = defineStore('workbench', {
         }
         return null;
       } finally {
-        isPollingRequest = false;
+        if (token === activePollToken) {
+          isPollingRequest = false;
+        }
       }
     },
 
     pollJob(jobId) {
       if (!jobId) return;
       this.stopPolling();
+      activePollToken += 1;
       this.polling = true;
 
       // Trigger immediate check, then poll every 1500ms
@@ -192,8 +199,8 @@ export const useWorkbenchStore = defineStore('workbench', {
         fileName: stem.label ? `${stem.label} (${stem.name}.wav)` : `${stem.name}.wav`,
         jobId: this.job?.jobId || null,
         stemName: stem.name,
-        rawUrl: stem.audioUrl || null,
-        rawDurationSec: Number(stem.durationSec || 0),
+        rawUrl: stem.originalAudioUrl || stem.audioUrl || null,
+        rawDurationSec: Number(stem.originalDurationSec ?? stem.durationSec ?? 0),
         syncAllStems: false,
       };
       this.activeTab = 'trimmer';

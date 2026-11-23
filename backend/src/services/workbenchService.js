@@ -144,14 +144,23 @@ async function signStorageUrl(storageKey) {
 
 async function attachStemUrls(stems = []) {
   return Promise.all(
-    stems.map(async (stem) => ({
-      name: stem.name,
-      label: stem.label,
-      storageKey: stem.storageKey,
-      audioUrl: await signStorageUrl(stem.storageKey),
-      durationSec: stem.durationSec,
-      isTrimmed: Boolean(stem.isTrimmed)
-    }))
+    stems.map(async (stem) => {
+      const audioUrl = await signStorageUrl(stem.storageKey);
+      const originalAudioUrl =
+        stem.isTrimmed && stem.originalStorageKey
+          ? await signStorageUrl(stem.originalStorageKey)
+          : audioUrl;
+      return {
+        name: stem.name,
+        label: stem.label,
+        storageKey: stem.storageKey,
+        audioUrl,
+        originalAudioUrl,
+        durationSec: stem.durationSec,
+        originalDurationSec: stem.originalDurationSec ?? stem.durationSec,
+        isTrimmed: Boolean(stem.isTrimmed)
+      };
+    })
   );
 }
 
@@ -291,6 +300,7 @@ export class WorkbenchService {
           storageKey: stem.storageKey,
           originalStorageKey: stem.storageKey,
           durationSec: stem.durationSec,
+          originalDurationSec: stem.durationSec,
           isTrimmed: false
         }));
 
@@ -445,6 +455,7 @@ export class WorkbenchService {
           return {
             ...existing,
             originalStorageKey: existing.originalStorageKey || existing.storageKey,
+            originalDurationSec: existing.originalDurationSec ?? existing.durationSec ?? result.originalDurationSec,
             storageKey: upd.storageKey,
             durationSec: upd.durationSec,
             isTrimmed: true

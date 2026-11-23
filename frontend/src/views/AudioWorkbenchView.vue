@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { AlertTriangle, ArrowRight, X } from 'lucide-vue-next'
 import AppNavbar from '../components/AppNavbar.vue'
@@ -13,6 +13,17 @@ const workbenchStore = useWorkbenchStore()
 
 const separatorTabRef = ref(null)
 const trimmerTabRef = ref(null)
+const errorBannerRef = ref(null)
+
+watch(
+  () => workbenchStore.error,
+  async (newErr) => {
+    if (newErr) {
+      await nextTick()
+      errorBannerRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
+)
 
 const folderTabs = [
   {
@@ -75,6 +86,9 @@ onMounted(async () => {
       console.warn('Guest initialization failed', err)
     }
   }
+  if (workbenchStore.isJobRunning && workbenchStore.job?.jobId) {
+    workbenchStore.pollJob(workbenchStore.job.jobId)
+  }
 })
 
 onUnmounted(() => {
@@ -117,6 +131,7 @@ onUnmounted(() => {
       <!-- Error Alert Banner -->
       <div
         v-if="workbenchStore.error"
+        ref="errorBannerRef"
         role="alert"
         aria-live="assertive"
         class="rounded-[14px] border-2 border-[#111111] bg-rose-50/95 shadow-[3px_4px_0_#111111] px-4 py-3 flex items-center justify-between gap-3 text-xs font-semibold text-rose-950 animate-fade-in"
