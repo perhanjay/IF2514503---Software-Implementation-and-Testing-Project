@@ -11,10 +11,9 @@ import soundfile as sf
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from workbench.silence_trimmer import (
-    compute_union_trim_bounds,
     decode_audio_bytes,
-    slice_aligned_batch,
-    trim_audio_silence,
+    detect_active_regions,
+    split_audio_by_regions,
 )
 from workbench.stem_separator import STEM_ORDER, separate_audio_stems
 
@@ -31,63 +30,136 @@ def _to_wav_bytes(audio: np.ndarray, sr: int = 48000) -> bytes:
     return buf.getvalue()
 
 
-def test_silence_trimmer_strips_lead_and_tail():
+def test_detect_active_regions_bridges_short_gaps_and_clamps_overlap_padding():
     sr = 48000
+    # Burst 1 (0.5s) + 80ms short gap (< 300ms) + Burst 2 (0.5s) + 600ms long gap + Burst 3 (0.5s)
     audio = np.vstack([
-        np.zeros((3 * sr, 2), dtype=np.float32),
-        _make_sine(440.0, 2.0, sr=sr, amp=0.5),
-        np.zeros((4 * sr, 2), dtype=np.float32),
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.5, sr=sr, amp=0.5),
+        np.zeros((int(0.08 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.5, sr=sr, amp=0.5),
+        np.zeros((int(0.60 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.5, sr=sr, amp=0.5),
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
     ])
-    res = trim_audio_silence(audio, sr, threshold_db=-45.0, pad_ms=100.0, fade_ms=15.0)
-    assert 2.15 <= res["trimmed_duration_sec"] <= 2.30
-    assert 2.85 <= res["lead_in_removed_sec"] <= 3.05
-    assert 3.85 <= res["tail_removed_sec"] <= 4.05
-    assert len(res["peaks"]) == 200
+
+    regions = detect_active_regions(
+        audio,
+        sr,
+        threshold_db=-45.0,
+        min_silence_gap_ms=300.0,
+        min_asset_ms=100.0,
+        pad_ms=50.0,
+    )
+    assert len(regions) == 2
+    assert 1.05 <= regions[0]["duration_sec"] <= 1.25
+    assert 0.55 <= regions[1]["duration_sec"] <= 0.65
+    assert regions[0]["end_sec"] <= regions[1]["start_sec"]
+
+    # Narrow 40ms gap (< 2 * pad_ms=50ms) with min_silence_gap_ms=20ms keeps 2 regions and clamps at midpoint
+    narrow_audio = np.vstack([
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.4, sr=sr, amp=0.5),
+        np.zeros((int(0.04 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.4, sr=sr, amp=0.5),
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+    ])
+    narrow_regions = detect_active_regions(
+        narrow_audio,
+        sr,
+        threshold_db=-45.0,
+        min_silence_gap_ms=20.0,
+        min_asset_ms=100.0,
+        pad_ms=50.0,
+    )
+    assert len(narrow_regions) == 2
+    assert narrow_regions[0]["end_sec"] <= narrow_regions[1]["start_sec"]
+    assert abs(narrow_regions[0]["end_sec"] - 0.62) < 0.015
+    assert abs(narrow_regions[1]["start_sec"] - 0.62) < 0.015
 
 
-def test_silence_trimmer_applies_zero_crossing_fade():
+def test_detect_active_regions_filters_short_noise_and_rejects_full_silence():
     sr = 48000
-    audio = _make_sine(220.0, 1.0, sr=sr, amp=0.8)
-    # Force DC discontinuity at both edges using manual trim without silence pad
-    res = trim_audio_silence(audio, sr, fade_ms=15.0, manual_start_sec=0.1, manual_end_sec=0.9)
-    trimmed = res["trimmed_audio"]
-    assert abs(float(trimmed[0, 0])) < 1e-4
-    assert abs(float(trimmed[-1, 0])) < 1e-4
+    # 20ms noise spike + 500ms silence + 300ms valid burst -> only valid burst kept
+    audio_with_spike = np.vstack([
+        np.zeros((int(0.1 * sr), 2), dtype=np.float32),
+        _make_sine(880.0, 0.02, sr=sr, amp=0.6),
+        np.zeros((int(0.5 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.3, sr=sr, amp=0.5),
+        np.zeros((int(0.1 * sr), 2), dtype=np.float32),
+    ])
+    regions = detect_active_regions(
+        audio_with_spike,
+        sr,
+        threshold_db=-45.0,
+        min_silence_gap_ms=200.0,
+        min_asset_ms=100.0,
+        pad_ms=20.0,
+    )
+    assert len(regions) == 1
+    assert regions[0]["start_sec"] >= 0.55
 
+    # Only 20ms spike when min_asset_ms=100 -> rejected
+    only_spike = np.vstack([
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+        _make_sine(880.0, 0.02, sr=sr, amp=0.6),
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+    ])
+    with pytest.raises(ValueError, match="hening"):
+        detect_active_regions(only_spike, sr, threshold_db=-45.0, min_asset_ms=100.0)
 
-def test_silence_trimmer_rejects_full_silence_and_invalid_bounds():
-    sr = 48000
+    # Pure silence -> rejected
     silent = np.zeros((2 * sr, 2), dtype=np.float32)
     with pytest.raises(ValueError, match="hening"):
-        trim_audio_silence(silent, sr, threshold_db=-45.0)
-
-    active = _make_sine(440.0, 2.0, sr=sr)
-    with pytest.raises(ValueError, match="batas"):
-        trim_audio_silence(active, sr, manual_start_sec=1.5, manual_end_sec=1.0)
+        detect_active_regions(silent, sr, threshold_db=-45.0)
 
 
-def test_union_envelope_preserves_intro_drum_when_vocal_enters_late():
+def test_split_audio_by_regions_slices_pcm24_with_zero_crossing_fade_and_dedup_names():
     sr = 48000
-    # 2s total silence -> 2s drum intro (vocal still silent) -> 2s both active -> 2s end silence
-    drums = np.vstack([
-        np.zeros((2 * sr, 2), dtype=np.float32),
-        _make_sine(100.0, 4.0, sr=sr, amp=0.6),
-        np.zeros((2 * sr, 2), dtype=np.float32),
-    ])
-    vocals = np.vstack([
-        np.zeros((4 * sr, 2), dtype=np.float32),
-        _make_sine(800.0, 2.0, sr=sr, amp=0.6),
-        np.zeros((2 * sr, 2), dtype=np.float32),
-    ])
-    stems = {"drums": drums, "vocals": vocals, "bass": drums.copy(), "other": vocals.copy()}
-    start_idx, end_idx = compute_union_trim_bounds(stems, sr, threshold_db=-45.0, pad_ms=100.0)
-    # Cut must happen around t=1.9s (keeping the 2s..4s drum intro intact)
-    assert start_idx / sr <= 2.0
-    assert end_idx / sr >= 6.0
+    audio = _make_sine(220.0, 2.0, sr=sr, amp=0.8)
 
-    batch = slice_aligned_batch(stems, sr, start_idx, end_idx, fade_ms=15.0)
-    lengths = {len(v["trimmed_audio"]) for v in batch.values()}
-    assert len(lengths) == 1
+    assets = split_audio_by_regions(
+        audio,
+        sr,
+        regions=[
+            {"name": "../sfx", "start_sec": 0.2, "end_sec": 0.9},
+            {"name": "sfx", "start_sec": 1.2, "end_sec": 1.8},
+            {"name": "../..", "start_sec": 1.85, "end_sec": 1.98},
+        ],
+        fade_ms=15.0,
+    )
+    assert len(assets) == 3
+    assert assets[0]["name"] == "sfx"
+    assert assets[0]["file_name"] == "sfx.wav"
+    assert assets[1]["name"] == "sfx_1"
+    assert assets[1]["file_name"] == "sfx_1.wav"
+    assert assets[2]["name"] == "asset_3"
+    assert assets[2]["file_name"] == "asset_3.wav"
+
+    for asset in assets[:2]:
+        info = sf.info(io.BytesIO(asset["wav_bytes"]))
+        assert info.samplerate == 48000
+        assert info.subtype == "PCM_24"
+        assert info.channels == 2
+        sliced, _ = sf.read(io.BytesIO(asset["wav_bytes"]), dtype="float32")
+        assert abs(float(sliced[0, 0])) < 1e-4
+        assert abs(float(sliced[-1, 0])) < 1e-4
+
+    # Reject empty, >100, inverted, too short (<0.01s), and non-finite bounds
+    with pytest.raises(ValueError):
+        split_audio_by_regions(audio, sr, regions=[])
+    with pytest.raises(ValueError):
+        split_audio_by_regions(
+            audio,
+            sr,
+            regions=[{"name": f"r{i}", "start_sec": 0.0, "end_sec": 0.1} for i in range(101)],
+        )
+    with pytest.raises(ValueError):
+        split_audio_by_regions(audio, sr, regions=[{"name": "bad", "start_sec": 1.5, "end_sec": 1.0}])
+    with pytest.raises(ValueError):
+        split_audio_by_regions(audio, sr, regions=[{"name": "tiny", "start_sec": 0.5, "end_sec": 0.505}])
+    with pytest.raises(ValueError):
+        split_audio_by_regions(audio, sr, regions=[{"name": "nan", "start_sec": float("nan"), "end_sec": 0.5}])
 
 
 def test_corrupt_audio_bytes_rejected_cleanly():
@@ -181,76 +253,61 @@ def test_worker_separate_workbench_audio_s3_and_redis(monkeypatch):
     assert "Uploading to S3" in progress_history
 
 
-def test_worker_trim_workbench_audio_single_and_synced(monkeypatch):
+def test_worker_split_workbench_audio_uploads_assets_to_s3():
     import worker as worker_mod
 
     sr = 48000
-    drums = np.vstack([
-        np.zeros((sr, 2), dtype=np.float32),
-        _make_sine(100.0, 2.0, sr, amp=0.5),
-        np.zeros((sr, 2), dtype=np.float32),
-    ])
-    vocals = np.vstack([
-        np.zeros((2 * sr, 2), dtype=np.float32),
-        _make_sine(600.0, 1.0, sr, amp=0.5),
-        np.zeros((sr, 2), dtype=np.float32),
+    kit_audio = np.vstack([
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
+        _make_sine(120.0, 0.5, sr, amp=0.5),
+        np.zeros((int(0.5 * sr), 2), dtype=np.float32),
+        _make_sine(440.0, 0.6, sr, amp=0.5),
+        np.zeros((int(0.2 * sr), 2), dtype=np.float32),
     ])
 
     s3_objects = {
-        "workbench/u1/j1/stems/drums.wav": _to_wav_bytes(drums, sr),
-        "workbench/u1/j1/stems/vocals.wav": _to_wav_bytes(vocals, sr),
-        "workbench/u1/j1/stems/bass.wav": _to_wav_bytes(drums, sr),
-        "workbench/u1/j1/stems/other.wav": _to_wav_bytes(vocals, sr),
+        "workbench/u1/raw/kit.wav": _to_wav_bytes(kit_audio, sr),
     }
+    get_calls = []
 
     class FakeS3:
         def get_object(self, Bucket, Key):
+            get_calls.append(Key)
             return {"Body": io.BytesIO(s3_objects[Key])}
 
         def put_object(self, Bucket, Key, Body, ContentType=None):
             s3_objects[Key] = Body
 
     with patch.object(worker_mod, "get_s3_client", return_value=FakeS3()):
-        single_res = worker_mod.trim_workbench_audio({
-            "mode": "single",
-            "sourceStorageKey": "workbench/u1/j1/stems/vocals.wav",
-            "targetKey": "workbench/u1/trim-1/FIXED_vocals.wav",
-            "thresholdDb": -45.0,
-            "padMs": 100.0,
-            "fadeMs": 15.0,
-        })
-        assert single_res["targetKey"] == "workbench/u1/trim-1/FIXED_vocals.wav"
-        assert single_res["trimmedDurationSec"] < single_res["originalDurationSec"]
-        assert 1.1 <= single_res["trimmedDurationSec"] <= 1.3
-        assert len(single_res["trimmedPeaks"]) == 200
-        assert "workbench/u1/trim-1/FIXED_vocals.wav" in s3_objects
-
-        synced_res = worker_mod.trim_workbench_audio({
-            "mode": "synced",
-            "stems": [
-                {"name": "vocals", "sourceStorageKey": "workbench/u1/j1/stems/vocals.wav", "targetKey": "workbench/u1/j1/trimmed/vocals.wav"},
-                {"name": "drums", "sourceStorageKey": "workbench/u1/j1/stems/drums.wav", "targetKey": "workbench/u1/j1/trimmed/drums.wav"},
-                {"name": "bass", "sourceStorageKey": "workbench/u1/j1/stems/bass.wav", "targetKey": "workbench/u1/j1/trimmed/bass.wav"},
-                {"name": "other", "sourceStorageKey": "workbench/u1/j1/stems/other.wav", "targetKey": "workbench/u1/j1/trimmed/other.wav"},
+        res = worker_mod.split_workbench_audio({
+            "splitId": "split-abc",
+            "userId": "u1",
+            "sourceStorageKey": "workbench/u1/raw/kit.wav",
+            "fileName": "kit.wav",
+            "regions": [
+                {"name": "kick", "startSec": 0.18, "endSec": 0.72},
+                {"name": "snare", "startSec": 1.18, "endSec": 1.82},
             ],
-            "thresholdDb": -45.0,
-            "padMs": 100.0,
             "fadeMs": 15.0,
         })
-        assert len(synced_res["updatedStems"]) == 4
-        durations = {s["durationSec"] for s in synced_res["updatedStems"]}
-        assert len(durations) == 1
-        assert 2.1 <= synced_res["trimmedDurationSec"] <= 2.3
 
-        default_target_res = worker_mod.trim_workbench_audio({
-            "mode": "single",
-            "sourceStorageKey": "workbench/u1/j1/stems/vocals.wav",
-            "thresholdDb": -45.0,
-            "padMs": 100.0,
-            "fadeMs": 15.0,
-        })
-        assert default_target_res["targetKey"].startswith("workbench/u1/j1/stems/TRIMMED_")
-        assert default_target_res["targetKey"] in s3_objects
+    assert get_calls == ["workbench/u1/raw/kit.wav"]
+    assert res["splitId"] == "split-abc"
+    assert abs(res["durationSec"] - 2.0) < 0.01
+    assert len(res["assets"]) == 2
+    assert res["assets"][0]["name"] == "kick"
+    assert res["assets"][0]["fileName"] == "kick.wav"
+    assert res["assets"][1]["name"] == "snare"
+    assert res["assets"][1]["fileName"] == "snare.wav"
+    for asset in res["assets"]:
+        key = asset["storageKey"]
+        assert key.startswith("workbench/u1/split-split-abc/")
+        assert key.endswith(f"_{asset['fileName']}")
+        assert key in s3_objects
+        info = sf.info(io.BytesIO(s3_objects[key]))
+        assert info.samplerate == 48000
+        assert info.subtype == "PCM_24"
+        assert abs(asset["durationSec"] - info.duration) < 0.01
 
 
 def test_decode_audio_bytes_ffmpeg_mp3_fallback():
