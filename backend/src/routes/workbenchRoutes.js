@@ -27,7 +27,9 @@ router.use(authenticate, requireAudioEngineer);
 router.post('/separate', uploadSingleAudio, WorkbenchController.separate);
 router.get('/jobs/:jobId', WorkbenchController.getJobStatus);
 router.get('/jobs/:jobId/download-zip', WorkbenchController.downloadZip);
+router.get('/jobs/:jobId/stems/:stemName/download', WorkbenchController.downloadStem);
 router.post('/jobs/:jobId/send-to-session', WorkbenchController.sendToSession);
 router.post('/trim', uploadSingleAudio, WorkbenchController.trim);
+router.get('/export', WorkbenchController.exportObject);
 
 export default router;

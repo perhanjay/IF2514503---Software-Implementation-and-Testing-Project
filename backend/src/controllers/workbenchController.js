@@ -63,13 +63,52 @@ export class WorkbenchController {
   static async downloadZip(req, res) {
     try {
       const { jobId } = req.params;
-      const { filename, buffer } = await WorkbenchService.downloadJobZip(jobId, req.user.id);
+      const { format } = req.query || {};
+      const { filename, buffer } = await WorkbenchService.downloadJobZip(jobId, req.user.id, format);
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', buffer.length);
       return res.send(buffer);
     } catch (err) {
       return handleError(res, err, 'Gagal mengunduh arsip ZIP stem');
+    }
+  }
+
+  static async downloadStem(req, res) {
+    try {
+      const { jobId, stemName } = req.params;
+      const { format } = req.query || {};
+      const { filename, mimeType, buffer } = await WorkbenchService.downloadJobStem(
+        jobId,
+        req.user.id,
+        stemName,
+        format
+      );
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    } catch (err) {
+      return handleError(res, err, 'Gagal mengunduh stem audio');
+    }
+  }
+
+  static async exportObject(req, res) {
+    try {
+      const { storageKey, format, sourceTargetFormat, sourceBitrateKbps, fileName } = req.query || {};
+      const { filename, mimeType, buffer } = await WorkbenchService.exportStorageObject(req.user.id, {
+        storageKey,
+        format,
+        sourceTargetFormat,
+        sourceBitrateKbps,
+        fileName
+      });
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    } catch (err) {
+      return handleError(res, err, 'Gagal mengekspor berkas audio');
     }
   }
 

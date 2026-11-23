@@ -1,4 +1,6 @@
 import crypto from 'crypto';
+import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -132,6 +134,132 @@ async function validateUploadedAudio(file) {
   ) {
     throw createHttpError(400, 'Berkas audio rusak atau format tidak didukung');
   }
+
+  return detectSourceFormat(file, meta);
+}
+
+const REQUESTED_EXPORT_FORMATS = new Set(['auto', 'flac24', 'wav24', 'mp3_320']);
+const RESOLVED_FORMAT_META = {
+  wav24: { ext: '.wav', mime: 'audio/wav' },
+  wav16: { ext: '.wav', mime: 'audio/wav' },
+  flac24: { ext: '.flac', mime: 'audio/flac' },
+  flac16: { ext: '.flac', mime: 'audio/flac' },
+  mp3: { ext: '.mp3', mime: 'audio/mpeg' },
+  mp3_320: { ext: '.mp3', mime: 'audio/mpeg' }
+};
+
+function detectSourceFormat(file, meta) {
+  const ext = path.extname(file?.originalname || '').toLowerCase();
+  const codec = (meta?.format?.codec || '').toLowerCase();
+  const container = (meta?.format?.container || '').toLowerCase();
+  const bitrateKbps = meta?.format?.bitrate ? Math.round(meta.format.bitrate / 1000) : null;
+  const bitsPerSample = meta?.format?.bitsPerSample || null;
+
+  if (ext === '.mp3' || container.includes('mpeg') || codec.includes('mp3')) {
+    return {
+      container: 'mp3',
+      targetFormat: 'mp3',
+      bitrateKbps: Math.min(320, Math.max(192, bitrateKbps || 320))
+    };
+  }
+  if (ext === '.flac' || container.includes('flac') || codec.includes('flac')) {
+    return {
+      container: 'flac',
+      targetFormat: bitsPerSample === 16 ? 'flac16' : 'flac24',
+      bitrateKbps: null
+    };
+  }
+  return {
+    container: 'wav',
+    targetFormat: bitsPerSample === 16 ? 'wav16' : 'wav24',
+    bitrateKbps: null
+  };
+}
+
+function resolveExportSpec(requestedFormat = 'auto', sourceFormat = null) {
+  const normalized = String(requestedFormat || 'auto').trim().toLowerCase();
+  if (!REQUESTED_EXPORT_FORMATS.has(normalized)) {
+    throw createHttpError(400, 'Format unduhan tidak didukung. Pilih auto, flac24, wav24, atau mp3_320');
+  }
+
+  let targetFormat = normalized;
+  let bitrateKbps = normalized === 'mp3_320' ? 320 : null;
+
+  if (normalized === 'auto') {
+    const srcTarget = sourceFormat?.targetFormat;
+    targetFormat = RESOLVED_FORMAT_META[srcTarget] ? srcTarget : 'wav24';
+    bitrateKbps = targetFormat === 'mp3' ? Math.min(320, Math.max(192, Number(sourceFormat?.bitrateKbps) || 320)) : null;
+  }
+
+  const meta = RESOLVED_FORMAT_META[targetFormat] || RESOLVED_FORMAT_META.wav24;
+  return {
+    requestedFormat: normalized,
+    targetFormat,
+    bitrateKbps,
+    ext: meta.ext,
+    mime: meta.mime
+  };
+}
+
+async function fetchS3Buffer(storageKey) {
+  try {
+    const s3Res = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: storageKey
+      })
+    );
+    const byteArray = await s3Res.Body.transformToByteArray();
+    return Buffer.from(byteArray);
+  } catch (err) {
+    if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
+      throw createHttpError(404, 'Berkas audio tidak ditemukan di penyimpanan');
+    }
+    throw err;
+  }
+}
+
+async function transcodeStorageItems(items, spec) {
+  if (spec.targetFormat === 'wav24') {
+    return Promise.all(
+      items.map(async (item) => ({
+        name: item.name,
+        ext: '.wav',
+        mime: 'audio/wav',
+        buffer: await fetchS3Buffer(item.sourceStorageKey)
+      }))
+    );
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'polaris-export-'));
+  try {
+    const workerItems = items.map((item, idx) => ({
+      name: item.name,
+      sourceStorageKey: item.sourceStorageKey,
+      outputPath: path.join(tmpDir, `${idx}_${sanitizeFileName(item.name || 'audio')}${spec.ext}`),
+      targetFormat: spec.targetFormat,
+      bitrateKbps: spec.bitrateKbps,
+      fileName: item.fileName || `${item.name || 'audio'}.wav`
+    }));
+
+    const result = await runPythonWorker(
+      { items: workerItems },
+      '--export-stdin',
+      180000
+    );
+
+    const outItems = result.items || [];
+    return Promise.all(
+      outItems.map(async (entry, idx) => ({
+        name: entry.name || workerItems[idx].name,
+        ext: entry.ext || spec.ext,
+        mime: entry.mime || spec.mime,
+        buffer: await fs.readFile(entry.outputPath)
+      }))
+    );
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function signStorageUrl(storageKey) {
@@ -241,7 +369,7 @@ function parseOptionalNumber(val, defaultValue = null) {
 
 export class WorkbenchService {
   static async startSeparation(userId, file) {
-    await validateUploadedAudio(file);
+    const sourceFormat = await validateUploadedAudio(file);
     await ensureBucketExists();
 
     const jobId = crypto.randomUUID();
@@ -263,6 +391,7 @@ export class WorkbenchService {
       userId,
       fileName: originalFileName,
       sourceStorageKey,
+      sourceFormat,
       status: 'QUEUED',
       progress: 0,
       stepMessage: 'Menunggu antrean pemrosesan',
@@ -338,6 +467,7 @@ export class WorkbenchService {
     return {
       jobId: job.jobId,
       fileName: job.fileName,
+      sourceFormat: job.sourceFormat || null,
       status: job.status,
       progress: job.progress ?? 0,
       stepMessage: job.stepMessage || '',
@@ -366,7 +496,7 @@ export class WorkbenchService {
     const isSynced = syncAllStems === true || syncAllStems === 'true';
 
     if (file) {
-      await validateUploadedAudio(file);
+      const sourceFormat = await validateUploadedAudio(file);
       await ensureBucketExists();
 
       const trimId = crypto.randomUUID();
@@ -404,6 +534,7 @@ export class WorkbenchService {
       return {
         storageKey: result.targetKey,
         audioUrl,
+        sourceFormat,
         originalDurationSec: result.originalDurationSec,
         trimmedDurationSec: result.trimmedDurationSec,
         leadInRemovedSec: result.leadInRemovedSec,
@@ -469,6 +600,7 @@ export class WorkbenchService {
         return {
           storageKey: primaryStem.storageKey,
           audioUrl: primaryStem.audioUrl,
+          sourceFormat: job.sourceFormat || null,
           originalDurationSec: result.originalDurationSec,
           trimmedDurationSec: result.trimmedDurationSec,
           leadInRemovedSec: result.leadInRemovedSec,
@@ -508,6 +640,7 @@ export class WorkbenchService {
       return {
         storageKey: result.targetKey,
         audioUrl,
+        sourceFormat: job.sourceFormat || null,
         originalDurationSec: result.originalDurationSec,
         trimmedDurationSec: result.trimmedDurationSec,
         leadInRemovedSec: result.leadInRemovedSec,
@@ -519,7 +652,7 @@ export class WorkbenchService {
     throw createHttpError(400, 'Unggah berkas audio atau sertakan jobId stem');
   }
 
-  static async downloadJobZip(jobId, userId) {
+  static async downloadJobZip(jobId, userId, format = 'auto') {
     const job = await getJobRecord(jobId);
     if (job.userId !== userId) {
       throw createHttpError(403, 'Akses ditolak: Anda bukan pemilik pekerjaan ini');
@@ -528,16 +661,19 @@ export class WorkbenchService {
       throw createHttpError(400, 'Stem hasil pemisahan belum tersedia untuk diunduh');
     }
 
+    const spec = resolveExportSpec(format, job.sourceFormat);
+    const exported = await transcodeStorageItems(
+      job.stems.map((stem) => ({
+        name: stem.name,
+        sourceStorageKey: stem.storageKey,
+        fileName: `${stem.name}.wav`
+      })),
+      spec
+    );
+
     const zip = new AdmZip();
-    for (const stem of job.stems) {
-      const s3Res = await s3Client.send(
-        new GetObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: stem.storageKey
-        })
-      );
-      const byteArray = await s3Res.Body.transformToByteArray();
-      zip.addFile(`${stem.name}.wav`, Buffer.from(byteArray));
+    for (const item of exported) {
+      zip.addFile(`${item.name}${item.ext}`, item.buffer);
     }
 
     const baseName = path.basename(job.fileName || 'Workbench', path.extname(job.fileName || ''));
@@ -545,7 +681,76 @@ export class WorkbenchService {
 
     return {
       filename: `Polaris_Workbench_${safeTitle}_Stems.zip`,
-      buffer: zip.toBuffer()
+      buffer: zip.toBuffer(),
+      resolvedFormat: spec.targetFormat
+    };
+  }
+
+  static async downloadJobStem(jobId, userId, stemName, format = 'auto') {
+    const job = await getJobRecord(jobId);
+    if (job.userId !== userId) {
+      throw createHttpError(403, 'Akses ditolak: Anda bukan pemilik pekerjaan ini');
+    }
+    if (!STEM_NAMES.includes(stemName)) {
+      throw createHttpError(400, 'Nama stem tidak valid');
+    }
+    if (job.status !== 'COMPLETED' || !Array.isArray(job.stems) || job.stems.length === 0) {
+      throw createHttpError(400, 'Stem hasil pemisahan belum tersedia untuk diunduh');
+    }
+
+    const stem = job.stems.find((s) => s.name === stemName);
+    if (!stem) {
+      throw createHttpError(404, 'Stem tidak ditemukan pada pekerjaan ini');
+    }
+
+    const spec = resolveExportSpec(format, job.sourceFormat);
+    const [exported] = await transcodeStorageItems(
+      [
+        {
+          name: stem.name,
+          sourceStorageKey: stem.storageKey,
+          fileName: `${stem.name}.wav`
+        }
+      ],
+      spec
+    );
+
+    return {
+      filename: `${stem.name}${exported.ext}`,
+      mimeType: exported.mime,
+      buffer: exported.buffer
+    };
+  }
+
+  static async exportStorageObject(userId, { storageKey, format = 'auto', sourceTargetFormat, sourceBitrateKbps, fileName }) {
+    if (!storageKey || typeof storageKey !== 'string' || storageKey.includes('..') || !storageKey.startsWith(`workbench/${userId}/`)) {
+      throw createHttpError(403, 'Akses ditolak: berkas bukan milik Anda');
+    }
+
+    const parsedSourceFormat = sourceTargetFormat
+      ? { targetFormat: sourceTargetFormat, bitrateKbps: Number(sourceBitrateKbps) || null }
+      : null;
+    const spec = resolveExportSpec(format, parsedSourceFormat);
+
+    const rawBase = path.basename(fileName || storageKey, path.extname(fileName || storageKey)) || 'trimmed_audio';
+    const safeBase = sanitizeFileName(rawBase) || 'trimmed_audio';
+
+    const [exported] = await transcodeStorageItems(
+      [
+        {
+          name: safeBase,
+          sourceStorageKey: storageKey,
+          fileName: path.basename(storageKey)
+        }
+      ],
+      spec
+    );
+
+    const downloadName = safeBase.startsWith('TRIMMED_') ? `${safeBase}${exported.ext}` : `TRIMMED_${safeBase}${exported.ext}`;
+    return {
+      filename: downloadName,
+      mimeType: exported.mime,
+      buffer: exported.buffer
     };
   }
 

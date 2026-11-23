@@ -490,6 +490,94 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         assert.match(entry.entryName, /\.wav$/i);
         assert.ok(entry.getData().length > 44);
       }
+
+      // Verify FLAC 24-bit and MP3 320 kbps ZIP export formats + invalid format rejection
+      const resFlacZip = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}/download-zip?format=flac24`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resFlacZip.status, 200);
+      const flacEntries = new AdmZip(resFlacZip.body).getEntries();
+      assert.equal(flacEntries.length, 4);
+      for (const entry of flacEntries) {
+        assert.match(entry.entryName, /\.flac$/i);
+      }
+
+      const resMp3Zip = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}/download-zip?format=mp3_320`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resMp3Zip.status, 200);
+      const mp3Entries = new AdmZip(resMp3Zip.body).getEntries();
+      assert.equal(mp3Entries.length, 4);
+      for (const entry of mp3Entries) {
+        assert.match(entry.entryName, /\.mp3$/i);
+      }
+
+      const resBadFmt = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}/download-zip?format=ogg_bad`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(resBadFmt.status, 400);
+
+      // Verify single stem download & Anti-IDOR
+      const resStemFlac = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}/stems/vocals/download?format=flac24`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resStemFlac.status, 200);
+      assert.match(resStemFlac.headers['content-type'], /audio\/flac/);
+      assert.match(resStemFlac.headers['content-disposition'], /vocals\.flac/);
+
+      const resStemIdor = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}/stems/vocals/download?format=flac24`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      assert.equal(resStemIdor.status, 403);
+
+      // Verify /export Anti-IDOR and standalone transcoding
+      const job1StatusForExport = await request(app)
+        .get(`/api/v1/workbench/jobs/${job1Id}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      const sampleExportKey = job1StatusForExport.body.stems[0].storageKey;
+
+      const resExportIdor = await request(app)
+        .get(`/api/v1/workbench/export?storageKey=${encodeURIComponent(sampleExportKey)}&format=mp3_320`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      assert.equal(resExportIdor.status, 403);
+
+      const resExportFlac = await request(app)
+        .get(`/api/v1/workbench/export?storageKey=${encodeURIComponent(sampleExportKey)}&format=flac24&fileName=vocals.wav`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resExportFlac.status, 200);
+      assert.match(resExportFlac.headers['content-type'], /audio\/flac/);
+      assert.match(resExportFlac.headers['content-disposition'], /TRIMMED_vocals\.flac/);
+
+      // Verify 'auto' respects MP3 sourceFormat recorded in Redis
+      const rawJob1 = await redis.get(`workbench:job:${job1Id}`);
+      const parsedJob1 = JSON.parse(rawJob1);
+      const originalSourceFormat = parsedJob1.sourceFormat;
+      parsedJob1.sourceFormat = { container: 'mp3', targetFormat: 'mp3', bitrateKbps: 192 };
+      await redis.set(`workbench:job:${job1Id}`, JSON.stringify(parsedJob1), 'EX', 86400);
+      try {
+        const resAutoMp3 = await request(app)
+          .get(`/api/v1/workbench/jobs/${job1Id}/download-zip?format=auto`)
+          .set('Authorization', `Bearer ${tokenA}`)
+          .parse(binaryParser)
+          .buffer(true);
+        assert.equal(resAutoMp3.status, 200);
+        const autoEntries = new AdmZip(resAutoMp3.body).getEntries();
+        assert.equal(autoEntries.length, 4);
+        for (const entry of autoEntries) {
+          assert.match(entry.entryName, /\.mp3$/i);
+        }
+      } finally {
+        parsedJob1.sourceFormat = originalSourceFormat;
+        await redis.set(`workbench:job:${job1Id}`, JSON.stringify(parsedJob1), 'EX', 86400);
+      }
     });
 
     it('validates stemNames and duration alignment, then creates READY Session + 4 Tracks on send-to-session', async () => {
