@@ -10,6 +10,11 @@ const routes = [
   { path: '/login', component: LoginView },
   { path: '/register', component: RegisterView },
   { path: '/dashboard', component: DashboardView },
+  {
+    path: '/workbench',
+    name: 'AudioWorkbench',
+    component: () => import('../views/AudioWorkbenchView.vue'),
+  },
   { path: '/billing', component: BillingView, alias: '/wallet' },
   {
     path: '/admin/users',
@@ -42,9 +47,15 @@ router.beforeEach((to, from, next) => {
     }
   }
 
-  // If user is ADMIN, prevent access to consumer studio workspace and billing
+  // If user is ADMIN, prevent access to consumer studio workspace, workbench, and billing
   if (user?.role === 'ADMIN') {
-    if (to.path === '/dashboard' || to.path.startsWith('/dashboard') || to.path === '/billing' || to.path === '/wallet') {
+    if (
+      to.path === '/dashboard' ||
+      to.path.startsWith('/dashboard') ||
+      to.path.startsWith('/workbench') ||
+      to.path === '/billing' ||
+      to.path === '/wallet'
+    ) {
       return next('/admin/users');
     }
   }

@@ -239,6 +239,13 @@ function handleLogout() {
             Studio Workspace
           </router-link>
           <router-link
+            to="/workbench"
+            :class="route.path === '/workbench' ? 'text-black font-semibold' : 'text-[#60605e] hover:text-black font-medium'"
+            class="py-1 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
+          >
+            Audio Workbench
+          </router-link>
+          <router-link
             to="/billing"
             :class="route.path === '/billing' || route.path === '/wallet' ? 'text-black font-semibold' : 'text-[#60605e] hover:text-black font-medium'"
             class="py-1 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black"
@@ -450,6 +457,14 @@ function handleLogout() {
           class="block px-3 py-2 rounded-none text-sm transition-colors"
         >
           Studio Workspace
+        </router-link>
+        <router-link
+          to="/workbench"
+          @click="mobileMenuOpen = false"
+          :class="route.path === '/workbench' ? 'text-black font-semibold border-l-2 border-black' : 'text-[#60605e] hover:text-black border-l-2 border-transparent'"
+          class="block px-3 py-2 rounded-none text-sm transition-colors"
+        >
+          Audio Workbench
         </router-link>
         <router-link
           to="/billing"
