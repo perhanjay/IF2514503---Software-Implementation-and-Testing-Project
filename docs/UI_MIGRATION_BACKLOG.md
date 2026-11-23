@@ -17,6 +17,7 @@ Dokumen ini menjadi patokan gerak (*single source of truth*) untuk menyelesaikan
 - [x] **Studio Workspace** — [`DashboardView.vue`](../frontend/src/views/DashboardView.vue), tab folder berwarna `01`–`03`, [`TrackClassificationCard.vue`](../frontend/src/components/TrackClassificationCard.vue), [`DiagnosticTrackCard.vue`](../frontend/src/components/DiagnosticTrackCard.vue), [`HealthScoreGauge.vue`](../frontend/src/components/HealthScoreGauge.vue), [`RetroSelect.vue`](../frontend/src/components/ui/RetroSelect.vue), modal workspace, serta panel audio (`MultitrackAuditionPanel`, `GoniometerVisualizer`, `LedPeakMeter`, `SessionTransportBar`, `TrackTallyButtons`).
 - [x] **Dompet & Kuota Token (`/billing`)** — [`BillingView.vue`](../frontend/src/views/BillingView.vue) dipecah menjadi [`WalletBalanceCard.vue`](../frontend/src/components/billing/WalletBalanceCard.vue), [`TokenPackageSelector.vue`](../frontend/src/components/billing/TokenPackageSelector.vue), dan [`TokenLedgerCard.vue`](../frontend/src/components/billing/TokenLedgerCard.vue).
 - [x] **Panel Admin (`/admin/users`, `/admin/transactions`)** — [`AdminUsersView.vue`](../frontend/src/views/AdminUsersView.vue), [`AdminTransactionsView.vue`](../frontend/src/views/AdminTransactionsView.vue), [`adminFormatters.js`](../frontend/src/utils/adminFormatters.js), serta komponen adaptif dan drawer di [`frontend/src/components/admin/`](../frontend/src/components/admin/) ([`AdminUsersDirectory.vue`](../frontend/src/components/admin/AdminUsersDirectory.vue), [`AdminTransactionsDirectory.vue`](../frontend/src/components/admin/AdminTransactionsDirectory.vue), [`UserSupportDrawer.vue`](../frontend/src/components/admin/UserSupportDrawer.vue), [`AdminUserOverviewCard.vue`](../frontend/src/components/admin/AdminUserOverviewCard.vue), [`AdminTokenAdjustmentForm.vue`](../frontend/src/components/admin/AdminTokenAdjustmentForm.vue), [`AdminUserLedgerSection.vue`](../frontend/src/components/admin/AdminUserLedgerSection.vue), [`AdminAccountSecurityCard.vue`](../frontend/src/components/admin/AdminAccountSecurityCard.vue), [`AdminSecurityConfirmModals.vue`](../frontend/src/components/admin/AdminSecurityConfirmModals.vue)).
+- [x] **Masuk Akun (`/login`)** — [`LoginView.vue`](../frontend/src/views/LoginView.vue) dan [`ForgotPasswordModal.vue`](../frontend/src/components/auth/ForgotPasswordModal.vue).
 
 ---
 
@@ -49,10 +50,9 @@ Panel Admin merupakan area dengan komponen v1 terbanyak (121 baris terdeteksi me
 
 ## Prioritas 2 (Fokus Sekarang): Laman Autentikasi
 
-- [ ] **Masuk Akun** — [`LoginView.vue`](../frontend/src/views/LoginView.vue) (`/login`)
-  - [ ] Migrasikan kanvas ke `.notebook-paper` + *ambient pastel halos*, serta kartu utama dari `rounded-none` ke kartu `#111111`-outlined v2 (`rounded-[18px]` + `shadow-[3px_4px_0_#111111]`).
-  - [ ] Perbarui input formulir, *error banner*, tautan navigasi atas (hapus `font-mono-accent`), dan tombol submit `.btn-ink-stamp` ke `.btn-keycap-blue` / `.btn-keycap-dark`.
-  - [ ] Rombak modal **Lupa Kata Sandi 2-Langkah** (`showResetModal`) di dalamnya ke `.retro-glass-panel` / v2.
+- [x] **Masuk Akun** — [`LoginView.vue`](../frontend/src/views/LoginView.vue) (`/login`) + [`ForgotPasswordModal.vue`](../frontend/src/components/auth/ForgotPasswordModal.vue)
+  - [x] Kanvas `.notebook-paper` + *ambient pastel halos* dan kartu utama `#111111`-outlined `rounded-[18px]`.
+  - [x] Keycap navigasi atas (`Kembali ke Beranda`, `Studio Instan`), tombol mata sandi, keycap `.btn-keycap-blue`, serta pemecahan & migrasi modal Lupa Kata Sandi 2-langkah (`ForgotPasswordModal.vue`) menggunakan `useDialogFocus`.
 - [ ] **Daftar Akun Baru** — [`RegisterView.vue`](../frontend/src/views/RegisterView.vue) (`/register`)
   - [ ] Selaraskan kanvas, kartu, input formulir, helper teks, dan keycap CTA dengan [`LoginView.vue`](../frontend/src/views/LoginView.vue) v2.
 
