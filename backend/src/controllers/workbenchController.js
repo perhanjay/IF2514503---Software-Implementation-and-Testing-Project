@@ -28,35 +28,34 @@ export class WorkbenchController {
     }
   }
 
-  static async trim(req, res) {
+  static async split(req, res) {
     try {
-      const {
-        jobId,
-        stemName,
-        thresholdDb,
-        padMs,
-        fadeMs,
-        manualStartSec,
-        manualEndSec,
-        syncAllStems
-      } = req.body || {};
-
-      const result = await WorkbenchService.trimAudio({
+      const { jobId, stemName, regions, fadeMs } = req.body || {};
+      const result = await WorkbenchService.splitAudio({
         userId: req.user.id,
         file: req.file,
         jobId,
         stemName,
-        thresholdDb,
-        padMs,
-        fadeMs,
-        manualStartSec,
-        manualEndSec,
-        syncAllStems
+        regions,
+        fadeMs
       });
-
       return res.status(200).json(result);
     } catch (err) {
-      return handleError(res, err, 'Gagal memangkas hening audio');
+      return handleError(res, err, 'Gagal memecah segmen audio');
+    }
+  }
+
+  static async downloadSplitZip(req, res) {
+    try {
+      const { splitId } = req.params;
+      const { format } = req.query || {};
+      const { filename, buffer } = await WorkbenchService.downloadSplitZip(splitId, req.user.id, format);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    } catch (err) {
+      return handleError(res, err, 'Gagal mengunduh arsip ZIP aset audio');
     }
   }
 

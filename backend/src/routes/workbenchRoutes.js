@@ -29,7 +29,8 @@ router.get('/jobs/:jobId', WorkbenchController.getJobStatus);
 router.get('/jobs/:jobId/download-zip', WorkbenchController.downloadZip);
 router.get('/jobs/:jobId/stems/:stemName/download', WorkbenchController.downloadStem);
 router.post('/jobs/:jobId/send-to-session', WorkbenchController.sendToSession);
-router.post('/trim', uploadSingleAudio, WorkbenchController.trim);
+router.post('/split', uploadSingleAudio, WorkbenchController.split);
+router.get('/splits/:splitId/download-zip', WorkbenchController.downloadSplitZip);
 router.get('/export', WorkbenchController.exportObject);
 
 export default router;

@@ -99,6 +99,23 @@ async function mergeJobUpdate(jobId, patch) {
   return merged;
 }
 
+async function getSplitRecord(splitId) {
+  if (!isValidUuid(splitId)) {
+    throw createHttpError(404, 'Manifest pemecahan audio tidak ditemukan');
+  }
+  await ensureRedisConnected();
+  const raw = await redis.get(`workbench:split:${splitId}`);
+  if (!raw) {
+    throw createHttpError(404, 'Manifest pemecahan audio tidak ditemukan');
+  }
+  return JSON.parse(raw);
+}
+
+async function saveSplitRecord(manifest) {
+  await ensureRedisConnected();
+  await redis.set(`workbench:split:${manifest.splitId}`, JSON.stringify(manifest), 'EX', WORKBENCH_JOB_TTL_SEC);
+}
+
 async function validateUploadedAudio(file) {
   if (!file) {
     throw createHttpError(400, 'Berkas audio wajib diunggah');
@@ -336,7 +353,7 @@ function runPythonWorker(payload, mode, timeoutMs = 180000) {
           .map((line) => line.trim())
           .filter(Boolean);
         const lastMessage = lines[lines.length - 1] || `Worker exited with code ${code}`;
-        if (/hening|rusak|tidak didukung|tidak valid|tidak boleh kosong/i.test(lastMessage)) {
+        if (/hening|rusak|tidak didukung|tidak valid|tidak boleh kosong|jumlah region|hingga 100|valueerror/i.test(lastMessage)) {
           return reject(createHttpError(400, lastMessage));
         }
         return reject(new Error(`Worker exited with code ${code}: ${stderr.trim()}`));
@@ -356,15 +373,72 @@ function runPythonWorker(payload, mode, timeoutMs = 180000) {
   });
 }
 
-function parseOptionalNumber(val, defaultValue = null) {
-  if (val === undefined || val === null || val === '') {
-    return defaultValue;
+function parseSplitRegions(regionsInput) {
+  let parsed = regionsInput;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw createHttpError(400, 'Format JSON daftar region tidak valid');
+    }
   }
-  const num = Number(val);
-  if (!Number.isFinite(num)) {
-    throw createHttpError(400, 'Parameter numerik pemangkasan tidak valid');
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) {
+    throw createHttpError(400, 'Daftar region harus berupa array berisi 1 hingga 100 segmen');
+  }
+
+  return parsed.map((region, idx) => {
+    if (!region || typeof region !== 'object' || Array.isArray(region)) {
+      throw createHttpError(400, `Region ke-${idx + 1} tidak valid`);
+    }
+    const rawStart = region.startSec;
+    const rawEnd = region.endSec;
+    if (
+      rawStart === undefined || rawStart === null || rawStart === '' || typeof rawStart === 'boolean' ||
+      rawEnd === undefined || rawEnd === null || rawEnd === '' || typeof rawEnd === 'boolean'
+    ) {
+      throw createHttpError(400, `Batas waktu region ke-${idx + 1} wajib berupa angka`);
+    }
+    const startSec = Number(rawStart);
+    const endSec = Number(rawEnd);
+    if (!Number.isFinite(startSec) || !Number.isFinite(endSec) || startSec < 0 || endSec <= startSec) {
+      throw createHttpError(400, `Rentang waktu region ke-${idx + 1} tidak valid`);
+    }
+    if (endSec - startSec < 0.01 - 1e-9) {
+      throw createHttpError(400, `Durasi region ke-${idx + 1} minimal 0.01 detik`);
+    }
+    return {
+      name: typeof region.name === 'string' ? region.name : '',
+      startSec,
+      endSec
+    };
+  });
+}
+
+function parseSplitFadeMs(fadeMsInput) {
+  if (fadeMsInput === undefined || fadeMsInput === null || fadeMsInput === '') {
+    return 15;
+  }
+  if (typeof fadeMsInput === 'boolean') {
+    throw createHttpError(400, 'Parameter fadeMs harus berupa angka antara 0 hingga 100');
+  }
+  const num = Number(fadeMsInput);
+  if (!Number.isFinite(num) || num < 0 || num > 100) {
+    throw createHttpError(400, 'Parameter fadeMs harus berupa angka antara 0 hingga 100');
   }
   return num;
+}
+
+function buildAudioZip(exportedItems, rawSourceName, suffix) {
+  const zip = new AdmZip();
+  for (const item of exportedItems) {
+    zip.addFile(`${item.name}${item.ext}`, item.buffer);
+  }
+  const baseName = path.basename(rawSourceName || 'Workbench', path.extname(rawSourceName || ''));
+  const safeTitle = sanitizeFileName(baseName) || 'Workbench';
+  return {
+    filename: `Polaris_Workbench_${safeTitle}_${suffix}.zip`,
+    buffer: zip.toBuffer()
+  };
 }
 
 export class WorkbenchService {
@@ -476,34 +550,30 @@ export class WorkbenchService {
     };
   }
 
-  static async trimAudio({
+  static async splitAudio({
     userId,
     file,
     jobId,
     stemName,
-    thresholdDb,
-    padMs,
-    fadeMs,
-    manualStartSec,
-    manualEndSec,
-    syncAllStems
+    regions,
+    fadeMs
   }) {
-    const parsedThreshold = parseOptionalNumber(thresholdDb, -45);
-    const parsedPad = parseOptionalNumber(padMs, 100);
-    const parsedFade = parseOptionalNumber(fadeMs, 15);
-    const parsedStart = parseOptionalNumber(manualStartSec, null);
-    const parsedEnd = parseOptionalNumber(manualEndSec, null);
-    const isSynced = syncAllStems === true || syncAllStems === 'true';
+    const normalizedRegions = parseSplitRegions(regions);
+    const parsedFadeMs = parseSplitFadeMs(fadeMs);
+
+    let splitId;
+    let sourceStorageKey;
+    let sourceFileName;
+    let sourceFormat = null;
 
     if (file) {
-      const sourceFormat = await validateUploadedAudio(file);
+      sourceFormat = await validateUploadedAudio(file);
       await ensureBucketExists();
 
-      const trimId = crypto.randomUUID();
+      splitId = crypto.randomUUID();
       const safeName = sanitizeFileName(file.originalname);
-      const baseName = path.basename(safeName, path.extname(safeName)) || 'audio';
-      const sourceStorageKey = `workbench/${userId}/trim-${trimId}/source_${safeName}`;
-      const targetKey = `workbench/${userId}/trim-${trimId}/TRIMMED_${baseName}.wav`;
+      sourceStorageKey = `workbench/${userId}/split-${splitId}/source_${safeName}`;
+      sourceFileName = file.originalname;
 
       await s3Client.send(
         new PutObjectCommand({
@@ -513,37 +583,7 @@ export class WorkbenchService {
           ContentType: file.mimetype || 'audio/wav'
         })
       );
-
-      const result = await runPythonWorker(
-        {
-          mode: 'single',
-          sourceStorageKey,
-          targetKey,
-          fileName: file.originalname,
-          thresholdDb: parsedThreshold,
-          padMs: parsedPad,
-          fadeMs: parsedFade,
-          manualStartSec: parsedStart,
-          manualEndSec: parsedEnd
-        },
-        '--trim-stdin',
-        180000
-      );
-
-      const audioUrl = await signStorageUrl(result.targetKey);
-      return {
-        storageKey: result.targetKey,
-        audioUrl,
-        sourceFormat,
-        originalDurationSec: result.originalDurationSec,
-        trimmedDurationSec: result.trimmedDurationSec,
-        leadInRemovedSec: result.leadInRemovedSec,
-        tailRemovedSec: result.tailRemovedSec,
-        trimmedPeaks: result.trimmedPeaks
-      };
-    }
-
-    if (jobId) {
+    } else if (jobId) {
       const job = await getJobRecord(jobId);
       if (job.userId !== userId) {
         throw createHttpError(403, 'Akses ditolak: Anda bukan pemilik pekerjaan ini');
@@ -551,105 +591,92 @@ export class WorkbenchService {
       if (job.status !== 'COMPLETED' || !Array.isArray(job.stems) || job.stems.length === 0) {
         throw createHttpError(400, 'Pemisahan stem belum selesai');
       }
-      if (stemName !== undefined && stemName !== null && stemName !== '' && !STEM_NAMES.includes(stemName)) {
+      if (!stemName || !STEM_NAMES.includes(stemName)) {
         throw createHttpError(400, 'Nama stem tidak valid');
-      }
-
-      if (isSynced) {
-        const trimBatchId = crypto.randomUUID().slice(0, 8);
-        const stemsPayload = job.stems.map((s) => ({
-          name: s.name,
-          sourceStorageKey: s.originalStorageKey || s.storageKey,
-          targetKey: `workbench/${userId}/${jobId}/trimmed/${s.name}_${trimBatchId}.wav`
-        }));
-
-        const primaryStemName = stemName && STEM_NAMES.includes(stemName) ? stemName : 'vocals';
-        const result = await runPythonWorker(
-          {
-            mode: 'synced',
-            stems: stemsPayload,
-            primaryStemName,
-            thresholdDb: parsedThreshold,
-            padMs: parsedPad,
-            fadeMs: parsedFade,
-            manualStartSec: parsedStart,
-            manualEndSec: parsedEnd
-          },
-          '--trim-stdin',
-          180000
-        );
-
-        const updatedByName = new Map((result.updatedStems || []).map((u) => [u.name, u]));
-        const nextStems = job.stems.map((existing) => {
-          const upd = updatedByName.get(existing.name);
-          if (!upd) return existing;
-          return {
-            ...existing,
-            originalStorageKey: existing.originalStorageKey || existing.storageKey,
-            originalDurationSec: existing.originalDurationSec ?? existing.durationSec ?? result.originalDurationSec,
-            storageKey: upd.storageKey,
-            durationSec: upd.durationSec,
-            isTrimmed: true
-          };
-        });
-
-        await mergeJobUpdate(jobId, { stems: nextStems });
-        const updatedJobStems = await attachStemUrls(nextStems);
-        const primaryStem = updatedJobStems.find((s) => s.name === primaryStemName) || updatedJobStems[0];
-
-        return {
-          storageKey: primaryStem.storageKey,
-          audioUrl: primaryStem.audioUrl,
-          sourceFormat: job.sourceFormat || null,
-          originalDurationSec: result.originalDurationSec,
-          trimmedDurationSec: result.trimmedDurationSec,
-          leadInRemovedSec: result.leadInRemovedSec,
-          tailRemovedSec: result.tailRemovedSec,
-          trimmedPeaks: result.trimmedPeaks,
-          updatedJobStems
-        };
-      }
-
-      if (!stemName) {
-        throw createHttpError(400, 'Nama stem wajib dipilih untuk pemangkasan tunggal');
       }
       const targetStem = job.stems.find((s) => s.name === stemName);
       if (!targetStem) {
-        throw createHttpError(400, 'Stem tidak ditemukan pada pekerjaan ini');
+        throw createHttpError(404, 'Stem tidak ditemukan pada pekerjaan ini');
       }
 
-      const trimId = crypto.randomUUID();
-      const targetKey = `workbench/${userId}/trim-${trimId}/TRIMMED_${stemName}.wav`;
-      const result = await runPythonWorker(
-        {
-          mode: 'single',
-          sourceStorageKey: targetStem.originalStorageKey || targetStem.storageKey,
-          targetKey,
-          fileName: `${stemName}.wav`,
-          thresholdDb: parsedThreshold,
-          padMs: parsedPad,
-          fadeMs: parsedFade,
-          manualStartSec: parsedStart,
-          manualEndSec: parsedEnd
-        },
-        '--trim-stdin',
-        180000
-      );
-
-      const audioUrl = await signStorageUrl(result.targetKey);
-      return {
-        storageKey: result.targetKey,
-        audioUrl,
-        sourceFormat: job.sourceFormat || null,
-        originalDurationSec: result.originalDurationSec,
-        trimmedDurationSec: result.trimmedDurationSec,
-        leadInRemovedSec: result.leadInRemovedSec,
-        tailRemovedSec: result.tailRemovedSec,
-        trimmedPeaks: result.trimmedPeaks
-      };
+      splitId = crypto.randomUUID();
+      sourceStorageKey = targetStem.storageKey;
+      sourceFormat = job.sourceFormat || null;
+      sourceFileName = `${stemName}.wav`;
+    } else {
+      throw createHttpError(400, 'Unggah berkas audio atau sertakan jobId stem');
     }
 
-    throw createHttpError(400, 'Unggah berkas audio atau sertakan jobId stem');
+    const result = await runPythonWorker(
+      {
+        splitId,
+        userId,
+        sourceStorageKey,
+        fileName: sourceFileName,
+        regions: normalizedRegions,
+        fadeMs: parsedFadeMs
+      },
+      '--split-stdin',
+      180000
+    );
+
+    const manifestAssets = (result.assets || []).map((asset) => ({
+      name: asset.name,
+      fileName: asset.fileName || `${asset.name}.wav`,
+      storageKey: asset.storageKey,
+      durationSec: asset.durationSec
+    }));
+
+    await saveSplitRecord({
+      splitId,
+      userId,
+      sourceFileName,
+      sourceFormat,
+      assets: manifestAssets
+    });
+
+    const signedAssets = await Promise.all(
+      manifestAssets.map(async (asset) => ({
+        ...asset,
+        audioUrl: await signStorageUrl(asset.storageKey)
+      }))
+    );
+
+    return {
+      splitId,
+      sourceFileName,
+      sourceFormat,
+      fadeMs: parsedFadeMs,
+      totalAssets: signedAssets.length,
+      assets: signedAssets
+    };
+  }
+
+  static async downloadSplitZip(splitId, userId, format = 'auto') {
+    const split = await getSplitRecord(splitId);
+    if (split.userId !== userId) {
+      throw createHttpError(403, 'Akses ditolak: Anda bukan pemilik aset pemecahan ini');
+    }
+    if (!Array.isArray(split.assets) || split.assets.length === 0) {
+      throw createHttpError(400, 'Aset hasil pemecahan belum tersedia untuk diunduh');
+    }
+
+    const spec = resolveExportSpec(format, split.sourceFormat);
+    const exported = await transcodeStorageItems(
+      split.assets.map((asset) => ({
+        name: asset.name,
+        sourceStorageKey: asset.storageKey,
+        fileName: asset.fileName || `${asset.name}.wav`
+      })),
+      spec
+    );
+
+    const { filename, buffer } = buildAudioZip(exported, split.sourceFileName, 'Assets');
+    return {
+      filename,
+      buffer,
+      resolvedFormat: spec.targetFormat
+    };
   }
 
   static async downloadJobZip(jobId, userId, format = 'auto') {
@@ -671,17 +698,10 @@ export class WorkbenchService {
       spec
     );
 
-    const zip = new AdmZip();
-    for (const item of exported) {
-      zip.addFile(`${item.name}${item.ext}`, item.buffer);
-    }
-
-    const baseName = path.basename(job.fileName || 'Workbench', path.extname(job.fileName || ''));
-    const safeTitle = sanitizeFileName(baseName) || 'Workbench';
-
+    const { filename, buffer } = buildAudioZip(exported, job.fileName, 'Stems');
     return {
-      filename: `Polaris_Workbench_${safeTitle}_Stems.zip`,
-      buffer: zip.toBuffer(),
+      filename,
+      buffer,
       resolvedFormat: spec.targetFormat
     };
   }

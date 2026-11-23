@@ -60,6 +60,53 @@ function makeWavBuffer({
   return buffer;
 }
 
+function makeMultiBurstWavBuffer({
+  sampleRate = 48000,
+  durationSec = 2.0,
+  bursts = [
+    { startSec: 0.2, endSec: 0.7, freq: 440 },
+    { startSec: 1.2, endSec: 1.7, freq: 660 }
+  ],
+  amp = 0.6,
+  channels = 2
+} = {}) {
+  const totalSamples = Math.floor(durationSec * sampleRate);
+  const bytesPerSample = 2;
+  const blockAlign = channels * bytesPerSample;
+  const dataSize = totalSamples * blockAlign;
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVE', 8);
+
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(channels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * blockAlign, 28);
+  buffer.writeUInt16LE(blockAlign, 32);
+  buffer.writeUInt16LE(16, 34);
+
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+
+  let offset = 44;
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / sampleRate;
+    const active = bursts.find((b) => t >= b.startSec && t < b.endSec);
+    const sampleFloat = active ? amp * Math.sin(2 * Math.PI * active.freq * t) : 0;
+    const sampleInt = Math.max(-32768, Math.min(32767, Math.round(sampleFloat * 32767)));
+    for (let ch = 0; ch < channels; ch++) {
+      buffer.writeInt16LE(sampleInt, offset);
+      offset += 2;
+    }
+  }
+
+  return buffer;
+}
+
 async function pollJobUntilDone(token, jobId, timeoutMs = 30000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -87,7 +134,7 @@ const binaryParser = (res, callback) => {
   });
 };
 
-describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge)', () => {
+describe('Audio Workbench API (Stem Separator, Asset Splitter, & Session Bridge)', () => {
   let userA;
   let userB;
   let adminUser;
@@ -95,6 +142,7 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
   let tokenB;
   let adminToken;
   const createdJobIds = [];
+  const createdSplitIds = [];
 
   before(async () => {
     process.env.POLARIS_FAST_STEM_MODE = '1';
@@ -132,6 +180,13 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         // Ignore cleanup errors
       }
     }
+    for (const splitId of createdSplitIds) {
+      try {
+        await redis.del(`workbench:split:${splitId}`);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
     await cleanupTestData();
     if (redis.status === 'ready' || redis.status === 'connecting') {
       await redis.quit();
@@ -148,8 +203,11 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       const res2 = await request(app).get('/api/v1/workbench/jobs/00000000-0000-0000-0000-000000000000');
       assert.equal(res2.status, 401);
 
-      const res3 = await request(app).post('/api/v1/workbench/trim').send({});
+      const res3 = await request(app).post('/api/v1/workbench/split').send({});
       assert.equal(res3.status, 401);
+
+      const res4 = await request(app).get('/api/v1/workbench/splits/00000000-0000-0000-0000-000000000000/download-zip');
+      assert.equal(res4.status, 401);
     });
 
     it('rejects ADMIN role requests with 403', async () => {
@@ -167,15 +225,21 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       assert.equal(res2.status, 403);
 
       const res3 = await request(app)
-        .post('/api/v1/workbench/trim')
+        .post('/api/v1/workbench/split')
         .set('Authorization', `Bearer ${adminToken}`)
-        .attach('audio', wav, 'admin_trim.wav');
+        .field('regions', JSON.stringify([{ name: 'part_1', startSec: 0, endSec: 0.3 }]))
+        .attach('audio', wav, 'admin_split.wav');
       assert.equal(res3.status, 403);
+
+      const res4 = await request(app)
+        .get('/api/v1/workbench/splits/00000000-0000-0000-0000-000000000000/download-zip')
+        .set('Authorization', `Bearer ${adminToken}`);
+      assert.equal(res4.status, 403);
     });
   });
 
   describe('2. Input & Resource Validation (404 & 400)', () => {
-    it('returns 404 JSON cleanly for invalid or non-existent jobId', async () => {
+    it('returns 404 JSON cleanly for invalid or non-existent jobId and splitId', async () => {
       const resInvalid = await request(app)
         .get('/api/v1/workbench/jobs/not-a-uuid')
         .set('Authorization', `Bearer ${tokenA}`);
@@ -187,6 +251,18 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         .set('Authorization', `Bearer ${tokenA}`);
       assert.equal(resMissing.status, 404);
       assert.ok(resMissing.body.error);
+
+      const resSplitInvalid = await request(app)
+        .get('/api/v1/workbench/splits/not-a-uuid/download-zip')
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(resSplitInvalid.status, 404);
+      assert.ok(resSplitInvalid.body.error);
+
+      const resSplitMissing = await request(app)
+        .get('/api/v1/workbench/splits/00000000-0000-0000-0000-000000000000/download-zip')
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(resSplitMissing.status, 404);
+      assert.ok(resSplitMissing.body.error);
     });
 
     it('rejects empty, unsupported, and corrupt uploads with 400', async () => {
@@ -213,11 +289,12 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         .attach('audio', Buffer.from('not-a-real-wav-payload'), 'corrupt.wav');
       assert.equal(resCorruptSep.status, 400);
 
-      const resCorruptTrim = await request(app)
-        .post('/api/v1/workbench/trim')
+      const resCorruptSplit = await request(app)
+        .post('/api/v1/workbench/split')
         .set('Authorization', `Bearer ${tokenA}`)
+        .field('regions', JSON.stringify([{ name: 'part_1', startSec: 0, endSec: 0.3 }]))
         .attach('audio', Buffer.from('not-a-real-wav-payload'), 'corrupt.wav');
-      assert.equal(resCorruptTrim.status, 400);
+      assert.equal(resCorruptSplit.status, 400);
 
       const oversizedBuf = Buffer.alloc(100 * 1024 * 1024 + 1);
       const resOversized = await request(app)
@@ -229,75 +306,183 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
     });
   });
 
-  describe('3. Standalone Silence Trimmer', () => {
-    it('trims leading and trailing silence and returns presigned audioUrl and S3 key', async () => {
-      const paddedWav = makeWavBuffer({
+  describe('3. Standalone Multi-Region Asset Splitter', () => {
+    let standaloneSplitId;
+
+    it('rejects invalid split regions and fadeMs bounds with 400 before invoking worker', async () => {
+      const wav = makeWavBuffer({ sampleRate: 48000, durationSec: 1.5, freq: 440, amp: 0.5 });
+
+      const resMissingRegions = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .attach('audio', wav, 'missing_regions.wav');
+      assert.equal(resMissingRegions.status, 400);
+
+      const resEmptyRegions = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('regions', JSON.stringify([]))
+        .attach('audio', wav, 'empty_regions.wav');
+      assert.equal(resEmptyRegions.status, 400);
+
+      const tooManyRegions = Array.from({ length: 101 }, (_, idx) => ({
+        name: `sfx_${idx + 1}`,
+        startSec: 0,
+        endSec: 0.5
+      }));
+      const resTooMany = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('regions', JSON.stringify(tooManyRegions))
+        .attach('audio', wav, 'too_many_regions.wav');
+      assert.equal(resTooMany.status, 400);
+
+      const resInverted = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('regions', JSON.stringify([{ name: 'bad', startSec: 0.9, endSec: 0.4 }]))
+        .attach('audio', wav, 'inverted_bounds.wav');
+      assert.equal(resInverted.status, 400);
+
+      const resTooShort = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('regions', JSON.stringify([{ name: 'tiny', startSec: 0.2, endSec: 0.205 }]))
+        .attach('audio', wav, 'too_short.wav');
+      assert.equal(resTooShort.status, 400);
+
+      const resBadFade = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('fadeMs', '150')
+        .field('regions', JSON.stringify([{ name: 'ok', startSec: 0.1, endSec: 0.6 }]))
+        .attach('audio', wav, 'bad_fade.wav');
+      assert.equal(resBadFade.status, 400);
+
+      const resNegativeFade = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('fadeMs', '-5')
+        .field('regions', JSON.stringify([{ name: 'ok', startSec: 0.1, endSec: 0.6 }]))
+        .attach('audio', wav, 'neg_fade.wav');
+      assert.equal(resNegativeFade.status, 400);
+    });
+
+    it('splits standalone WAV into named S3 assets with presigned audioUrls', async () => {
+      const multiBurstWav = makeMultiBurstWavBuffer({
         sampleRate: 48000,
-        durationSec: 1.5,
-        leadSilenceSec: 0.5,
-        tailSilenceSec: 0.5,
-        freq: 440,
-        amp: 0.6
+        durationSec: 2.0,
+        bursts: [
+          { startSec: 0.2, endSec: 0.7, freq: 440 },
+          { startSec: 1.2, endSec: 1.7, freq: 660 }
+        ]
       });
 
+      const regions = [
+        { name: 'sfx_hit', startSec: 0.2, endSec: 0.7 },
+        { name: 'sfx_jump', startSec: 1.2, endSec: 1.7 }
+      ];
+
       const res = await request(app)
-        .post('/api/v1/workbench/trim')
+        .post('/api/v1/workbench/split')
         .set('Authorization', `Bearer ${tokenA}`)
-        .field('thresholdDb', '-40')
-        .field('padMs', '50')
         .field('fadeMs', '15')
-        .attach('audio', paddedWav, 'padded_guitar.wav');
+        .field('regions', JSON.stringify(regions))
+        .attach('audio', multiBurstWav, 'sfx_pack.wav');
 
       assert.equal(res.status, 200);
-      assert.ok(res.body.storageKey.startsWith('workbench/'));
-      assert.ok(res.body.audioUrl);
-      assert.match(res.body.audioUrl, /X-Amz-Signature=/);
-      assert.ok(res.body.originalDurationSec >= 1.45);
-      assert.ok(res.body.trimmedDurationSec < res.body.originalDurationSec);
-      assert.ok(res.body.leadInRemovedSec > 0.3);
-      assert.ok(res.body.tailRemovedSec > 0.3);
-      assert.ok(Array.isArray(res.body.trimmedPeaks));
-      assert.equal(res.body.trimmedPeaks.length, 200);
+      assert.ok(res.body.splitId);
+      assert.match(res.body.splitId, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      standaloneSplitId = res.body.splitId;
+      createdSplitIds.push(standaloneSplitId);
+
+      assert.equal(res.body.sourceFileName, 'sfx_pack.wav');
+      assert.equal(res.body.sourceFormat?.container, 'wav');
+      assert.equal(res.body.fadeMs, 15);
+      assert.equal(res.body.totalAssets, 2);
+      assert.equal(res.body.assets.length, 2);
+
+      assert.deepEqual(
+        res.body.assets.map((a) => a.name),
+        ['sfx_hit', 'sfx_jump']
+      );
+      assert.deepEqual(
+        res.body.assets.map((a) => a.fileName),
+        ['sfx_hit.wav', 'sfx_jump.wav']
+      );
+      assert.notEqual(res.body.assets[0].audioUrl, res.body.assets[1].audioUrl);
+
+      for (const asset of res.body.assets) {
+        assert.ok(asset.storageKey.startsWith(`workbench/${userA.user.id}/split-${standaloneSplitId}/`));
+        assert.match(asset.audioUrl, /X-Amz-Signature=/);
+        assert.ok(Math.abs(asset.durationSec - 0.5) < 0.02);
+
+        const head = await s3Client.send(
+          new HeadObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: asset.storageKey
+          })
+        );
+        assert.ok(head.ContentLength > 44);
+      }
     });
 
-    it('rejects all-silent WAV with 400 and descriptive error message', async () => {
-      const silentWav = makeWavBuffer({
-        sampleRate: 48000,
-        durationSec: 1.0,
-        amp: 0
-      });
-
-      const res = await request(app)
-        .post('/api/v1/workbench/trim')
+    it('downloads split assets ZIP in wav24, flac24, and mp3_320 and enforces validation & Anti-IDOR', async () => {
+      const resWavZip = await request(app)
+        .get(`/api/v1/workbench/splits/${standaloneSplitId}/download-zip?format=wav24`)
         .set('Authorization', `Bearer ${tokenA}`)
-        .field('thresholdDb', '-45')
-        .attach('audio', silentWav, 'all_silent.wav');
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resWavZip.status, 200);
+      assert.match(resWavZip.headers['content-type'], /application\/zip/);
+      const wavNames = new AdmZip(resWavZip.body)
+        .getEntries()
+        .map((e) => e.entryName)
+        .sort();
+      assert.deepEqual(wavNames, ['sfx_hit.wav', 'sfx_jump.wav']);
 
-      assert.equal(res.status, 400);
-      assert.match(res.body.error, /hening/i);
-    });
-
-    it('rejects invalid manual trim bounds (manualStartSec >= manualEndSec) with 400', async () => {
-      const wav = makeWavBuffer({
-        sampleRate: 48000,
-        durationSec: 1.2,
-        freq: 440,
-        amp: 0.5
-      });
-
-      const res = await request(app)
-        .post('/api/v1/workbench/trim')
+      const resFlacZip = await request(app)
+        .get(`/api/v1/workbench/splits/${standaloneSplitId}/download-zip?format=flac24`)
         .set('Authorization', `Bearer ${tokenA}`)
-        .field('manualStartSec', '0.9')
-        .field('manualEndSec', '0.4')
-        .attach('audio', wav, 'invalid_bounds.wav');
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resFlacZip.status, 200);
+      const flacNames = new AdmZip(resFlacZip.body)
+        .getEntries()
+        .map((e) => e.entryName)
+        .sort();
+      assert.deepEqual(flacNames, ['sfx_hit.flac', 'sfx_jump.flac']);
 
-      assert.equal(res.status, 400);
-      assert.match(res.body.error, /tidak valid/i);
+      const resMp3Zip = await request(app)
+        .get(`/api/v1/workbench/splits/${standaloneSplitId}/download-zip?format=mp3_320`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resMp3Zip.status, 200);
+      const mp3Names = new AdmZip(resMp3Zip.body)
+        .getEntries()
+        .map((e) => e.entryName)
+        .sort();
+      assert.deepEqual(mp3Names, ['sfx_hit.mp3', 'sfx_jump.mp3']);
+
+      const resBadFmt = await request(app)
+        .get(`/api/v1/workbench/splits/${standaloneSplitId}/download-zip?format=ogg_bad`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(resBadFmt.status, 400);
+
+      const resIdor = await request(app)
+        .get(`/api/v1/workbench/splits/${standaloneSplitId}/download-zip`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      assert.equal(resIdor.status, 403);
+
+      const resMissing = await request(app)
+        .get('/api/v1/workbench/splits/00000000-0000-0000-0000-000000000000/download-zip')
+        .set('Authorization', `Bearer ${tokenA}`);
+      assert.equal(resMissing.status, 404);
     });
   });
 
-  describe('4. Full Separation, Concurrency Queue, Anti-IDOR, Synced Trim, ZIP, & Send-to-Session', () => {
+  describe('4. Full Separation, Concurrency Queue, Anti-IDOR, Stem Split, ZIP, & Send-to-Session', () => {
     let job1Id;
     let job2Id;
 
@@ -373,11 +558,15 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         .set('Authorization', `Bearer ${tokenB}`);
       assert.equal(resZip.status, 403);
 
-      const resTrim = await request(app)
-        .post('/api/v1/workbench/trim')
+      const resSplitIdor = await request(app)
+        .post('/api/v1/workbench/split')
         .set('Authorization', `Bearer ${tokenB}`)
-        .send({ jobId: job1Id, stemName: 'vocals', syncAllStems: true });
-      assert.equal(resTrim.status, 403);
+        .send({
+          jobId: job1Id,
+          stemName: 'vocals',
+          regions: [{ name: 'stolen_clip', startSec: 0.1, endSec: 0.5 }]
+        });
+      assert.equal(resSplitIdor.status, 403);
 
       const resSend = await request(app)
         .post(`/api/v1/workbench/jobs/${job1Id}/send-to-session`)
@@ -386,31 +575,59 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
       assert.equal(resSend.status, 403);
     });
 
-    it('trims a single job stem without altering job.stems in Redis when syncAllStems is false', async () => {
+    it('splits a separated Tab 1 stem into named assets without altering job.stems and exports single asset cleanly', async () => {
       const beforeRes = await request(app)
         .get(`/api/v1/workbench/jobs/${job1Id}`)
         .set('Authorization', `Bearer ${tokenA}`);
       assert.equal(beforeRes.status, 200);
       const beforeStems = beforeRes.body.stems;
 
-      const resTrim = await request(app)
-        .post('/api/v1/workbench/trim')
+      const resSplit = await request(app)
+        .post('/api/v1/workbench/split')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({
           jobId: job1Id,
           stemName: 'vocals',
-          syncAllStems: false,
-          thresholdDb: -40,
-          padMs: 50,
-          fadeMs: 15
+          fadeMs: 15,
+          regions: [
+            { name: 'vox_hook', startSec: 0.2, endSec: 0.6 },
+            { name: 'vox_tail', startSec: 0.7, endSec: 1.1 }
+          ]
         });
 
-      assert.equal(resTrim.status, 200);
-      assert.ok(resTrim.body.storageKey.startsWith('workbench/'));
-      assert.ok(resTrim.body.audioUrl);
-      assert.match(resTrim.body.audioUrl, /X-Amz-Signature=/);
-      assert.ok(resTrim.body.trimmedDurationSec < resTrim.body.originalDurationSec);
-      assert.equal(resTrim.body.updatedJobStems, undefined);
+      assert.equal(resSplit.status, 200);
+      assert.ok(resSplit.body.splitId);
+      createdSplitIds.push(resSplit.body.splitId);
+      assert.equal(resSplit.body.totalAssets, 2);
+      assert.deepEqual(resSplit.body.sourceFormat, beforeRes.body.sourceFormat);
+      assert.deepEqual(
+        resSplit.body.assets.map((a) => a.name),
+        ['vox_hook', 'vox_tail']
+      );
+      assert.deepEqual(
+        resSplit.body.assets.map((a) => a.fileName),
+        ['vox_hook.wav', 'vox_tail.wav']
+      );
+      for (const asset of resSplit.body.assets) {
+        assert.ok(asset.storageKey.startsWith('workbench/'));
+        assert.match(asset.audioUrl, /X-Amz-Signature=/);
+        assert.ok(Math.abs(asset.durationSec - 0.4) < 0.02);
+      }
+
+      const firstAsset = resSplit.body.assets[0];
+      const resExportFlac = await request(app)
+        .get(`/api/v1/workbench/export?storageKey=${encodeURIComponent(firstAsset.storageKey)}&format=flac24&fileName=${encodeURIComponent(firstAsset.fileName)}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .parse(binaryParser)
+        .buffer(true);
+      assert.equal(resExportFlac.status, 200);
+      assert.match(resExportFlac.headers['content-type'], /audio\/flac/);
+      assert.match(resExportFlac.headers['content-disposition'], /vox_hook\.flac/);
+
+      const resExportIdor = await request(app)
+        .get(`/api/v1/workbench/export?storageKey=${encodeURIComponent(firstAsset.storageKey)}&format=flac24`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      assert.equal(resExportIdor.status, 403);
 
       const afterRes = await request(app)
         .get(`/api/v1/workbench/jobs/${job1Id}`)
@@ -420,52 +637,6 @@ describe('Audio Workbench API (Stem Separator, Silence Trimmer, & Session Bridge
         assert.equal(afterRes.body.stems[i].storageKey, beforeStems[i].storageKey);
         assert.equal(afterRes.body.stems[i].durationSec, beforeStems[i].durationSec);
         assert.equal(afterRes.body.stems[i].isTrimmed, false);
-      }
-    });
-
-    it('performs synced 4-stem trim and updates all 4 stems in Redis with equal durationSec', async () => {
-      const resTrim = await request(app)
-        .post('/api/v1/workbench/trim')
-        .set('Authorization', `Bearer ${tokenA}`)
-        .send({
-          jobId: job1Id,
-          stemName: 'vocals',
-          syncAllStems: true,
-          thresholdDb: -40,
-          padMs: 50,
-          fadeMs: 15
-        });
-
-      assert.equal(resTrim.status, 200);
-      assert.ok(resTrim.body.audioUrl);
-      assert.ok(resTrim.body.trimmedDurationSec < resTrim.body.originalDurationSec);
-      assert.ok(Array.isArray(resTrim.body.updatedJobStems));
-      assert.equal(resTrim.body.updatedJobStems.length, 4);
-      for (const stem of resTrim.body.updatedJobStems) {
-        assert.equal(stem.isTrimmed, true);
-        assert.ok(stem.originalAudioUrl);
-        assert.match(stem.originalAudioUrl, /X-Amz-Signature=/);
-        assert.notEqual(stem.originalAudioUrl, stem.audioUrl);
-        assert.ok(Math.abs(stem.originalDurationSec - resTrim.body.originalDurationSec) < 0.001);
-        assert.ok(stem.originalDurationSec > stem.durationSec);
-      }
-
-      const resJob = await request(app)
-        .get(`/api/v1/workbench/jobs/${job1Id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
-
-      assert.equal(resJob.status, 200);
-      assert.equal(resJob.body.stems.length, 4);
-      const durations = new Set(resJob.body.stems.map((s) => Number(s.durationSec.toFixed(6))));
-      assert.equal(durations.size, 1);
-      for (const stem of resJob.body.stems) {
-        assert.equal(stem.isTrimmed, true);
-        assert.ok(stem.audioUrl);
-        assert.ok(stem.originalAudioUrl);
-        assert.match(stem.originalAudioUrl, /X-Amz-Signature=/);
-        assert.notEqual(stem.originalAudioUrl, stem.audioUrl);
-        assert.ok(Math.abs(stem.originalDurationSec - resTrim.body.originalDurationSec) < 0.001);
-        assert.ok(stem.originalDurationSec > stem.durationSec);
       }
     });
 
