@@ -30,6 +30,7 @@ try:
         slice_aligned_batch,
     )
     from .workbench.stem_separator import STEM_ORDER, separate_audio_stems
+    from .workbench.audio_exporter import transcode_audio_bytes
 except (ImportError, ValueError):
     from ai.instrument_classifier import classify_track
     from ai.pairing_detector import detect_track_pairs
@@ -51,6 +52,7 @@ except (ImportError, ValueError):
         slice_aligned_batch,
     )
     from workbench.stem_separator import STEM_ORDER, separate_audio_stems
+    from workbench.audio_exporter import transcode_audio_bytes
 
 load_dotenv()
 
@@ -698,6 +700,45 @@ def trim_workbench_audio(payload):
     raise ValueError(f"Mode trim tidak valid: {mode}")
 
 
+def export_workbench_audio(payload):
+    """Fetch S3 audio objects, transcode to targetFormat, and write to outputPath."""
+    s3 = get_s3_client()
+    items = payload.get("items", [])
+    if not items:
+        raise ValueError("Daftar berkas ekspor tidak boleh kosong")
+
+    exported = []
+    for item in items:
+        source_key = item["sourceStorageKey"]
+        output_path = item["outputPath"]
+        target_format = item.get("targetFormat", "wav24")
+        bitrate_kbps = item.get("bitrateKbps")
+        file_name = item.get("fileName") or os.path.basename(source_key) or "audio.wav"
+
+        raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=source_key)["Body"].read()
+        result = transcode_audio_bytes(
+            raw_bytes,
+            target_format=target_format,
+            bitrate_kbps=bitrate_kbps,
+            file_name=file_name,
+        )
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(result["bytes"])
+
+        exported.append({
+            "name": item.get("name"),
+            "outputPath": output_path,
+            "ext": result["ext"],
+            "mime": result["mime"],
+            "format": result["format"],
+            "sizeBytes": len(result["bytes"]),
+        })
+
+    return {"items": exported}
+
+
 def sanitize_floats(obj):
     if isinstance(obj, bool):
         return obj
@@ -774,6 +815,18 @@ if __name__ == "__main__":
             input_data = sys.stdin.read()
             payload = json.loads(input_data)
             output = trim_workbench_audio(payload)
+            clean_output = sanitize_floats(output)
+            print(json.dumps(clean_output))
+            sys.exit(0)
+        except Exception as err:
+            sys.stderr.write(f"{err}\n")
+            sys.exit(1)
+
+    elif "--export-stdin" in sys.argv:
+        try:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+            output = export_workbench_audio(payload)
             clean_output = sanitize_floats(output)
             print(json.dumps(clean_output))
             sys.exit(0)

@@ -301,3 +301,32 @@ def test_decode_with_ffmpeg_timeout_raises_value_error_and_cleans_temp_files():
     assert len(created_paths) == 2
     for path in created_paths:
         assert not os.path.exists(path)
+
+
+def test_encode_wav_bytes_defaults_to_pcm24_and_transcodes_formats():
+    from workbench.silence_trimmer import encode_wav_bytes
+    from workbench.audio_exporter import transcode_audio_bytes
+
+    sr = 48000
+    sine = _make_sine(440.0, 0.5, sr=sr, amp=0.5)
+    wav24_bytes = encode_wav_bytes(sine, sr)
+    info = sf.info(io.BytesIO(wav24_bytes))
+    assert info.subtype == "PCM_24"
+    assert info.samplerate == 48000
+
+    flac_out = transcode_audio_bytes(wav24_bytes, target_format="flac24")
+    assert flac_out["ext"] == ".flac"
+    assert flac_out["mime"] == "audio/flac"
+    flac_info = sf.info(io.BytesIO(flac_out["bytes"]))
+    assert flac_info.format == "FLAC"
+    assert flac_info.subtype == "PCM_24"
+    assert len(flac_out["bytes"]) < len(wav24_bytes)
+
+    mp3_out = transcode_audio_bytes(wav24_bytes, target_format="mp3_320")
+    assert mp3_out["ext"] == ".mp3"
+    assert mp3_out["mime"] == "audio/mpeg"
+    assert len(mp3_out["bytes"]) > 0
+    assert len(mp3_out["bytes"]) < len(wav24_bytes)
+
+    with pytest.raises(ValueError, match="tidak didukung"):
+        transcode_audio_bytes(wav24_bytes, target_format="ogg_invalid")

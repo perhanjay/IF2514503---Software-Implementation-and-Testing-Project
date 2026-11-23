@@ -115,11 +115,17 @@ def decode_audio_bytes(raw_bytes: bytes, file_name: str) -> tuple[np.ndarray, in
     return np.ascontiguousarray(stereo, dtype=np.float32), TARGET_SAMPLE_RATE
 
 
-def encode_wav_bytes(audio_data: np.ndarray, sample_rate: int = TARGET_SAMPLE_RATE) -> bytes:
-    """Encode float32 stereo audio array into WAV bytes."""
+def encode_wav_bytes(
+    audio_data: np.ndarray,
+    sample_rate: int = TARGET_SAMPLE_RATE,
+    subtype: str = "PCM_24",
+) -> bytes:
+    """Encode stereo audio array into lossless WAV bytes (24-bit PCM by default)."""
     stereo = _ensure_stereo_2d(audio_data)
+    if subtype != "FLOAT":
+        stereo = np.clip(stereo, -1.0, 1.0)
     buf = io.BytesIO()
-    sf.write(buf, stereo, int(sample_rate), format="WAV", subtype="FLOAT")
+    sf.write(buf, stereo, int(sample_rate), format="WAV", subtype=subtype)
     return buf.getvalue()
 
 
