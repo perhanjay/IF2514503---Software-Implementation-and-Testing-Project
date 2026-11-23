@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { RefreshCw, Zap } from 'lucide-vue-next'
 
 const props = defineProps({
   score: {
@@ -45,101 +46,102 @@ const emit = defineEmits(['rescan'])
 const colorConfig = computed(() => {
   if (props.score >= 90) {
     return {
-      scoreText: 'text-emerald-700',
-      badgeBg: 'bg-emerald-50',
-      badgeBorder: 'border-emerald-300',
-      badgeText: 'text-emerald-800'
+      scoreText: 'text-[#5ad363]',
+      badgeBg: 'bg-[#5ad363]/20',
+      badgeBorder: 'border-[#111111]/20',
+      badgeText: 'text-emerald-900'
     }
   } else if (props.score >= 65) {
     return {
-      scoreText: 'text-amber-700',
-      badgeBg: 'bg-amber-50',
-      badgeBorder: 'border-amber-300',
-      badgeText: 'text-amber-800'
+      scoreText: 'text-[#ffda40]',
+      badgeBg: 'bg-[#ffda40]/45',
+      badgeBorder: 'border-[#111111]/20',
+      badgeText: 'text-amber-950'
     }
   } else {
     return {
-      scoreText: 'text-rose-700',
-      badgeBg: 'bg-rose-50',
-      badgeBorder: 'border-rose-300',
-      badgeText: 'text-rose-800'
+      scoreText: 'text-rose-300',
+      badgeBg: 'bg-[#ff82c2]/30',
+      badgeBorder: 'border-[#111111]/20',
+      badgeText: 'text-rose-950'
     }
   }
 })
 </script>
 
 <template>
-  <div class="pb-5 border-b border-stone/60">
+  <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 sm:p-5">
     <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-      
-      <!-- Left: Clean Typographic Score Block & Rating with Rescan Button Below -->
-      <div class="flex items-start gap-4 sm:gap-6">
-        <div class="flex items-baseline gap-1.5 shrink-0 pt-0.5">
-          <span 
+      <!-- Left: Smoked Monitor Score Block & Rating with Tactile Rescan Keycap Below -->
+      <div class="flex items-start sm:items-center gap-4 sm:gap-5">
+        <div class="retro-monitor border-2 border-[#111111] shadow-[2px_3px_0_#111111] px-4 py-3 flex items-baseline gap-1.5 shrink-0">
+          <span
             :class="[colorConfig.scoreText]"
-            class="font-editorial text-5xl sm:text-6xl font-black leading-none tracking-tighter">
+            class="font-editorial tabular-nums text-4xl sm:text-5xl font-black leading-none tracking-tighter"
+          >
             {{ Math.round(score) }}
           </span>
-          <span class="font-mono-accent text-xs font-semibold uppercase tracking-widest text-slate">
+          <span class="font-sans text-xs font-semibold text-[#a1a1aa]">
             / 100
           </span>
         </div>
 
-        <!-- Title & status text with Pindai Ulang button directly below it -->
+        <!-- Title & status text with Pindai Ulang keycap directly below it -->
         <div class="space-y-2 text-left">
-          <h3 class="font-editorial text-xl sm:text-2xl text-ink-black font-extrabold tracking-tight leading-tight">
+          <h3 class="font-editorial text-xl sm:text-2xl text-[#111111] font-extrabold tracking-tight leading-tight">
             {{ ratingLabel }}
           </h3>
           <div>
-            <button 
+            <button
+              type="button"
               @click="emit('rescan')"
               :disabled="isRescanning"
-              class="py-1 px-3 border border-stone hover:border-ink-black hover:bg-paper-white bg-bone text-ink-black text-xs font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-all font-mono-accent disabled:opacity-50">
-              <svg class="w-3.5 h-3.5 text-stone" :class="{'animate-spin': isRescanning}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              class="btn-keycap btn-keycap-sm btn-keycap-white px-3.5 py-1.5 text-xs"
+            >
+              <RefreshCw
+                class="w-3.5 h-3.5 text-[#111111]"
+                :class="{ 'animate-spin': isRescanning }"
+                :stroke-width="2.1"
+              />
               <span>{{ isRescanning ? 'Memindai Ulang...' : 'Pindai Ulang' }}</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Right: Stems Breakdown Stats & Token Estimation (Seamless, united with background) -->
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-6 w-full md:w-auto">
-        <div class="flex items-center divide-x divide-stone/60 text-center">
-          <div class="pr-3">
-            <span class="font-mono-accent text-sm font-bold text-emerald-700 block">
+      <!-- Right: Stems Breakdown Stats & Token Estimation (Uniform Tactile Retro Cards) -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full md:w-auto">
+        <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-[#fcfcfb] shadow-[2px_3px_0_#111111] px-4 py-2.5 flex items-center justify-around sm:justify-start divide-x divide-[#111111]/15 text-center">
+          <div class="pr-3.5">
+            <span class="font-sans tabular-nums text-base font-extrabold text-emerald-800 block leading-tight">
               {{ cleanTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate uppercase tracking-wider font-semibold">Bersih</span>
+            <span class="font-sans text-[11px] text-[#111111] font-bold">Bersih</span>
           </div>
-          <div class="px-3">
-            <span class="font-mono-accent text-sm font-bold text-amber-700 block">
+          <div class="px-3.5">
+            <span class="font-sans tabular-nums text-base font-extrabold text-amber-800 block leading-tight">
               {{ warningTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate uppercase tracking-wider font-semibold">Warning</span>
+            <span class="font-sans text-[11px] text-[#111111] font-bold">Warning</span>
           </div>
-          <div class="pl-3">
-            <span class="font-mono-accent text-sm font-bold text-rose-700 block">
+          <div class="pl-3.5">
+            <span class="font-sans tabular-nums text-base font-extrabold text-rose-800 block leading-tight">
               {{ criticalTracks }}
             </span>
-            <span class="font-mono-accent text-[10px] text-slate uppercase tracking-wider font-semibold">Kritis</span>
+            <span class="font-sans text-[11px] text-[#111111] font-bold">Kritis</span>
           </div>
         </div>
 
-        <div class="text-left flex items-center gap-2.5">
-          <div class="w-7 h-7 bg-ink-black text-paper-white flex items-center justify-center shrink-0">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+        <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-[#fcfcfb] shadow-[2px_3px_0_#111111] px-3.5 py-2.5 text-left flex items-center gap-3">
+          <div class="w-8 h-8 rounded-[10px] bg-[#ffda40] border-[1.5px] border-[#111111] shadow-[1.5px_2px_0_0_#111111] text-[#111111] flex items-center justify-center shrink-0">
+            <Zap class="w-4 h-4" :stroke-width="2.2" />
           </div>
-          <div class="text-xs">
-            <div class="font-bold text-ink-black uppercase tracking-wider font-editorial text-[10px]">Estimasi Perbaikan:</div>
-            <div class="font-mono-accent font-bold text-ink-black text-xs">{{ estimatedTokens }} Token Polaris</div>
+          <div class="leading-tight">
+            <div class="font-sans font-semibold text-[#60605e] text-[11px]">Estimasi Perbaikan:</div>
+            <div class="font-sans tabular-nums font-bold text-[#111111] text-xs mt-0.5">{{ estimatedTokens }} Token Polaris</div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 </template>

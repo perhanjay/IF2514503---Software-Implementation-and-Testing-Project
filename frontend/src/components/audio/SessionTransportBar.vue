@@ -35,45 +35,46 @@ const bitDepthLabel = computed(() => {
 </script>
 
 <template>
-  <div class="bg-black text-white rounded-none px-4 py-2.5 border border-black flex flex-wrap items-center justify-between gap-3 text-xs select-none">
+  <div class="retro-monitor px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs select-none">
     
     <!-- Left: Studio Clock & Engine Telemetry -->
-    <div class="flex items-center gap-3">
-      <!-- Static Studio Green Tally Light -->
-      <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-none bg-emerald-400 inline-block" />
-        <span class="font-mono-accent text-[11px] font-bold tracking-wider text-emerald-400 uppercase">
-          DSP Engine Active
-        </span>
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Static Studio Green Tally Pill -->
+      <div class="inline-flex items-center gap-1.5 rounded-full bg-[#10b981]/15 border border-[#10b981]/40 px-2.5 py-0.5 font-sans text-[11px] font-bold text-[#5ad363]">
+        <svg class="w-3 h-3 text-[#5ad363] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <span>DSP Engine Active</span>
       </div>
 
-      <span class="text-[#60605e] hidden sm:inline">|</span>
+      <span class="text-[#a1a1aa]/40 hidden sm:inline">|</span>
 
       <!-- Sampling Rate & Bit Depth -->
-      <div class="flex items-center gap-1.5 font-mono-accent text-[11px] text-white">
-        <span class="text-[#60605e] uppercase text-[9px] tracking-wider">Clock:</span>
-        <span class="font-bold">{{ sampleRateLabel }}</span>
-        <span class="text-[#60605e]">/</span>
-        <span>{{ bitDepthLabel }} PCM</span>
+      <div class="flex items-center gap-1.5 text-xs">
+        <span class="font-sans text-[#a1a1aa] font-medium">Clock:</span>
+        <span class="font-telemetry font-bold text-[#ffffff]">{{ sampleRateLabel }}</span>
+        <span class="text-[#a1a1aa]/60">/</span>
+        <span class="font-telemetry font-semibold text-[#f5f3eb]">{{ bitDepthLabel }}</span>
+        <span class="font-sans text-[#a1a1aa]">PCM</span>
       </div>
     </div>
 
     <!-- Center/Right: Multitrack Channel Layout -->
-    <div class="flex items-center gap-3 font-mono-accent text-[11px]">
-      <div class="flex items-center gap-2 text-white">
-        <span class="text-[#60605e] uppercase text-[9px] tracking-wider">Stems:</span>
-        <span class="font-bold">{{ totalTracks }} Stems</span>
-        <span class="text-[#60605e] text-[10px]">
-          ({{ stereoCount }} Stereo, {{ monoCount }} Mono)
+    <div class="flex flex-wrap items-center gap-3 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="font-sans text-[#a1a1aa] font-medium">Stems:</span>
+        <span class="font-telemetry font-bold text-[#20afff]">{{ totalTracks }}</span>
+        <span class="font-sans font-semibold text-[#f5f3eb]">Stems</span>
+        <span class="font-sans text-[#a1a1aa] text-[11px]">
+          (<span class="font-telemetry text-[#f5f3eb]">{{ stereoCount }}</span> Stereo, <span class="font-telemetry text-[#f5f3eb]">{{ monoCount }}</span> Mono)
         </span>
       </div>
 
-      <span class="text-[#60605e] hidden sm:inline">|</span>
+      <span class="text-[#a1a1aa]/40 hidden md:inline">|</span>
 
       <!-- Compliance Standard Badge -->
-      <div class="hidden md:flex items-center gap-1 text-[10px] text-[#c1c0bc]">
-        <span class="w-1.5 h-1.5 rounded-none bg-white inline-block" />
-        <span>ITU-R BS.1770-4</span>
+      <div class="hidden md:inline-flex items-center gap-1.5 rounded-full bg-white/8 border border-white/15 px-2.5 py-0.5 font-sans text-[11px] font-medium text-[#f5f3eb]">
+        <span>ITU-R <span class="font-telemetry font-semibold text-[#20afff]">BS.1770-4</span></span>
       </div>
     </div>
 

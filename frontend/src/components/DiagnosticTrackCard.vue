@@ -1,5 +1,20 @@
 <script setup>
 import { ref, computed } from 'vue'
+import {
+  AudioLines,
+  Mic,
+  Link2,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  AlertTriangle,
+  Zap,
+  Ban,
+  TrendingDown,
+  Scale,
+  CheckCircle2,
+  Wrench
+} from 'lucide-vue-next'
 import LedPeakMeter from './audio/LedPeakMeter.vue'
 
 const props = defineProps({
@@ -33,27 +48,55 @@ const correlationPercent = computed(() => {
   return Math.max(0, Math.min(100, ((val + 1.0) / 2.0) * 100))
 })
 
-const correlationColorClass = computed(() => {
+const phaseTone = computed(() => {
   const val = diag.value?.phaseCorrelation ?? 1.0
-  if (val < 0.0) return 'text-rose-700 font-bold'
-  if (val < 0.4) return 'text-amber-700 font-bold'
-  return 'text-emerald-700 font-bold'
+  if (val < 0.0) {
+    return {
+      pill: 'bg-[#ff82c2] border-[#111111] text-[#111111]',
+      label: 'Fasa Batal (Out of Phase)'
+    }
+  }
+  if (val < 0.4) {
+    return {
+      pill: 'bg-[#ffda40] border-[#111111] text-[#111111]',
+      label: 'Stereo Lebar'
+    }
+  }
+  return {
+    pill: 'bg-[#5ad363] border-[#111111] text-[#111111]',
+    label: 'Fasa Terpadu (In Phase)'
+  }
 })
 
 const statusBadge = computed(() => {
   if (props.track?.status === 'REPAIRED' || props.track?.repairedStorageKey) {
-    return { label: 'Telah Diperbaiki', color: 'text-emerald-700' }
+    return {
+      label: 'Telah Diperbaiki',
+      pillClass: 'bg-[#5ad363] border-[#111111] text-[#111111] shadow-[1.5px_2px_0_#111111]'
+    }
   }
   if (!diag.value) {
-    return { label: 'Belum Dipindai', color: 'text-slate' }
+    return {
+      label: 'Belum Dipindai',
+      pillClass: 'bg-[#eaeef4] border-[#111111]/25 text-[#60605e]'
+    }
   }
   const s = diag.value?.healthStatus || 'Clean'
   if (s === 'Critical') {
-    return { label: 'Kritis', color: 'text-rose-700' }
+    return {
+      label: 'Kritis',
+      pillClass: 'bg-[#ff82c2] border-[#111111] text-[#111111] shadow-[1.5px_2px_0_#111111]'
+    }
   } else if (s === 'Warning') {
-    return { label: 'Perhatian', color: 'text-amber-700' }
+    return {
+      label: 'Perhatian',
+      pillClass: 'bg-[#ffda40] border-[#111111] text-[#111111] shadow-[1.5px_2px_0_#111111]'
+    }
   } else {
-    return { label: 'Bersih', color: 'text-emerald-700' }
+    return {
+      label: 'Bersih',
+      pillClass: 'bg-[#5ad363] border-[#111111] text-[#111111] shadow-[1.5px_2px_0_#111111]'
+    }
   }
 })
 
@@ -71,258 +114,346 @@ const hasAnyAnomalies = computed(() => {
 </script>
 
 <template>
-  <div 
-    class="py-3.5 px-1 sm:px-2 transition-colors hover:bg-bone/30"
-    :class="showDetails ? 'space-y-4' : ''">
-    
-    <!-- Header: Track info, label, & status badge -->
-    <div 
-      @click="showDetails = !showDetails"
-      class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:bg-bone/40 -m-1 sm:-m-2 p-1 sm:p-2 transition-colors">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 flex items-center justify-center text-ink-black shrink-0">
-          <svg v-if="track.isStereo" class="w-5 h-5 text-ink-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-          </svg>
-          <svg v-else class="w-5 h-5 text-slate" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
-          </svg>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <h4 class="font-bold text-sm sm:text-base text-ink-black truncate max-w-xs sm:max-w-md">
-              {{ track.fileName }}
-            </h4>
-            <span class="font-mono-accent text-xs text-ink-black uppercase font-semibold">
-              {{ track.instrumentLabel || track.detectedLabel || 'Audio' }}
-            </span>
-            <span v-if="track.isStereo" class="font-mono-accent text-[10px] text-[#0052FF] font-bold">
-              STEREO
-            </span>
-            <span v-else class="font-mono-accent text-[10px] text-stone font-semibold">
-              MONO
-            </span>
+  <div :class="showDetails ? 'py-2' : 'py-2.5'">
+    <!-- Unified Track Card Container (black outline wraps BOTH stem header + details when expanded) -->
+    <div
+      class="transition-all"
+      :class="showDetails
+        ? 'rounded-[16px] border-2 border-[#111111] bg-[#fcfcfb] shadow-[3px_4px_0_#111111] overflow-hidden'
+        : 'rounded-[12px] hover:bg-[#fcfcfb]'"
+    >
+      <!-- Header: Tactile Stem Emblem, Filename, Uniform Retro Pills & Rincian Keycap -->
+      <div
+        @click="showDetails = !showDetails"
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none transition-colors"
+        :class="showDetails
+          ? 'p-4 sm:p-5 bg-white border-b border-dashed border-[#111111]/15'
+          : 'p-2.5 sm:p-3'"
+      >
+        <div class="flex items-center gap-3.5 min-w-0">
+          <!-- Tactile Stem Icon Tile -->
+          <div
+            class="w-10 h-10 rounded-[10px] border-[1.5px] border-[#111111] shadow-[1.5px_2px_0_#111111] flex items-center justify-center shrink-0 text-[#111111]"
+            :class="track.isStereo ? 'bg-[#87d7ff]' : 'bg-[#fff099]'"
+            :title="track.isStereo ? 'Stem Stereo' : 'Stem Mono'"
+          >
+            <AudioLines v-if="track.isStereo" class="w-4.5 h-4.5" :stroke-width="2.2" />
+            <Mic v-else class="w-4.5 h-4.5" :stroke-width="2.2" />
           </div>
 
-          <p v-if="pairedTrack" class="text-xs text-slate mt-0.5 font-mono-accent">
-            Pasangan: <span class="font-bold text-ink-black">{{ pairedTrack.fileName }}</span>
-            <span v-if="pairInfo" class="text-[10px] text-slate"> ({{ pairInfo.pairType }})</span>
-          </p>
+          <div class="min-w-0 space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <h4 class="font-sans font-bold text-sm sm:text-base text-[#111111] truncate max-w-xs sm:max-w-md">
+                {{ track.fileName }}
+              </h4>
+              <span class="inline-flex items-center rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 font-sans text-[11px] font-bold text-[#111111] leading-none">
+                {{ track.instrumentLabel || track.detectedLabel || 'Audio' }}
+              </span>
+              <span
+                v-if="track.isStereo"
+                class="inline-flex items-center rounded-full bg-[#87d7ff] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 font-sans text-[11px] font-bold text-[#111111] leading-none"
+              >
+                Stereo
+              </span>
+              <span
+                v-else
+                class="inline-flex items-center rounded-full bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 font-sans text-[11px] font-bold text-[#111111] leading-none"
+              >
+                Mono
+              </span>
+            </div>
+
+            <p v-if="pairedTrack" class="font-sans text-xs text-[#60605e] flex flex-wrap items-center gap-1">
+              <Link2 class="w-3 h-3 shrink-0 text-[#20afff]" :stroke-width="2.1" />
+              <span>Pasangan:</span>
+              <span class="font-bold text-[#111111]">{{ pairedTrack.fileName }}</span>
+              <span v-if="pairInfo" class="text-[11px] text-[#60605e]">({{ pairInfo.pairType }})</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 self-start sm:self-auto shrink-0">
+          <span
+            :class="[statusBadge.pillClass]"
+            class="inline-flex items-center justify-center rounded-full px-3 py-1 border-[1.5px] font-sans text-[11px] font-bold leading-none"
+          >
+            {{ statusBadge.label }}
+          </span>
+
+          <button
+            type="button"
+            @click.stop="showDetails = !showDetails"
+            :class="showDetails ? 'btn-keycap-yellow' : 'btn-keycap-white'"
+            class="btn-keycap btn-keycap-mini px-3.5 py-1.5 text-xs"
+          >
+            <span>{{ showDetails ? 'Tutup' : 'Rincian' }}</span>
+            <ChevronUp v-if="showDetails" class="w-3.5 h-3.5" :stroke-width="2.2" />
+            <ChevronDown v-else class="w-3.5 h-3.5" :stroke-width="2.2" />
+          </button>
         </div>
       </div>
 
-      <div class="flex items-center gap-2.5 self-start sm:self-auto">
-        <span 
-          :class="[statusBadge.color]"
-          class="font-mono-accent text-xs font-bold">
-          {{ statusBadge.label }}
+      <!-- Detailed Section (Seamlessly enclosed inside the unified black outline) -->
+      <div
+        v-if="showDetails"
+        class="p-4 sm:p-5 space-y-4 animate-fade-in"
+      >
+      <!-- Phase Correlation & DSP Telemetry -->
+      <div v-if="diag" class="space-y-4">
+        <!-- Unified Light-Paper Phase Correlation Plate -->
+        <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 sm:p-5 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#60605e]">
+                Korelasi Fasa
+              </span>
+              <span
+                :class="[phaseTone.pill]"
+                class="inline-flex items-center rounded-full border-[1.5px] shadow-[1.5px_2px_0_#111111] px-2.5 py-1 font-telemetry text-[11px] font-bold leading-none"
+              >
+                {{ diag.phaseCorrelation >= 0 ? '+' : '' }}{{ (diag.phaseCorrelation ?? 1.0).toFixed(2) }}
+              </span>
+            </div>
+            <span
+              :class="[phaseTone.pill]"
+              class="inline-flex items-center rounded-full border-[1.5px] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-sans text-[11px] font-bold leading-none"
+            >
+              {{ phaseTone.label }}
+            </span>
+          </div>
+
+          <!-- Calibrated Light Gauge Bar -->
+          <div class="relative w-full pt-1.5 pb-1">
+            <div class="relative w-full h-3 rounded-full bg-[#eaeef4] border-[1.5px] border-[#111111]/20 overflow-hidden">
+              <div class="absolute left-0 top-0 bottom-0 w-1/2 bg-[#ff82c2]/55" />
+              <div class="absolute right-0 top-0 bottom-0 w-1/2 bg-[#5ad363]/55" />
+              <div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-[#111111]/55 z-10" />
+            </div>
+
+            <!-- Tactile Needle Pointer (clamped cleanly inside track ends) -->
+            <div
+              class="absolute top-0.5 w-4 h-4 -ml-2 rounded-full bg-white border-2 border-[#111111] shadow-[1px_1.5px_0_#111111] z-20 transition-all duration-300 ease-out"
+              :style="{ left: `clamp(8px, ${correlationPercent}%, calc(100% - 8px))` }"
+            />
+
+            <!-- Scale Calibration Markings -->
+            <div class="relative w-full mt-2 flex justify-between text-[11px] text-[#60605e] select-none">
+              <span class="text-rose-800 font-bold">
+                <span class="font-telemetry">-1.0</span>
+                <span class="font-sans"> (Batal)</span>
+              </span>
+              <span class="font-telemetry hidden sm:inline">-0.5</span>
+              <span class="font-bold text-[#111111]">
+                <span class="font-telemetry">0.0</span>
+                <span class="font-sans"> (Stereo)</span>
+              </span>
+              <span class="font-telemetry hidden sm:inline">+0.5</span>
+              <span class="text-emerald-800 font-bold">
+                <span class="font-telemetry">+1.0</span>
+                <span class="font-sans"> (Mono)</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4-Column Tactile Telemetry Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
+          <!-- True-Peak with Hardware LED Peak Meter -->
+          <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-sans text-[11px] font-bold text-[#60605e] uppercase tracking-wide">True-Peak</span>
+              <span
+                v-if="diag.hasClipping"
+                class="inline-flex items-center rounded-full border-[1.5px] border-[#111111] bg-[#ff82c2] shadow-[1.5px_2px_0_#111111] px-2.5 py-0.5 font-sans text-[10px] font-bold text-[#111111] leading-none"
+              >
+                Clipped
+              </span>
+            </div>
+            <div
+              class="font-telemetry font-bold text-base"
+              :class="diag.hasClipping ? 'text-rose-700' : 'text-[#111111]'"
+            >
+              {{ diag.truePeakDbfs !== null ? `${diag.truePeakDbfs.toFixed(1)} dBFS` : '-' }}
+            </div>
+            <LedPeakMeter
+              :value="diag.truePeakDbfs"
+              :is-clipped="diag.hasClipping"
+            />
+          </div>
+
+          <!-- Crest Factor -->
+          <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 flex flex-col justify-between space-y-2">
+            <span class="font-sans text-[11px] font-bold text-[#60605e] uppercase tracking-wide">Crest Factor</span>
+            <div class="flex items-baseline gap-2">
+              <span class="font-telemetry font-bold text-base text-[#111111]">
+                {{ diag.crestFactor !== null ? `${diag.crestFactor.toFixed(1)} dB` : '-' }}
+              </span>
+              <span class="font-sans text-xs font-medium text-[#60605e]">Dinamika</span>
+            </div>
+          </div>
+
+          <!-- DC Offset -->
+          <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-sans text-[11px] font-bold text-[#60605e] uppercase tracking-wide">DC Offset</span>
+              <span
+                v-if="diag.hasDcOffset"
+                class="inline-flex items-center rounded-full border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] px-2.5 py-0.5 font-sans text-[10px] font-bold text-[#111111] leading-none"
+              >
+                Offset
+              </span>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-1.5">
+              <span
+                class="font-bold text-base"
+                :class="diag.hasDcOffset ? 'text-amber-800 font-sans' : 'text-[#111111]'"
+              >
+                <template v-if="diag.hasDcOffset">Terdeteksi</template>
+                <template v-else>
+                  <span class="font-telemetry">0.00%</span>
+                  <span class="font-sans text-xs font-semibold text-emerald-800 ml-1.5">Bersih</span>
+                </template>
+              </span>
+            </div>
+          </div>
+
+          <!-- Sub Rumble -->
+          <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white shadow-[2px_3px_0_#111111] p-4 flex flex-col justify-between space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-sans text-[11px] font-bold text-[#60605e] uppercase tracking-wide">Sub-Rumble</span>
+              <span
+                v-if="diag.hasSubRumble"
+                class="inline-flex items-center rounded-full border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] px-2.5 py-0.5 font-sans text-[10px] font-bold text-[#111111] leading-none"
+              >
+                Filter
+              </span>
+            </div>
+            <div class="flex flex-wrap items-baseline gap-1.5">
+              <span
+                class="font-bold text-base"
+                :class="diag.hasSubRumble ? 'text-amber-800' : 'text-[#111111] font-sans'"
+              >
+                <template v-if="diag.hasSubRumble">
+                  <span class="font-telemetry">&lt; 35 Hz</span>
+                  <span class="font-sans text-xs ml-1">Rumble</span>
+                </template>
+                <template v-else>Aman</template>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Problem Flags (Uniform Stamp Pills) -->
+      <div v-if="diag && hasAnyAnomalies" class="flex flex-wrap items-center gap-2.5 pt-0.5 font-sans text-xs">
+        <span
+          v-if="diag.hasPolarityInvert"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ff82c2] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <Ban class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Polaritas Terbalik <span class="font-telemetry">180°</span></span>
         </span>
 
-        <button 
-          @click.stop="showDetails = !showDetails"
-          class="btn-bone-secondary px-3 py-1 border border-stone text-ink-black text-xs font-semibold uppercase tracking-wider cursor-pointer font-mono-accent">
-          {{ showDetails ? 'Tutup' : 'Rincian' }}
-        </button>
-      </div>
-    </div>
+        <span
+          v-if="diag.hasFakeStereo"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ff82c2] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <AlertCircle class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Fake Stereo (Haas Effect)</span>
+        </span>
 
-    <!-- Detailed Section (Toggled by showDetails) -->
-    <div v-if="showDetails" class="space-y-4 pt-1 animate-fade-in">
-      <!-- Phase Correlation & DSP Telemetry (Borderless, Open Editorial Layout) -->
-      <div v-if="diag" class="space-y-4">
-      <!-- Phase Correlation Section -->
-      <div class="space-y-1.5">
-        <div class="flex items-center justify-between text-xs">
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] font-mono-accent uppercase tracking-wider text-slate font-semibold">
-              Korelasi Fasa:
-            </span>
-            <span 
-              :class="[correlationColorClass]"
-              class="font-mono-accent text-xs">
-              {{ diag.phaseCorrelation >= 0 ? '+' : '' }}{{ (diag.phaseCorrelation ?? 1.0).toFixed(2) }}
-            </span>
-          </div>
-          <span class="font-mono-accent text-[10px] text-slate">
-            Status: <span class="font-bold text-ink-black">{{ diag.phaseCorrelation < 0 ? 'Fasa Batal (Out of Phase)' : diag.phaseCorrelation < 0.4 ? 'Stereo Lebar' : 'Fasa Terpadu (In Phase)' }}</span>
+        <span
+          v-if="diag.hasCombFiltering"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <AlertTriangle class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Comb Filtering Mikro</span>
+        </span>
+
+        <span
+          v-if="diag.hasClipping"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ff82c2] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <Zap class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Inter-Sample Peak Clipping</span>
+        </span>
+
+        <span
+          v-if="diag.hasSubRumble"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <TrendingDown class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Sub-Rumble (<span class="font-telemetry">&lt; 35 Hz</span>)</span>
+        </span>
+
+        <span
+          v-if="diag.hasDcOffset"
+          class="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] px-3 py-1 font-bold text-[11px] text-[#111111] leading-none"
+        >
+          <Scale class="w-3.5 h-3.5 text-[#111111] shrink-0" :stroke-width="2.2" />
+          <span>Penyimpangan DC Offset</span>
+        </span>
+      </div>
+
+      <!-- Prominent Recommendations Callout Box -->
+      <div
+        class="rounded-[14px] border-2 border-[#111111] p-4 sm:p-5 shadow-[2px_3px_0_#111111] space-y-2.5"
+        :class="
+          diag && diag.recommendations && diag.recommendations.length
+            ? (diag.recommendations.some(r => r.severity === 'CRITICAL') ? 'bg-[#ff82c2]/22' : 'bg-[#ffda40]/32')
+            : diag
+              ? 'bg-[#5ad363]/20'
+              : 'bg-white'
+        "
+      >
+        <div class="flex items-center gap-2.5">
+          <span class="w-6 h-6 rounded-[7px] bg-[#111111] text-white flex items-center justify-center shrink-0">
+            <CheckCircle2 v-if="diag && (!diag.recommendations || !diag.recommendations.length)" class="w-3.5 h-3.5 text-[#5ad363]" :stroke-width="2.3" />
+            <Wrench v-else class="w-3.5 h-3.5 text-[#ffda40]" :stroke-width="2.2" />
           </span>
+          <h5 class="font-editorial font-bold text-xs sm:text-sm text-[#111111] tracking-tight">
+            Rekomendasi Solusi Teknis
+          </h5>
         </div>
 
-        <!-- Calibrated Gauge Bar (Clean hairline, borderless) -->
-        <div class="relative w-full pt-1 pb-3">
-          <div class="relative w-full h-1.5 bg-bone overflow-hidden">
-            <!-- Negative region tint (left half) -->
-            <div class="absolute left-0 top-0 bottom-0 w-1/2 bg-rose-200/80" />
-            <!-- Positive region tint (right half) -->
-            <div class="absolute right-0 top-0 bottom-0 w-1/2 bg-emerald-200/80" />
-            <!-- Center reference mark -->
-            <div class="absolute left-1/2 top-0 bottom-0 w-0.5 bg-ink-black z-10" />
-          </div>
-
-          <!-- Needle pointer -->
-          <div 
-            class="absolute top-0 bottom-2.5 w-1.5 bg-ink-black z-20 transition-all duration-300 ease-out"
-            :style="{ left: `${correlationPercent}%` }"
-          />
-
-          <!-- Scale Calibration Markings -->
-          <div class="relative w-full mt-1 flex justify-between text-[9px] font-mono-accent text-slate select-none">
-            <span class="text-rose-700 font-bold">-1.0 (Batal)</span>
-            <span>-0.5</span>
-            <span class="font-bold text-ink-black">0.0 (Stereo)</span>
-            <span>+0.5</span>
-            <span class="text-emerald-800 font-bold">+1.0 (Mono)</span>
+        <div
+          v-if="diag && diag.recommendations && diag.recommendations.length"
+          class="divide-y divide-[#111111]/15"
+        >
+          <div
+            v-for="(rec, idx) in diag.recommendations"
+            :key="idx"
+            class="font-sans text-[13px] sm:text-sm flex items-start gap-2.5 py-2 first:pt-1 last:pb-0 text-[#111111]"
+          >
+            <AlertCircle
+              v-if="rec.severity === 'CRITICAL'"
+              class="w-4 h-4 text-[#111111] shrink-0 mt-0.5"
+              :stroke-width="2.3"
+            />
+            <AlertTriangle
+              v-else
+              class="w-4 h-4 text-[#111111] shrink-0 mt-0.5"
+              :stroke-width="2.3"
+            />
+            <p class="leading-relaxed font-semibold text-[#111111]">
+              {{ rec.message }}
+            </p>
           </div>
         </div>
+        <p
+          v-else-if="diag"
+          class="font-sans text-[13px] sm:text-sm font-bold text-[#111111] leading-relaxed"
+        >
+          Kondisi stem optimal — seluruh parameter DSP memenuhi standar toleransi mixing.
+        </p>
+        <p
+          v-else
+          class="font-sans text-xs font-medium text-[#60605e] italic"
+        >
+          Data diagnostik DSP untuk trek ini belum tersedia.
+        </p>
       </div>
-
-      <!-- Unified Telemetry Strip (Open 4-column layout, no nested border boxes, no dividing lines) -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs pt-0.5">
-        <!-- True-Peak with Hardware LED Peak Meter -->
-        <div class="space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-mono-accent text-slate uppercase tracking-wider font-semibold">True-Peak</span>
-            <span v-if="diag.hasClipping" class="text-[10px] font-bold text-rose-700 font-mono-accent">
-              CLIPPED
-            </span>
-          </div>
-          <div class="font-mono-accent font-bold text-xs" :class="diag.hasClipping ? 'text-rose-800' : 'text-ink-black'">
-            {{ diag.truePeakDbfs !== null ? `${diag.truePeakDbfs.toFixed(1)} dBFS` : '-' }}
-          </div>
-          <LedPeakMeter 
-            :value="diag.truePeakDbfs" 
-            :is-clipped="diag.hasClipping" 
-            class="mt-1"
-          />
-        </div>
-
-        <!-- Crest Factor -->
-        <div class="space-y-1.5">
-          <span class="text-[10px] font-mono-accent text-slate uppercase tracking-wider font-semibold block">Crest Factor</span>
-          <div class="flex items-baseline gap-2">
-            <span class="font-mono-accent font-bold text-xs text-ink-black">
-              {{ diag.crestFactor !== null ? `${diag.crestFactor.toFixed(1)} dB` : '-' }}
-            </span>
-            <span class="text-[10px] text-slate font-mono-accent">Dinamika</span>
-          </div>
-        </div>
-
-        <!-- DC Offset -->
-        <div class="space-y-1.5">
-          <span class="text-[10px] font-mono-accent text-slate uppercase tracking-wider font-semibold block">DC Offset</span>
-          <div class="flex items-baseline gap-2">
-            <span class="font-mono-accent font-bold text-xs" :class="diag.hasDcOffset ? 'text-amber-900' : 'text-ink-black'">
-              {{ diag.hasDcOffset ? 'Terdeteksi' : '0.00% Bersih' }}
-            </span>
-            <span v-if="diag.hasDcOffset" class="text-[10px] font-bold text-amber-700 font-mono-accent">
-              OFFSET
-            </span>
-          </div>
-        </div>
-
-        <!-- Sub Rumble -->
-        <div class="space-y-1.5">
-          <span class="text-[10px] font-mono-accent text-slate uppercase tracking-wider font-semibold block">Sub-Rumble</span>
-          <div class="flex items-baseline gap-2">
-            <span class="font-mono-accent font-bold text-xs" :class="diag.hasSubRumble ? 'text-amber-900' : 'text-ink-black'">
-              {{ diag.hasSubRumble ? '< 35 Hz Rumble' : 'Aman' }}
-            </span>
-            <span v-if="diag.hasSubRumble" class="text-[10px] font-bold text-amber-700 font-mono-accent">
-              FILTER
-            </span>
-          </div>
-        </div>
       </div>
     </div>
-
-    <!-- Active Problem Flags (Borderless Text Readouts) -->
-    <div v-if="diag && hasAnyAnomalies" class="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-1 font-mono-accent text-xs">
-      <span 
-        v-if="diag.hasPolarityInvert"
-        class="font-bold text-rose-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-        </svg>
-        <span>Polaritas Terbalik 180°</span>
-      </span>
-
-      <span 
-        v-if="diag.hasFakeStereo"
-        class="font-bold text-rose-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>Fake Stereo (Haas Effect)</span>
-      </span>
-
-      <span 
-        v-if="diag.hasCombFiltering"
-        class="font-bold text-amber-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <span>Comb Filtering Mikro</span>
-      </span>
-
-      <span 
-        v-if="diag.hasClipping"
-        class="font-bold text-rose-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <span>Inter-Sample Peak Clipping</span>
-      </span>
-
-      <span 
-        v-if="diag.hasSubRumble"
-        class="font-bold text-amber-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-        </svg>
-        <span>Sub-Rumble (&lt; 35 Hz)</span>
-      </span>
-
-      <span 
-        v-if="diag.hasDcOffset"
-        class="font-bold text-amber-700 flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-        </svg>
-        <span>Penyimpangan DC Offset</span>
-      </span>
-    </div>
-
-    <!-- Recommendations Section -->
-    <div class="pt-2 space-y-2">
-      <span class="font-bold text-xs uppercase tracking-wider text-ink-black block font-mono-accent">
-        Rekomendasi Solusi Teknis:
-      </span>
-      
-      <div v-if="diag && diag.recommendations && diag.recommendations.length" class="space-y-2">
-        <div 
-          v-for="(rec, idx) in diag.recommendations" 
-          :key="idx"
-          class="text-xs flex items-start gap-2.5 font-mono-accent py-1"
-          :class="rec.severity === 'CRITICAL' ? 'text-rose-900' : 'text-ink-black'">
-          <svg v-if="rec.severity === 'CRITICAL'" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <svg v-else class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <p class="leading-relaxed font-normal">
-            {{ rec.message }}
-          </p>
-        </div>
-      </div>
-      <div v-else-if="diag" class="py-1 text-xs text-slate font-normal font-mono-accent">
-        Kondisi stem optimal — seluruh parameter DSP memenuhi standar toleransi mixing.
-      </div>
-      <div v-else class="py-1 text-xs text-slate italic font-mono-accent">
-        Data diagnostik DSP untuk trek ini belum tersedia.
-      </div>
-    </div>
-  </div>
-
   </div>
 </template>

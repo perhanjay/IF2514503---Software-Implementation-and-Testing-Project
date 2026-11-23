@@ -1,21 +1,31 @@
 @import "tailwindcss";
 
 @theme {
-  /* Colors */
-  --color-hot-pink: #ff82c2;
-  --color-sun-yellow: #ffda40;
-  --color-signal-blue: #20afff;
-  --color-ember-orange: #ff6138;
-  --color-leaf-green: #5ad363;
-  --color-ink-black: #000000;
-  --color-charcoal: #292c33;
-  --color-slate: #60605e;
-  --color-bone: #f1f0eb;
+  /* Paper, Ink & Studio Surface Tokens (v2 Design System) */
+  --color-notebook-paper: #fcfcfb;
   --color-paper-white: #ffffff;
-  --color-mist: #efefef;
-  --color-stone: #c1c0bc;
-  --color-sand: #e4d9cf;
+  --color-paper-warm: #f5f3eb;
   --color-frost: #cfd6e5;
+  --color-mist: #eaeef4;
+  --color-stone: #d4d4d0;
+  --color-slate: #60605e;
+  --color-charcoal: #27272a;
+  --color-ink-black: #111111;
+  --color-studio-dark: #18161a;
+  --color-monitor-dark: #18181b;
+  --color-monitor-muted: #a1a1aa;
+
+  /* Chromatic Studio Accents */
+  --color-signal-blue: #20afff;
+  --color-sun-yellow: #ffda40;
+  --color-hot-pink: #ff82c2;
+  --color-leaf-green: #5ad363;
+  --color-ember-orange: #ff6138;
+  --color-poster-orange: #ff5a2c;
+
+  /* Deprecated Legacy Tokens (retained temporarily for unmigrated secondary views) */
+  --color-bone: #f1f0eb;
+  --color-sand: #e4d9cf;
 
   /* Typography */
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -47,43 +57,58 @@
   --leading-display-xl: 1;
   --tracking-display-xl: -3.2px;
 
-  /* Spacing */
-  --spacing-8: 8px;
-  --spacing-16: 16px;
-  --spacing-24: 24px;
-  --spacing-32: 32px;
-  --spacing-48: 48px;
-  --spacing-56: 56px;
-  --spacing-64: 64px;
-  --spacing-72: 72px;
-  --spacing-80: 80px;
-  --spacing-128: 128px;
-  --spacing-144: 144px;
-  --spacing-240: 240px;
+  /* Radius Scale */
+  --radius-keycap: 12px;
+  --radius-keycap-sm: 10px;
+  --radius-keycap-mini: 8px;
+  --radius-card: 18px;
+  --radius-panel: 20px;
+  --radius-monitor: 14px;
 }
 
 @layer base {
   :root {
-    /* Editorial Theme Variables (Paper White canvas & Ink Black contrast) */
-    --bg-canvas: #ffffff;
-    --fg-text: #000000;
-    --accent: #000000;
-    --accent-hover: #292c33;
-    --accent-subtle: rgba(0, 0, 0, 0.05);
-    --muted-surf: #f1f0eb;
+    /* Core Surface & Ink Tokens */
+    --bg-canvas: #fcfcfb;
+    --fg-text: #111111;
+    --accent: #20afff;
+    --accent-hover: #27272a;
+    --accent-subtle: rgba(17, 17, 17, 0.05);
+    --surface-glass: rgba(255, 255, 255, 0.72);
+    --surface-glass-strong: rgba(255, 255, 255, 0.90);
+    --telemetry-plate: rgba(255, 255, 255, 0.94);
+    --surface-monitor: rgba(24, 24, 27, 0.95);
     --muted-fg: #60605e;
-    --border-color: #c1c0bc;
+    --border-color: #d4d4d0;
     --card-bg: #ffffff;
 
-    /* Editorial Accent Tokens */
-    --color-hot-pink: #ff82c2;
-    --color-bone: #f1f0eb;
+    /* Named Color Variables */
+    --color-notebook-paper: #fcfcfb;
+    --color-paper-white: #ffffff;
+    --color-paper-warm: #f5f3eb;
+    --color-ink-black: #111111;
+    --color-studio-dark: #18161a;
+    --color-monitor-dark: #18181b;
+    --color-monitor-muted: #a1a1aa;
+    --color-slate: #60605e;
+    --color-stone: #d4d4d0;
+    --color-mist: #eaeef4;
+    --color-frost: #cfd6e5;
     --color-signal-blue: #20afff;
     --color-sun-yellow: #ffda40;
-    --color-mist: #efefef;
-    --color-stone: #c1c0bc;
-    --color-ink-black: #000000;
-    --color-slate: #60605e;
+    --color-hot-pink: #ff82c2;
+    --color-leaf-green: #5ad363;
+    --color-ember-orange: #ff6138;
+    --color-poster-orange: #ff5a2c;
+
+    /* DSP Diagnostics Status Tokens */
+    --status-clean: #10b981;
+    --status-warning: #f59e0b;
+    --status-critical: #ef4444;
+
+    /* @deprecated Legacy variable aliases */
+    --muted-surf: #f1f0eb;
+    --color-bone: #f1f0eb;
   }
 
   body {
@@ -96,7 +121,7 @@
   }
 }
 
-/* Typography Roles (Plus Jakarta Sans Display & Telemetry) */
+/* Typography Roles (Plus Jakarta Sans UI/Display & Numeric Audio Telemetry) */
 .font-display {
   font-family: var(--font-sans);
   font-weight: 700;
@@ -105,59 +130,312 @@
 
 .font-editorial {
   font-family: var(--font-sans);
-  font-weight: 800;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
 }
 
-/* Reserved strictly for audio telemetry and numeric readings */
+/* Strictly reserved ONLY for numeric audio measurements (dBFS, Hz, ms, phase, timecode) */
+.font-telemetry,
 .font-mono-accent {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 @layer components {
-  /* Editorial Ink Stamp Buttons */
+  /* ========================================================================
+   * Canvas & Surfaces (Notebook Paper, Frosted Glass & Dark Studio Monitors)
+   * ======================================================================== */
+
+  .notebook-paper {
+    background-color: #fcfcfb;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 31px,
+      rgba(0, 0, 0, 0.05) 31px,
+      rgba(0, 0, 0, 0.05) 32px
+    );
+  }
+
+  .retro-glass-card {
+    background-color: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: var(--radius-card);
+    box-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.07),
+      0 0 0 1px rgba(17, 17, 17, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  }
+
+  .retro-glass-panel {
+    background-color: var(--surface-glass-strong);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid #111111;
+    border-radius: var(--radius-panel);
+    box-shadow:
+      4px 5px 0 0 #111111,
+      inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  }
+
+  /* High-contrast light backing plate ensuring >= 7:1 contrast for telemetry over glass */
+  .retro-telemetry-plate {
+    background-color: var(--telemetry-plate);
+    border: 1px solid rgba(17, 17, 17, 0.14);
+    border-radius: 10px;
+    color: #111111;
+  }
+
+  /* Smoked studio monitor screen for Goniometer, LED Meters, Waveforms & Transport */
+  .retro-monitor {
+    background-color: var(--surface-monitor);
+    color: #f5f3eb;
+    border: 1px solid #27272a;
+    border-radius: var(--radius-monitor);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* Frosted yellow sticky-note callout */
+  .retro-sticky-note {
+    background-color: rgba(255, 218, 64, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 14px;
+    color: #111111;
+    box-shadow:
+      0 14px 32px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  /* ========================================================================
+   * Tactile 3D Mechanical Keycap Buttons
+   * ======================================================================== */
+
+  .btn-keycap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border-radius: var(--radius-keycap);
+    border: 2px solid #111111;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    box-shadow:
+      3px 4px 0 0 #111111,
+      inset 0 -5px 0 0 rgba(0, 0, 0, 0.16),
+      inset 0 2px 0 0 rgba(255, 255, 255, 0.85),
+      inset 2px 0 0 0 rgba(255, 255, 255, 0.45),
+      inset -2px 0 0 0 rgba(255, 255, 255, 0.45);
+    transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    cursor: pointer;
+  }
+
+  .btn-keycap:focus-visible {
+    outline: 2px solid #111111;
+    outline-offset: 2px;
+  }
+
+  .btn-keycap:disabled {
+    opacity: 0.62;
+    filter: saturate(0.55);
+    cursor: not-allowed;
+  }
+
+  .btn-keycap-sm {
+    border-radius: var(--radius-keycap-sm);
+    box-shadow:
+      2.5px 3.5px 0 0 #111111,
+      inset 0 -4px 0 0 rgba(0, 0, 0, 0.15),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 0.85),
+      inset 1.5px 0 0 0 rgba(255, 255, 255, 0.45),
+      inset -1.5px 0 0 0 rgba(255, 255, 255, 0.45);
+  }
+
+  .btn-keycap-mini {
+    border-radius: var(--radius-keycap-mini);
+    border-width: 1.5px;
+    box-shadow:
+      1.5px 2.5px 0 0 #111111,
+      inset 0 -3px 0 0 rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .btn-keycap:hover:not(:disabled) {
+    transform: translateY(-1.5px);
+    box-shadow:
+      4px 5.5px 0 0 #111111,
+      inset 0 -5px 0 0 rgba(0, 0, 0, 0.16),
+      inset 0 2px 0 0 rgba(255, 255, 255, 0.9),
+      inset 2px 0 0 0 rgba(255, 255, 255, 0.5),
+      inset -2px 0 0 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .btn-keycap-sm:hover:not(:disabled) {
+    box-shadow:
+      3px 4.5px 0 0 #111111,
+      inset 0 -4px 0 0 rgba(0, 0, 0, 0.15),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .btn-keycap-mini:hover:not(:disabled) {
+    box-shadow:
+      2px 3px 0 0 #111111,
+      inset 0 -3px 0 0 rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
+  }
+
+  .btn-keycap:active:not(:disabled) {
+    transform: translate(2px, 3px);
+    box-shadow:
+      1px 1px 0 0 #111111,
+      inset 0 -2px 0 0 rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .btn-keycap-white {
+    background: linear-gradient(180deg, #ffffff 0%, #eaeef4 100%);
+    color: #111111;
+  }
+
+  .btn-keycap-blue {
+    background: linear-gradient(180deg, #87d7ff 0%, #20afff 100%);
+    color: #111111;
+  }
+
+  .btn-keycap-yellow {
+    background: linear-gradient(180deg, #fff099 0%, #ffda40 100%);
+    color: #111111;
+  }
+
+  .btn-keycap-pink {
+    background: linear-gradient(180deg, #ffcae6 0%, #ff82c2 100%);
+    color: #111111;
+  }
+
+  .btn-keycap-green {
+    background: linear-gradient(180deg, #9ae6a0 0%, #5ad363 100%);
+    color: #111111;
+  }
+
+  .btn-keycap-dark {
+    background: linear-gradient(180deg, #323238 0%, #18181b 100%);
+    color: #ffffff;
+    box-shadow:
+      2.5px 3.5px 0 0 #111111,
+      inset 0 -4px 0 0 rgba(0, 0, 0, 0.45),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 0.25);
+  }
+
+  .btn-keycap-dark:hover:not(:disabled) {
+    box-shadow:
+      3px 4.5px 0 0 #111111,
+      inset 0 -4px 0 0 rgba(0, 0, 0, 0.45),
+      inset 0 1.5px 0 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* ========================================================================
+   * Perforated Postage Stamps & Pill Badges
+   * ======================================================================== */
+
+  .stamp-serrated {
+    clip-path: polygon(
+      4px 0%,
+      calc(100% - 4px) 0%,
+      100% 14%,
+      calc(100% - 3px) 28%,
+      100% 42%,
+      calc(100% - 3px) 56%,
+      100% 70%,
+      calc(100% - 3px) 84%,
+      calc(100% - 4px) 100%,
+      4px 100%,
+      0% 84%,
+      3px 70%,
+      0% 56%,
+      3px 42%,
+      0% 28%,
+      3px 14%
+    );
+  }
+
+  .stamp-serrated-sq {
+    clip-path: polygon(
+      3px 0%,
+      calc(100% - 3px) 0%,
+      100% 16%,
+      calc(100% - 2px) 33%,
+      100% 50%,
+      calc(100% - 2px) 67%,
+      100% 84%,
+      calc(100% - 3px) 100%,
+      3px 100%,
+      0% 84%,
+      2px 67%,
+      0% 50%,
+      2px 33%,
+      0% 16%
+    );
+  }
+
+  .badge-pill-stamp {
+    border-radius: 9999px;
+    background-color: #111111;
+    color: #ffffff;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ========================================================================
+   * @deprecated Legacy v1 Compatibility Aliases (do not use for new UI)
+   * ======================================================================== */
+
   .btn-ink-stamp {
-    background-color: #000000;
+    background-color: #111111;
     color: #ffffff;
     border-radius: 0px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     transition: background-color 0.15s ease-in-out;
   }
   .btn-ink-stamp:hover {
-    background-color: #292c33;
+    background-color: #27272a;
   }
 
   .btn-bone-secondary {
     background-color: #f1f0eb;
-    color: #000000;
+    color: #111111;
+    border: 1px solid #c1c0bc;
     border-radius: 0px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
+    font-weight: 500;
+    letter-spacing: 0.04em;
     transition: background-color 0.15s ease-in-out;
   }
   .btn-bone-secondary:hover {
     background-color: #e5e3dc;
   }
 
-  /* Editorial Sticker Badge */
-  .badge-pill-stamp {
-    border-radius: 9999px;
-    background-color: #000000;
-    color: #ffffff;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  /* Subtle Functional Border for Cards without artificial drop-shadows */
   .editorial-card {
     border: 1px solid #c1c0bc;
     border-radius: 0px;
     background-color: #ffffff;
   }
+}
+
+/* Scrollbar hiding for touch carousels & folder strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Purposeful UI Transitions */
@@ -170,7 +448,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Custom Editorial Range Sliders for Cross-Browser Consistency (WebKit & Gecko) */
+/* Tactile Studio Fader & Range Sliders (WebKit & Gecko) */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -178,53 +456,61 @@ input[type="range"] {
   cursor: pointer;
 }
 
-input[type="range"]:focus {
-  outline: none;
+input[type="range"]:focus-visible {
+  outline: 2px solid #20afff;
+  outline-offset: 4px;
+  border-radius: 9999px;
 }
 
 /* WebKit (Chrome, Edge, Safari) */
 input[type="range"]::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;
-  background-color: rgba(193, 192, 188, 0.45);
-  border: 1px solid rgba(193, 192, 188, 0.8);
-  border-radius: 0px;
+  background-color: rgba(17, 17, 17, 0.12);
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 9999px;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 14px;
-  background-color: #000000;
-  border: none;
-  border-radius: 0px;
-  margin-top: -5px;
+  width: 14px;
+  height: 16px;
+  background-color: #111111;
+  border: 1.5px solid #ffffff;
+  border-radius: 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  margin-top: -6px;
   cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
 }
 
 input[type="range"]:active::-webkit-slider-thumb {
-  background-color: #ffda40;
+  background-color: #20afff;
+  transform: scale(1.06);
 }
 
 /* Firefox */
 input[type="range"]::-moz-range-track {
   width: 100%;
   height: 6px;
-  background-color: rgba(193, 192, 188, 0.45);
-  border: 1px solid rgba(193, 192, 188, 0.8);
-  border-radius: 0px;
+  background-color: rgba(17, 17, 17, 0.12);
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: 9999px;
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 12px;
-  height: 14px;
-  background-color: #000000;
-  border: none;
-  border-radius: 0px;
+  width: 14px;
+  height: 16px;
+  background-color: #111111;
+  border: 1.5px solid #ffffff;
+  border-radius: 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
 }
 
 input[type="range"]:active::-moz-range-thumb {
-  background-color: #ffda40;
+  background-color: #20afff;
+  transform: scale(1.06);
 }

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import io
+import uuid
 import redis
 import boto3
 import soundfile as sf
@@ -20,6 +21,15 @@ try:
     from .dsp.signal_metrics import analyze_track_signals
     from .dsp.health_score import calculate_track_health, calculate_session_health
     from .dsp.repair_engine import execute_track_repairs, align_pair_microdelay
+    from .workbench.silence_trimmer import (
+        TARGET_SAMPLE_RATE,
+        decode_audio_bytes,
+        encode_wav_bytes,
+        trim_audio_silence,
+        compute_union_trim_bounds,
+        slice_aligned_batch,
+    )
+    from .workbench.stem_separator import STEM_ORDER, separate_audio_stems
 except (ImportError, ValueError):
     from ai.instrument_classifier import classify_track
     from ai.pairing_detector import detect_track_pairs
@@ -32,6 +42,15 @@ except (ImportError, ValueError):
     from dsp.signal_metrics import analyze_track_signals
     from dsp.health_score import calculate_track_health, calculate_session_health
     from dsp.repair_engine import execute_track_repairs, align_pair_microdelay
+    from workbench.silence_trimmer import (
+        TARGET_SAMPLE_RATE,
+        decode_audio_bytes,
+        encode_wav_bytes,
+        trim_audio_silence,
+        compute_union_trim_bounds,
+        slice_aligned_batch,
+    )
+    from workbench.stem_separator import STEM_ORDER, separate_audio_stems
 
 load_dotenv()
 
@@ -467,6 +486,218 @@ def repair_session_tracks(session_id, tracks_data, pairs_data=None, repair_mode=
         "tracksRepaired": tracks_repaired
     }
 
+_WORKBENCH_STEM_LABELS = {
+    "vocals": "Vocals",
+    "drums": "Drums",
+    "bass": "Bass",
+    "other": "Other",
+}
+
+
+def _update_workbench_redis_progress(redis_key, progress, step_message, status="PROCESSING"):
+    """Update workbench job progress JSON (or hash) in Redis if redisKey is provided."""
+    if not redis_key:
+        return
+    try:
+        client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+        existing_raw = client.get(redis_key)
+        if existing_raw:
+            payload = json.loads(existing_raw)
+            if isinstance(payload, dict):
+                payload["status"] = status
+                payload["progress"] = progress
+                payload["stepMessage"] = step_message
+                client.set(redis_key, json.dumps(payload), ex=86400)
+                return
+        client.set(
+            redis_key,
+            json.dumps({
+                "status": status,
+                "progress": progress,
+                "stepMessage": step_message,
+            }),
+            ex=86400,
+        )
+    except redis.exceptions.ResponseError:
+        try:
+            client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+            client.hset(
+                redis_key,
+                mapping={
+                    "status": str(status),
+                    "progress": str(progress),
+                    "stepMessage": str(step_message),
+                },
+            )
+        except Exception as err:
+            sys.stderr.write(f"Warning: Redis hash progress update failed: {err}\n")
+    except Exception as err:
+        sys.stderr.write(f"Warning: Redis progress update failed: {err}\n")
+
+
+def _default_trim_target_key(source_key, file_name):
+    base_name = os.path.splitext(os.path.basename(file_name or source_key or "audio"))[0]
+    safe_base = base_name.replace(" ", "_") or "audio"
+    if source_key and source_key.startswith("workbench/"):
+        stem_dir = os.path.dirname(source_key)
+        return f"{stem_dir}/TRIMMED_{safe_base}_{uuid.uuid4().hex[:8]}.wav"
+    return f"workbench/trimmed/{uuid.uuid4().hex[:12]}/TRIMMED_{safe_base}.wav"
+
+
+def separate_workbench_audio(payload):
+    """Download mix audio from S3, separate into 4 zero-aligned stems, and upload stems to S3."""
+    s3 = get_s3_client()
+    job_id = payload.get("jobId") or uuid.uuid4().hex
+    user_id = payload.get("userId") or "anonymous"
+    file_name = payload.get("fileName") or "audio.wav"
+    source_key = payload["sourceStorageKey"]
+    redis_key = payload.get("redisKey")
+    use_fast = payload.get("useFastFallback")
+
+    s3_obj = s3.get_object(Bucket=S3_BUCKET, Key=source_key)
+    audio_bytes = s3_obj["Body"].read()
+
+    def on_progress(pct, msg):
+        _update_workbench_redis_progress(redis_key, pct, msg)
+
+    result = separate_audio_stems(
+        audio_bytes,
+        file_name,
+        use_fast_fallback=use_fast,
+        progress_callback=on_progress,
+    )
+
+    _update_workbench_redis_progress(redis_key, 80, "Uploading to S3")
+    stems_meta = []
+    for name in STEM_ORDER:
+        stem_key = f"workbench/{user_id}/{job_id}/stems/{name}.wav"
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=stem_key,
+            Body=result["stems"][name],
+            ContentType="audio/wav",
+        )
+        stems_meta.append({
+            "name": name,
+            "label": _WORKBENCH_STEM_LABELS.get(name, name.title()),
+            "storageKey": stem_key,
+            "durationSec": result["duration_sec"],
+        })
+
+    return {
+        "status": "COMPLETED",
+        "durationSec": result["duration_sec"],
+        "stems": stems_meta,
+    }
+
+
+def trim_workbench_audio(payload):
+    """Execute single-track or union-envelope synced silence trimming against S3 objects."""
+    s3 = get_s3_client()
+    mode = payload.get("mode", "single")
+    threshold_db = float(payload.get("thresholdDb", -45.0))
+    pad_ms = float(payload.get("padMs", 100.0))
+    fade_ms = float(payload.get("fadeMs", 15.0))
+    manual_start_sec = payload.get("manualStartSec")
+    manual_end_sec = payload.get("manualEndSec")
+    if manual_start_sec is not None:
+        manual_start_sec = float(manual_start_sec)
+    if manual_end_sec is not None:
+        manual_end_sec = float(manual_end_sec)
+
+    if mode == "single":
+        source_key = payload["sourceStorageKey"]
+        file_name = payload.get("fileName") or os.path.basename(source_key) or "audio.wav"
+        target_key = payload.get("targetKey") or _default_trim_target_key(source_key, file_name)
+
+        raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=source_key)["Body"].read()
+        audio_data, sr = decode_audio_bytes(raw_bytes, file_name)
+        res = trim_audio_silence(
+            audio_data,
+            sr,
+            threshold_db=threshold_db,
+            pad_ms=pad_ms,
+            fade_ms=fade_ms,
+            manual_start_sec=manual_start_sec,
+            manual_end_sec=manual_end_sec,
+        )
+        wav_bytes = encode_wav_bytes(res["trimmed_audio"], res["sample_rate"])
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=target_key,
+            Body=wav_bytes,
+            ContentType="audio/wav",
+        )
+        return {
+            "originalDurationSec": res["original_duration_sec"],
+            "trimmedDurationSec": res["trimmed_duration_sec"],
+            "leadInRemovedSec": res["lead_in_removed_sec"],
+            "tailRemovedSec": res["tail_removed_sec"],
+            "trimmedPeaks": res["peaks"],
+            "targetKey": target_key,
+        }
+
+    if mode == "synced":
+        stems_input = payload.get("stems") or []
+        if not stems_input:
+            raise ValueError("Daftar stem untuk mode synced tidak boleh kosong")
+
+        stems_map = {}
+        target_keys = {}
+        for item in stems_input:
+            name = item["name"]
+            src_key = item["sourceStorageKey"]
+            tgt_key = item.get("targetKey") or _default_trim_target_key(src_key, f"{name}.wav")
+            raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=src_key)["Body"].read()
+            audio_data, _ = decode_audio_bytes(raw_bytes, os.path.basename(src_key) or f"{name}.wav")
+            stems_map[name] = audio_data
+            target_keys[name] = tgt_key
+
+        start_idx, end_idx = compute_union_trim_bounds(
+            stems_map,
+            TARGET_SAMPLE_RATE,
+            threshold_db=threshold_db,
+            pad_ms=pad_ms,
+            manual_start_sec=manual_start_sec,
+            manual_end_sec=manual_end_sec,
+        )
+        batch = slice_aligned_batch(stems_map, TARGET_SAMPLE_RATE, start_idx, end_idx, fade_ms=fade_ms)
+
+        updated_stems = []
+        for item in stems_input:
+            name = item["name"]
+            stem_res = batch[name]
+            tgt_key = target_keys[name]
+            wav_bytes = encode_wav_bytes(stem_res["trimmed_audio"], stem_res["sample_rate"])
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=tgt_key,
+                Body=wav_bytes,
+                ContentType="audio/wav",
+            )
+            updated_stems.append({
+                "name": name,
+                "storageKey": tgt_key,
+                "durationSec": stem_res["trimmed_duration_sec"],
+            })
+
+        primary_name = payload.get("primaryStemName")
+        if primary_name not in batch:
+            primary_name = "vocals" if "vocals" in batch else stems_input[0]["name"]
+        primary_res = batch[primary_name]
+
+        return {
+            "originalDurationSec": primary_res["original_duration_sec"],
+            "trimmedDurationSec": primary_res["trimmed_duration_sec"],
+            "leadInRemovedSec": primary_res["lead_in_removed_sec"],
+            "tailRemovedSec": primary_res["tail_removed_sec"],
+            "trimmedPeaks": primary_res["peaks"],
+            "updatedStems": updated_stems,
+        }
+
+    raise ValueError(f"Mode trim tidak valid: {mode}")
+
+
 def sanitize_floats(obj):
     if isinstance(obj, bool):
         return obj
@@ -525,6 +756,30 @@ if __name__ == "__main__":
         clean_output = sanitize_floats(output)
         print(json.dumps(clean_output))
         sys.exit(0)
+
+    elif "--separate-stdin" in sys.argv:
+        try:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+            output = separate_workbench_audio(payload)
+            clean_output = sanitize_floats(output)
+            print(json.dumps(clean_output))
+            sys.exit(0)
+        except Exception as err:
+            sys.stderr.write(f"{err}\n")
+            sys.exit(1)
+
+    elif "--trim-stdin" in sys.argv:
+        try:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+            output = trim_workbench_audio(payload)
+            clean_output = sanitize_floats(output)
+            print(json.dumps(clean_output))
+            sys.exit(0)
+        except Exception as err:
+            sys.stderr.write(f"{err}\n")
+            sys.exit(1)
 
     else:
         print("[Polaris Audio Worker] Background worker ready.")

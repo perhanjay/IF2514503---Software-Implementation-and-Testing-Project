@@ -132,6 +132,18 @@ Dokumen ini disusun sebagai panduan pengujian fungsional independen (*Blackbox T
 
 ---
 
+### Modul 10: Audio Workbench (AI Stem Separator & Smart Silence Trimmer)
+
+| ID Test | Kategori / Fitur | Tindakan Pengguna / Masukan | Hasil yang Diharapkan (*Expected Result*) | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **TC-WB-01** | **AI Stem Separation (4 Stem Terisolasi)** | 1. Buka `/workbench` pada tab **01 AI Stem Separator**.<br>2. Unggah berkas audio `.wav`/`.flac`/`.mp3` ($\le 100\text{ MB}$).<br>3. Klik **"Mulai Pemisahan Stem"** | • Berkas diunggah ke `POST /api/v1/workbench/separate` (HTTP 202 `QUEUED`).<br>• Monitor progres menampilkan status `QUEUED` $\rightarrow$ `PROCESSING` $\rightarrow$ `COMPLETED`.<br>• Muncul 4 kartu stem (`Vocals`, `Drums`, `Bass`, `Other`) lengkap dengan pemutar Web Audio sinkron (Solo/Mute), tombol **"Buka di Trimmer"**, dan **"Unduh WAV"**. | [x] PASSED |
+| **TC-WB-02** | **Concurrent Queueing Pemisahan Stem** | Kirim dua permintaan pemisahan stem secara bersamaan/berurutan cepat | • Kedua job langsung diterima dengan status awal `QUEUED` dan UUID berbeda.<br>• Worker memproses antrean secara berurutan (FIFO concurrency = 1) tanpa crash atau saling menimpa stem di Redis/MinIO S3. | [x] PASSED |
+| **TC-WB-03** | **Real-Time Silence Threshold & Margin Aman Preview** | 1. Pada tab **02 Smart Silence Trimmer**, muat stem dari Tab 01 atau berkas lokal.<br>2. Geser slider **Silence Threshold** ($-60$ s.d. $-20\text{ dB}$) dan **Margin Aman** ($0$ s.d. $500\text{ ms}$), atau seret handle manual `IN` / `OUT` | • Kanvas bentuk gelombang (`WaveformTrimmerCanvas`) merender ulang zona hening berbayang merah muda dan garis batas potong secara instan ($< 16\text{ ms}$) tanpa memanggil server.<br>• Tombol **"Reset Handle Manual"** mengembalikan batas potong otomatis. | [x] PASSED |
+| **TC-WB-04** | **Synced 4-Stem Trim vs Standalone Trim & A/B Audition** | 1. Uji trim pada stem Tab 01 dengan opsi *"Terapkan titik potong yang sama ke seluruh 4 stem agar tetap sinkron (Zero-Aligned)"* aktif vs berkas lokal mandiri.<br>2. Klik **"Terapkan Pemangkasan & De-Click"** ($5/15/30\text{ ms}$).<br>3. Beralih antara **Asli (Raw)** dan **Dipangkas (Trimmed)** | • Mode Synced memangkas seluruh 4 stem dengan titik potong identik dan menandai kartu stem dengan badge **`Tersinkron (Trimmed)`**.<br>• Mode Standalone hanya memangkas berkas tunggal tanpa mengubah job stem.<br>• Kanvas beralih ke gelombang hijau hasil trim, menampilkan telemetri *Durasi Asli*, *Durasi Akhir*, *Hening Dibuang*, audisi A/B Web Audio real-time, serta unduhan WAV hasil trim. | [x] PASSED |
+| **TC-WB-05** | **Studio Workspace Bridge (Kirim ke Studio Workspace)** | Pada hasil Tab 01, klik **"Kirim ke Studio Workspace"** (uji baik saat stem sinkron maupun setelah trim tidak sinkron) | • Jika selisih durasi antar stem $\le 0.1\text{ detik}$, sistem membuat sesi baru di Studio Workspace (`POST /api/v1/workbench/jobs/:jobId/send-to-session`) dan mengarahkan pengguna ke `/dashboard`.<br>• Jika selisih durasi $> 0.1\text{ detik}$, sistem menolak (HTTP 400) dan menampilkan alert agar pengguna menyinkronkan stem di Trimmer terlebih dahulu. | [x] PASSED |
+
+---
+
 ## 3. Skenario Pengujian Alur Penuh (End-to-End Walkthrough) di Browser
 
 Anda dapat memverifikasi seluruh sistem dari hulu ke hilir secara berurutan dengan alur berikut:

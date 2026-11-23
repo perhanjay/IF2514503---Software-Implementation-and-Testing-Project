@@ -111,267 +111,268 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-full space-y-5">
-    
-    <!-- Header: Studio Info & Format Badges (Flat, Seamless) -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone/60 pb-3">
-      <div class="flex flex-wrap items-center gap-2">
-        <h4 class="font-editorial text-sm sm:text-base font-bold text-ink-black tracking-tight">
-          Pemutar Audisi A/B Komparatif
-        </h4>
-        <span class="font-mono-accent text-[11px] text-ink-black font-semibold uppercase tracking-wider">
-          Sample-Accurate
-        </span>
-        <span class="text-stone font-mono-accent text-[11px]">/</span>
-        <span class="font-mono-accent text-[11px] text-stone">
-          48.0 kHz / 24-bit Float
-        </span>
-      </div>
-
-      <div class="flex items-center gap-2 self-start sm:self-auto font-mono-accent text-xs">
-        <button
-          type="button"
-          @click="loadAudioSources"
-          :disabled="isFetchingSources || player.isLoading.value"
-          title="Sinkronkan ulang audio dengan hasil perbaikan terbaru"
-          class="flex items-center gap-1.5 px-3 py-1.5 bg-paper-white hover:bg-bone text-ink-black border border-stone font-semibold cursor-pointer transition-all disabled:opacity-50">
-          <svg 
-            class="w-3.5 h-3.5 text-stone" 
-            :class="{ 'animate-spin': isFetchingSources || player.isLoading.value }" 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor" 
-            stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>Sinkronkan Audio</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Loading State -->
+  <div class="w-full space-y-4">
+    <!-- Loading State (Unified White Card matching Design System) -->
     <div 
       v-if="isFetchingSources || player.isLoading.value" 
-      class="min-h-[220px] flex flex-col items-center justify-center p-8 space-y-3 bg-bone border border-stone">
-      <div class="relative w-11 h-11">
-        <div class="animate-spin rounded-full h-11 w-11 border-2 border-stone border-t-ink-black" />
-        <div class="absolute inset-0 flex items-center justify-center text-[10px] font-mono-accent text-ink-black font-bold">
-          {{ player.loadingProgress.value }}%
-        </div>
+      class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] min-h-[220px] flex flex-col items-center justify-center p-8 space-y-4">
+      <div class="w-11 h-11 rounded-[12px] border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] text-[#111111] flex items-center justify-center">
+        <svg class="animate-spin w-5 h-5 text-[#111111]" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path>
+        </svg>
       </div>
-      <div class="text-center space-y-1">
-        <p class="text-xs font-semibold text-ink-black">
-          {{ isFetchingSources ? 'Mengambil lisensi streaming audio...' : 'Mendekode buffer stem multitrack ke memori...' }}
-        </p>
-        <p class="text-[11px] text-stone font-mono-accent">
+      <div class="text-center space-y-1.5">
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <p class="font-editorial text-sm font-bold text-[#111111]">
+            {{ isFetchingSources ? 'Mengambil lisensi streaming audio...' : 'Mendekode buffer stem multitrack ke memori...' }}
+          </p>
+          <span class="inline-flex items-center rounded-full bg-[#87d7ff] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-0.5 font-telemetry text-[11px] font-bold text-[#111111] leading-none">
+            {{ player.loadingProgress.value }}%
+          </span>
+        </div>
+        <p class="font-sans text-xs text-[#60605e]">
           Menyiapkan perbandingan real-time audio asli vs hasil perbaikan
         </p>
       </div>
-      <div class="w-56 h-2 bg-stone/20 border border-stone overflow-hidden">
+      <div class="w-60 h-3 rounded-full bg-[#eaeef4] border-[1.5px] border-[#111111] overflow-hidden">
         <div 
-          class="h-full bg-ink-black transition-all duration-150"
-          :style="{ width: `${player.loadingProgress.value}%` }"
+          class="h-full bg-[#20afff] rounded-full transition-all duration-150"
+          :style="{ width: `${Math.max(8, player.loadingProgress.value)}%` }"
         />
       </div>
     </div>
 
-    <!-- Error State -->
+    <!-- Error State (Unified White Card) -->
     <div 
       v-else-if="fetchError || player.loadError.value" 
-      class="min-h-[200px] flex flex-col items-center justify-center p-6 space-y-3 text-center bg-[#FFF1F2] border border-[#FDA4AF]">
-      <div class="w-10 h-10 border border-[#FDA4AF] bg-white text-rose-700 flex items-center justify-center text-base font-bold font-mono-accent">
+      class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] min-h-[200px] flex flex-col items-center justify-center p-6 space-y-3 text-center">
+      <div class="w-10 h-10 rounded-[10px] border-[1.5px] border-[#111111] bg-[#ff82c2] shadow-[1.5px_2px_0_#111111] text-[#111111] flex items-center justify-center text-base font-bold font-sans">
         !
       </div>
-      <h5 class="text-xs font-bold text-rose-900 font-editorial">Gagal Memuat Sumber Audio Audisi</h5>
-      <p class="text-xs text-rose-700 max-w-md font-mono-accent">
+      <h5 class="text-sm font-bold text-[#111111] font-editorial">Gagal Memuat Sumber Audio Audisi</h5>
+      <p class="text-xs text-[#60605e] max-w-md font-sans">
         {{ fetchError || player.loadError.value }}
       </p>
       <button 
+        type="button"
         @click="loadAudioSources" 
-        class="btn-ink-stamp text-xs py-2 px-4">
+        class="btn-keycap btn-keycap-sm btn-keycap-pink text-xs py-2 px-4">
         Coba Muat Ulang
       </button>
     </div>
 
-    <!-- Main Studio Console Workbench -->
+    <!-- Main Studio Console Workbench (2 Unified White Cards matching Phase 02 Rhythm) -->
     <div v-else class="space-y-4">
       
-      <!-- Master Workbench (A/B, Waktu Pemutaran, Goniometer - Seamless Canvas) -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-2">
-        
-        <!-- Left Column (lg:col-span-8): A/B Selector on top, Waktu Pemutaran & Transport underneath -->
-        <div class="lg:col-span-8 space-y-4">
-          
-          <!-- 1. Komparasi Audisi A/B -->
-          <div class="space-y-2.5">
-            <!-- Big A / B Toggle Selector (Flat, No Subheaders) -->
-            <div class="grid grid-cols-2 gap-3">
-              <!-- Mode A (Raw) -->
-              <button
-                type="button"
-                @click="player.setPlaybackMode('A')"
-                :aria-pressed="player.playbackMode.value === 'A'"
-                class="flex items-center justify-between p-2.5 sm:p-3 border text-left transition-all cursor-pointer"
-                :class="player.playbackMode.value === 'A'
-                  ? 'bg-ink-black border-ink-black text-paper-white'
-                  : 'bg-paper-white border-stone text-stone hover:text-ink-black hover:bg-bone'">
-                <span class="font-mono-accent text-xs font-black tracking-wider">A: AUDIO ASLI</span>
-                <span 
-                  v-if="player.playbackMode.value === 'A'"
-                  class="w-2 h-2 bg-amber-400 shrink-0" 
-                />
-              </button>
+      <!-- CARD 1: Unified Master Audition Console (Header + A/B + Transport + Goniometer) -->
+      <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-4 sm:p-5 space-y-4">
+        <!-- Console Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-dashed border-[#111111]/15 pb-3.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <h4 class="font-editorial text-sm sm:text-base font-bold text-[#111111] tracking-tight">
+              Pemutar Audisi A/B Komparatif
+            </h4>
+            <span class="inline-flex items-center rounded-full bg-[#87d7ff] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 font-sans text-[11px] font-bold text-[#111111] leading-none">
+              Sample-Accurate
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 text-[11px] font-bold text-[#111111] leading-none">
+              <span class="font-telemetry">48.0 kHz</span>
+              <span class="text-[#60605e]">/</span>
+              <span class="font-telemetry">24-bit</span>
+              <span class="font-sans">Float</span>
+            </span>
+          </div>
 
-              <!-- Mode B (Repaired) -->
-              <button
-                type="button"
-                @click="player.setPlaybackMode('B')"
-                :aria-pressed="player.playbackMode.value === 'B'"
-                class="flex items-center justify-between p-2.5 sm:p-3 border text-left transition-all cursor-pointer"
-                :class="player.playbackMode.value === 'B'
-                  ? 'bg-[#0052FF] border-[#0052FF] text-white'
-                  : 'bg-paper-white border-stone text-stone hover:text-ink-black hover:bg-bone'">
-                <span class="font-mono-accent text-xs font-black tracking-wider">B: HASIL PERBAIKAN</span>
-                <span 
-                  v-if="player.playbackMode.value === 'B'"
-                  class="w-2 h-2 bg-white shrink-0" 
-                />
-              </button>
+          <div class="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              @click="loadAudioSources"
+              :disabled="isFetchingSources || player.isLoading.value"
+              title="Sinkronkan ulang audio dengan hasil perbaikan terbaru"
+              class="btn-keycap btn-keycap-sm btn-keycap-white px-3.5 py-1.5 text-xs font-sans font-bold">
+              <svg 
+                class="w-3.5 h-3.5 text-[#111111]" 
+                :class="{ 'animate-spin': isFetchingSources || player.isLoading.value }" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor" 
+                stroke-width="2.2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Sinkronkan Audio</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Master Workbench Grid (A/B + Transport Left, Goniometer Right) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+          
+          <!-- Left Column (lg:col-span-8): A/B Keycaps on top, Transport Deck underneath -->
+          <div class="lg:col-span-8 space-y-4">
+            
+            <!-- 1. Komparasi Audisi A/B -->
+            <div class="space-y-3">
+              <!-- Tactile Keycap A / B Selector -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Mode A (Raw) -->
+                <button
+                  type="button"
+                  @click="player.setPlaybackMode('A')"
+                  :aria-pressed="player.playbackMode.value === 'A'"
+                  class="btn-keycap btn-keycap-sm flex items-center justify-between px-3.5 py-2.5 text-left text-xs"
+                  :class="player.playbackMode.value === 'A' ? 'btn-keycap-dark' : 'btn-keycap-white'">
+                  <span class="font-sans font-bold">A: Audio Asli</span>
+                  <span 
+                    v-if="player.playbackMode.value === 'A'"
+                    class="px-2 py-0.5 rounded-full bg-[#ffda40] text-[#111111] text-[10px] font-bold shrink-0" 
+                  >Aktif</span>
+                </button>
+
+                <!-- Mode B (Repaired) -->
+                <button
+                  type="button"
+                  @click="player.setPlaybackMode('B')"
+                  :aria-pressed="player.playbackMode.value === 'B'"
+                  class="btn-keycap btn-keycap-sm flex items-center justify-between px-3.5 py-2.5 text-left text-xs"
+                  :class="player.playbackMode.value === 'B' ? 'btn-keycap-blue' : 'btn-keycap-white'">
+                  <span class="font-sans font-bold">B: Hasil Perbaikan</span>
+                  <span 
+                    v-if="player.playbackMode.value === 'B'"
+                    class="px-2 py-0.5 rounded-full bg-[#111111] text-white text-[10px] font-bold shrink-0" 
+                  >Aktif</span>
+                </button>
+              </div>
+
+              <!-- Mono Check & Master Section -->
+              <div class="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  @click="player.toggleMonoCheck"
+                  :aria-pressed="player.isMonoCheck.value"
+                  class="btn-keycap btn-keycap-sm px-3.5 py-2 text-xs font-sans font-bold flex items-center gap-2"
+                  :class="player.isMonoCheck.value ? 'btn-keycap-yellow' : 'btn-keycap-white'">
+                  <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8m-8 10h8M5 12h14" />
+                  </svg>
+                  <span>Mono Check (L+R)</span>
+                </button>
+
+                <!-- Master Volume -->
+                <div class="rounded-[12px] border-[1.5px] border-[#111111] bg-[#fcfcfb] shadow-[1.5px_2px_0_#111111] px-3.5 py-2 flex-1 flex items-center gap-3 min-w-[160px]">
+                  <span class="text-xs font-sans text-[#60605e] font-bold uppercase tracking-wider">Master</span>
+                  <input 
+                    type="range"
+                    min="0"
+                    max="1.5"
+                    step="0.01"
+                    :value="player.masterVolume.value"
+                    @input="player.setMasterVolume(parseFloat($event.target.value))"
+                    class="flex-1 h-1.5 cursor-pointer"
+                    title="Master Output Volume"
+                  />
+                  <span class="inline-flex items-center rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-0.5 text-[11px] font-telemetry text-[#111111] font-bold leading-none">
+                    {{ Math.round(player.masterVolume.value * 100) }}%
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <!-- Mono Check & Master Section -->
-            <div class="flex flex-wrap items-center gap-3">
-              <!-- Mono Check Button (FR-6.4) -->
-              <button
-                type="button"
-                @click="player.toggleMonoCheck"
-                :aria-pressed="player.isMonoCheck.value"
-                class="px-3 py-1.5 border font-mono-accent text-xs font-bold transition-all flex items-center gap-2 cursor-pointer active:translate-y-[1px]"
-                :class="player.isMonoCheck.value
-                  ? 'bg-amber-400 text-ink-black border-2 border-ink-black'
-                  : 'bg-paper-white hover:bg-bone text-ink-black border border-stone'">
-                <span class="w-2 h-2 shrink-0" :class="player.isMonoCheck.value ? 'bg-ink-black' : 'bg-stone'" />
-                <span>MONO CHECK (L+R)</span>
-              </button>
+            <!-- 2. Waktu Pemutaran, Transport & Peak Meters Sub-Card -->
+            <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-[#fcfcfb] shadow-[2px_3px_0_#111111] p-4 space-y-3.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-sans text-[11px] text-[#60605e] font-bold uppercase tracking-wider">Waktu Pemutaran</span>
+                <div class="inline-flex items-center gap-1 rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-3 py-1 font-telemetry text-xs font-bold leading-none text-[#111111]">
+                  <span>{{ formatTime(player.currentTime.value) }}</span>
+                  <span class="text-[#60605e]">/</span>
+                  <span class="text-[#60605e]">{{ formatTime(player.duration.value) }}</span>
+                </div>
+              </div>
 
-              <!-- Master Volume -->
-              <div class="flex-1 flex items-center gap-2 min-w-[130px]">
-                <span class="text-[10px] font-mono-accent text-slate uppercase font-semibold">Master:</span>
+              <div>
                 <input 
                   type="range"
                   min="0"
-                  max="1.5"
-                  step="0.01"
-                  :value="player.masterVolume.value"
-                  @input="player.setMasterVolume(parseFloat($event.target.value))"
-                  class="flex-1 accent-ink-black h-1.5 bg-stone/20 cursor-pointer"
-                  title="Master Output Volume"
+                  :max="player.duration.value || 1"
+                  step="0.05"
+                  :value="player.currentTime.value"
+                  @input="player.seek(parseFloat($event.target.value))"
+                  class="w-full h-2 cursor-pointer"
                 />
-                <span class="text-[10px] font-mono-accent text-ink-black font-bold w-9 text-right">
-                  {{ Math.round(player.masterVolume.value * 100) }}%
-                </span>
               </div>
-            </div>
-          </div>
 
-          <!-- 2. Waktu Pemutaran (Dipindah ke bawah Komparasi A/B) -->
-          <div class="space-y-2.5 pt-3 border-t border-stone/60">
-            <div class="flex items-center justify-between font-mono-accent">
-              <span class="text-[10px] text-slate uppercase font-bold tracking-wider">Waktu Pemutaran</span>
-              <div class="flex items-center gap-1 text-sm font-bold">
-                <span class="text-ink-black">{{ formatTime(player.currentTime.value) }}</span>
-                <span class="text-stone">/</span>
-                <span class="text-stone">{{ formatTime(player.duration.value) }}</span>
-              </div>
-            </div>
+              <div class="flex flex-wrap sm:flex-nowrap items-center gap-3 pt-1">
+                <button 
+                  type="button"
+                  @click="player.stop"
+                  class="btn-keycap btn-keycap-sm btn-keycap-white w-10 h-10 shrink-0"
+                  title="Hentikan & Reset">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                  </svg>
+                </button>
 
-            <!-- Scrubber Track Slider -->
-            <div>
-              <input 
-                type="range"
-                min="0"
-                :max="player.duration.value || 1"
-                step="0.05"
-                :value="player.currentTime.value"
-                @input="player.seek(parseFloat($event.target.value))"
-                class="w-full accent-ink-black h-2 bg-stone/20 border border-stone cursor-pointer"
-              />
-            </div>
+                <button 
+                  type="button"
+                  @click="player.isPlaying.value ? player.pause() : player.play()"
+                  class="btn-keycap btn-keycap-sm w-10 h-10 shrink-0"
+                  :class="player.isPlaying.value ? 'btn-keycap-yellow' : 'btn-keycap-blue'"
+                  :title="player.isPlaying.value ? 'Jeda (Spasi)' : 'Putar Semua Trek (Spasi)'">
+                  <svg v-if="!player.isPlaying.value" class="w-4 h-4 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                </button>
 
-            <!-- Transport Controls & Peak Meters -->
-            <div class="flex items-center gap-3">
-              <button 
-                @click="player.stop"
-                class="w-9 h-9 bg-paper-white hover:bg-bone text-ink-black border border-stone flex items-center justify-center cursor-pointer transition-colors active:translate-y-0.5"
-                title="Hentikan & Reset">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="6" width="12" height="12" />
-                </svg>
-              </button>
-
-              <button 
-                @click="player.isPlaying.value ? player.pause() : player.play()"
-                class="w-9 h-9 flex items-center justify-center text-paper-white border border-ink-black transition-all cursor-pointer active:translate-y-0.5"
-                :class="player.isPlaying.value ? 'bg-amber-500 hover:bg-amber-600 text-ink-black' : 'bg-ink-black hover:bg-slate text-paper-white'"
-                :title="player.isPlaying.value ? 'Jeda (Spasi)' : 'Putar Semua Trek (Spasi)'">
-                <svg v-if="!player.isPlaying.value" class="w-4 h-4 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-                </svg>
-              </button>
-
-              <!-- Peak Meter L/R -->
-              <div class="flex-1 max-w-[160px] space-y-1 pl-2">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[8px] font-mono-accent text-stone font-bold w-3">L</span>
-                  <div class="flex-1">
-                    <LedPeakMeter :value="player.peakLeft.value" />
+                <div class="flex-1 min-w-[160px] space-y-2 sm:pl-2">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-[6px] border-[1.5px] border-[#111111] bg-[#f5f3eb] text-[10px] font-telemetry text-[#111111] font-bold shrink-0">L</span>
+                    <div class="flex-1">
+                      <LedPeakMeter :value="player.peakLeft.value" />
+                    </div>
                   </div>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <span class="text-[8px] font-mono-accent text-stone font-bold w-3">R</span>
-                  <div class="flex-1">
-                    <LedPeakMeter :value="player.peakRight.value" />
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-[6px] border-[1.5px] border-[#111111] bg-[#f5f3eb] text-[10px] font-telemetry text-[#111111] font-bold shrink-0">R</span>
+                    <div class="flex-1">
+                      <LedPeakMeter :value="player.peakRight.value" />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+          </div>
+
+          <!-- Right Column (lg:col-span-4): Goniometer Lissajous Sub-Card -->
+          <div class="lg:col-span-4 flex flex-col items-center lg:items-end justify-center lg:border-l lg:border-dashed lg:border-[#111111]/15 lg:pl-5">
+            <GoniometerVisualizer 
+              :get-data="player.getGoniometerData"
+              :is-playing="player.isPlaying.value"
+              :size="155"
+            />
           </div>
 
         </div>
-
-        <!-- Right Column (lg:col-span-4): Goniometer Lissajous Phase Scope (Borderless) -->
-        <div class="lg:col-span-4 flex flex-col items-center justify-center p-2 lg:border-l lg:border-stone/60">
-          <div class="text-[10px] font-mono-accent text-slate font-bold mb-2 uppercase tracking-wider">
-            Goniometer Fase (Lissajous)
-          </div>
-          <GoniometerVisualizer 
-            :get-data="player.getGoniometerData"
-            :is-playing="player.isPlaying.value"
-            :size="150"
-          />
-        </div>
-
       </div>
 
-      <!-- Multitrack Stem Channel Strips List (Flat, Seamless) -->
-      <div>
-        <div class="divide-y divide-stone/40 border-y border-stone/60 max-h-[440px] overflow-y-auto">
-          <!-- Stem Row (Flat list row that blends into canvas background) -->
+      <!-- CARD 2: Unified Stem Channel Strips & Shortcuts Card -->
+      <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] overflow-hidden">
+        <div class="divide-y divide-[#111111]/12 max-h-[440px] overflow-y-auto p-1 sm:p-2">
+          <!-- Stem Row -->
           <div 
             v-for="t in player.tracks.value" 
             :key="t.id"
-            class="py-3 px-1 sm:px-2 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-bone/40 transition-colors">
+            class="py-3 px-3 sm:px-4 rounded-[10px] flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-[#fcfcfb] transition-colors">
             
-            <!-- Stem Identity: Filename & Duration (Clean, No Clutter) -->
+            <!-- Stem Identity: Filename & Duration Pill -->
             <div class="min-w-[200px]">
-              <div class="flex flex-wrap items-baseline gap-2">
-                <h5 class="font-editorial text-sm font-bold text-ink-black truncate max-w-xs sm:max-w-md" :title="t.name || t.fileName">
+              <div class="flex flex-wrap items-center gap-2">
+                <h5 class="font-editorial text-sm font-bold text-[#111111] truncate max-w-xs sm:max-w-md" :title="t.name || t.fileName">
                   {{ t.name || t.fileName || 'Trek Audio' }}
                 </h5>
-                <span class="text-[11px] text-stone font-mono-accent">
+                <span class="inline-flex items-center rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2 py-0.5 text-[11px] font-bold text-[#111111] font-telemetry leading-none">
                   {{ formatTime(t.duration) }}
                 </span>
               </div>
@@ -379,7 +380,6 @@ onUnmounted(() => {
 
             <!-- Channel Controls: Mute, Solo, Pan, Volume -->
             <div class="flex flex-wrap items-center gap-4 w-full md:w-auto">
-              <!-- Mute / Solo Tally Buttons -->
               <TrackTallyButtons 
                 :track-id="t.id"
                 :initial-muted="t.isMuted"
@@ -388,9 +388,9 @@ onUnmounted(() => {
                 @toggle-solo="player.toggleTrackSolo(t.id)"
               />
 
-              <!-- Panning Slider (Ergonomic Full Track) -->
-              <div class="flex items-center gap-1.5 min-w-[130px]">
-                <span class="text-[10px] font-mono-accent text-stone font-semibold">Pan:</span>
+              <!-- Panning Slider -->
+              <div class="flex items-center gap-2 min-w-[145px]">
+                <span class="text-xs font-sans text-[#60605e] font-bold">Pan:</span>
                 <input 
                   type="range"
                   min="-1"
@@ -405,15 +405,15 @@ onUnmounted(() => {
                 <button 
                   type="button"
                   @click="t.pan = 0; player.setTrackPan(t.id, 0)"
-                  class="text-[10px] font-mono-accent text-ink-black font-semibold w-8 text-center cursor-pointer hover:underline"
+                  class="btn-keycap btn-keycap-mini btn-keycap-white px-2 py-0.5 text-[11px] font-telemetry font-bold min-w-[40px]"
                   title="Klik untuk reset Pan ke Center (0)">
                   {{ t.pan === 0 ? 'C' : t.pan < 0 ? `L${Math.round(Math.abs(t.pan)*100)}` : `R${Math.round(t.pan*100)}` }}
                 </button>
               </div>
 
               <!-- Volume Fader -->
-              <div class="flex items-center gap-2 min-w-[140px]">
-                <span class="text-[10px] font-mono-accent text-stone font-semibold">Vol:</span>
+              <div class="flex items-center gap-2 min-w-[150px]">
+                <span class="text-xs font-sans text-[#60605e] font-bold">Vol:</span>
                 <input 
                   type="range"
                   min="0"
@@ -424,7 +424,7 @@ onUnmounted(() => {
                   class="w-20 shrink-0 h-1.5 cursor-pointer"
                   title="Stem Channel Volume"
                 />
-                <span class="text-[10px] font-mono-accent text-ink-black font-bold w-9 text-right">
+                <span class="inline-flex items-center justify-center rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2 py-0.5 text-[11px] font-telemetry text-[#111111] font-bold min-w-[44px] leading-none">
                   {{ Math.round(t.volume * 100) }}%
                 </span>
               </div>
@@ -432,17 +432,28 @@ onUnmounted(() => {
 
           </div>
         </div>
-      </div>
 
-      <!-- Studio Sub-Footer Bar with Shortcuts (Clean Hairline Separator) -->
-      <div class="pt-3 border-t border-stone/60 flex flex-wrap items-center justify-between text-[11px] font-mono-accent text-stone gap-2">
-        <div class="flex items-center gap-3">
-          <span><kbd class="px-1.5 py-0.5 bg-bone text-ink-black border border-stone font-semibold">Spasi</kbd> Putar/Jeda</span>
-          <span><kbd class="px-1.5 py-0.5 bg-bone text-ink-black border border-stone font-semibold">A</kbd> / <kbd class="px-1.5 py-0.5 bg-bone text-ink-black border border-stone font-semibold">B</kbd> Switch A/B</span>
-          <span><kbd class="px-1.5 py-0.5 bg-bone text-ink-black border border-stone font-semibold">M</kbd> Mono Check</span>
-        </div>
-        <div>
-          <span>POLARIS Audio Engine v1.0</span>
+        <!-- Integrated Shortcuts Footer Bar -->
+        <div class="border-t border-[#111111]/12 bg-[#fcfcfb] px-4 py-3 flex flex-wrap items-center justify-between text-xs font-sans text-[#60605e] gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="inline-flex items-center gap-1.5">
+              <kbd class="px-1.5 py-0.5 text-[11px] font-sans font-bold text-[#111111] rounded-[6px] bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111]">Spasi</kbd>
+              <span class="font-medium text-[#111111]">Putar/Jeda</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <kbd class="px-1.5 py-0.5 text-[11px] font-sans font-bold text-[#111111] rounded-[6px] bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111]">A</kbd>
+              <span>/</span>
+              <kbd class="px-1.5 py-0.5 text-[11px] font-sans font-bold text-[#111111] rounded-[6px] bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111]">B</kbd>
+              <span class="font-medium text-[#111111]">Switch A/B</span>
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <kbd class="px-1.5 py-0.5 text-[11px] font-sans font-bold text-[#111111] rounded-[6px] bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111]">M</kbd>
+              <span class="font-medium text-[#111111]">Mono Check</span>
+            </span>
+          </div>
+          <div>
+            <span class="font-sans font-bold text-[#111111]">Polaris Audio Engine <span class="font-telemetry">v1.0</span></span>
+          </div>
         </div>
       </div>
 
