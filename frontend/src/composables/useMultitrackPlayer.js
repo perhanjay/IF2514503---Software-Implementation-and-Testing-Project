@@ -523,7 +523,9 @@ export function useMultitrackPlayer() {
     stop()
     if (audioCtx) {
       try {
-        audioCtx.close()
+        if (audioCtx.state !== 'closed') {
+          audioCtx.close()?.catch?.(() => {})
+        }
       } catch (_) {}
       audioCtx = null
     }

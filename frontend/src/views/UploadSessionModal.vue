@@ -73,120 +73,134 @@ async function startUpload() {
 </script>
 
 <template>
-  <div 
-    @click.self="$emit('close')"
-    class="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-    <div 
+  <div
+    @click.self="!uploading && $emit('close')"
+    class="fixed inset-0 z-50 bg-[#111111]/55 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+  >
+    <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      class="bg-white border-2 border-black max-w-xl w-full rounded-none p-7 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] space-y-6 animate-fade-in">
-      
+      class="retro-glass-panel max-w-xl w-full p-6 sm:p-7 space-y-6 font-sans"
+    >
       <!-- Modal Header -->
-      <div class="flex items-start justify-between border-b border-[#c1c0bc] pb-4">
+      <div class="flex items-start justify-between gap-4 border-b border-[#111111]/12 pb-4">
         <div>
-          <span class="badge-pill-stamp px-2.5 py-0.5 text-[10px] bg-black text-white font-medium inline-block">INGESTION STUDIO</span>
-          <h3 id="modal-title" class="text-xl sm:text-2xl text-black font-medium mt-2 tracking-tight">Unggah Sesi Multitrack</h3>
-          <p class="text-xs text-[#60605e] mt-0.5 font-normal">Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW</p>
+          <span class="stamp-serrated inline-block px-3 py-0.5 text-[10px] bg-[#ffda40] text-[#111111] font-bold uppercase tracking-wider">
+            Ingestion Studio
+          </span>
+          <h3 id="modal-title" class="text-xl sm:text-2xl font-editorial font-bold text-[#111111] mt-2 tracking-tight">
+            Unggah Sesi Multitrack
+          </h3>
+          <p class="text-xs text-[#60605e] mt-0.5 font-normal">
+            Mendukung berkas stem terpisah (WAV/FLAC) atau arsip .ZIP proyek DAW
+          </p>
         </div>
-        <button 
-          @click="$emit('close')" 
+        <button
+          @click="$emit('close')"
+          :disabled="uploading"
           type="button"
           aria-label="Tutup Dialog"
-          class="text-black hover:opacity-60 cursor-pointer text-xl font-normal p-1">
-          ✕
+          class="btn-keycap btn-keycap-mini btn-keycap-white w-8 h-8 shrink-0"
+        >
+          <span aria-hidden="true" class="text-sm font-bold leading-none">✕</span>
         </button>
       </div>
 
-      <div v-if="errorMsg" class="bg-rose-50 border border-rose-300 text-rose-800 text-xs p-3.5 rounded-none font-normal">
+      <div v-if="errorMsg" class="bg-rose-50/95 border border-rose-300 text-rose-900 text-xs p-3.5 rounded-[12px] font-medium">
         {{ errorMsg }}
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-medium text-black uppercase tracking-wider mb-1.5 font-mono-accent">
-            JUDUL SESI / NAMA PROYEK
+          <label for="upload-session-title" class="block text-xs font-bold text-[#111111] mb-1.5">
+            Judul Sesi / Nama Proyek
           </label>
-          <input 
-            v-model="sessionTitle" 
-            type="text" 
+          <input
+            id="upload-session-title"
+            v-model="sessionTitle"
+            type="text"
             placeholder="Contoh: Echoes in the Night (Multitrack 24-bit)"
-            class="w-full bg-[#f1f0eb] border border-[#c1c0bc] rounded-none px-4 py-3 text-sm text-black placeholder-[#60605e] focus:outline-none focus:border-black focus:bg-white transition-colors"
+            class="w-full bg-white/90 border-[1.5px] border-[#111111]/20 rounded-[12px] px-4 py-3 text-sm text-[#111111] placeholder-[#60605e] focus:outline-none focus:border-[#111111] focus:bg-white transition-colors"
           />
         </div>
 
         <!-- Dropzone Area -->
-        <div 
+        <div
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
           @drop.prevent="handleDrop"
-          :class="isDragging ? 'border-black bg-[#ff82c2]/20' : 'border-[#c1c0bc] bg-[#f1f0eb]/60'"
-          class="border border-dashed rounded-none p-8 text-center cursor-pointer transition-all relative group">
-          
-          <input 
-            type="file" 
-            multiple 
+          :class="isDragging ? 'border-[#20afff] bg-[#20afff]/15' : 'border-[#111111]/25 bg-[#fcfcfb]/90 hover:border-[#111111]/45'"
+          class="border-2 border-dashed rounded-[16px] p-8 text-center cursor-pointer transition-all relative group"
+        >
+          <input
+            type="file"
+            multiple
             accept=".wav,.flac,.zip,.mp3,.aiff"
-            @change="handleFileSelect" 
+            @change="handleFileSelect"
             class="absolute inset-0 opacity-0 cursor-pointer"
           />
 
-          <div class="w-12 h-12 rounded-none bg-black text-white flex items-center justify-center mx-auto mb-3">
+          <div class="w-12 h-12 rounded-[14px] bg-[#18181b] text-white border-2 border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center mx-auto mb-3 group-hover:-translate-y-0.5 transition-transform">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
             </svg>
           </div>
 
-          <p class="text-sm font-medium text-black">
-            Tarik &amp; jatuhkan stem ke sini, atau <span class="underline">pilih berkas</span>
+          <p class="text-sm font-semibold text-[#111111]">
+            Tarik &amp; jatuhkan stem ke sini, atau <span class="underline decoration-[#20afff] decoration-2 underline-offset-4">pilih berkas</span>
           </p>
-          <p class="text-xs text-[#60605e] mt-1 font-mono-accent font-normal">
-            Maksimal 2 GB per sesi multitrack • Presisi 24/32-bit float terjaga
+          <p class="text-xs text-[#60605e] mt-1 font-normal">
+            Maksimal <span class="font-telemetry font-semibold text-[#111111]">2 GB</span> per sesi multitrack &middot; Presisi <span class="font-telemetry font-semibold text-[#111111]">24/32-bit</span> float terjaga
           </p>
         </div>
 
         <!-- File selection summary -->
         <div v-if="selectedFiles.length" class="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-          <span class="text-xs font-medium text-black block font-mono-accent uppercase tracking-wider">
+          <span class="text-xs font-bold text-[#111111] block tabular-nums">
             {{ selectedFiles.length }} Berkas Siap Diunggah:
           </span>
-          <div 
-            v-for="(f, i) in selectedFiles" 
-            :key="i" 
-            class="flex items-center justify-between bg-[#f1f0eb] border border-[#c1c0bc] rounded-none px-3 py-2 text-xs text-black">
-            <span class="truncate max-w-xs font-mono-accent text-[11px]">{{ f.name }}</span>
-            <span class="text-[#60605e] font-mono text-[10px]">{{ (f.size / (1024 * 1024)).toFixed(2) }} MB</span>
+          <div
+            v-for="(f, i) in selectedFiles"
+            :key="i"
+            class="retro-telemetry-plate flex items-center justify-between px-3.5 py-2 text-xs text-[#111111]"
+          >
+            <span class="truncate max-w-xs font-medium">{{ f.name }}</span>
+            <span class="text-[#60605e] font-telemetry text-[11px] shrink-0">{{ (f.size / (1024 * 1024)).toFixed(2) }} MB</span>
           </div>
         </div>
 
         <!-- Ingestion Progress bar -->
-        <div v-if="uploading" class="space-y-1.5 pt-2">
-          <div class="flex justify-between text-xs text-black font-mono-accent font-normal">
-            <span>Mengunggah ke MinIO S3 Storage...</span>
-            <span class="font-medium">{{ uploadProgress }}%</span>
+        <div v-if="uploading" class="retro-telemetry-plate p-3 space-y-2">
+          <div class="flex justify-between text-xs text-[#111111] font-medium">
+            <span>Mengunggah ke penyimpanan studio...</span>
+            <span class="font-telemetry font-bold">{{ uploadProgress }}%</span>
           </div>
-          <div class="w-full h-2 bg-[#f1f0eb] border border-[#c1c0bc] rounded-none overflow-hidden">
-            <div class="h-full bg-black transition-all duration-300" :style="{ width: uploadProgress + '%' }"></div>
+          <div class="w-full h-2.5 bg-[#eaeef4] border border-[#111111]/20 rounded-full overflow-hidden">
+            <div class="h-full bg-[#20afff] transition-all duration-300 rounded-full" :style="{ width: uploadProgress + '%' }"></div>
           </div>
         </div>
       </div>
 
       <!-- Action buttons -->
-      <div class="flex justify-end gap-3 pt-3 border-t border-[#c1c0bc]">
-        <button 
-          @click="$emit('close')" 
+      <div class="flex justify-end gap-3 pt-3 border-t border-[#111111]/12">
+        <button
+          type="button"
+          @click="$emit('close')"
           :disabled="uploading"
-          class="btn-bone-secondary px-5 py-2.5 rounded-none border border-[#c1c0bc] text-xs uppercase tracking-wider cursor-pointer">
+          class="btn-keycap btn-keycap-sm btn-keycap-white px-5 py-2.5 text-xs"
+        >
           Batal
         </button>
-        <button 
-          @click="startUpload" 
+        <button
+          type="button"
+          @click="startUpload"
           :disabled="uploading || !selectedFiles.length"
-          class="btn-ink-stamp px-6 py-2.5 rounded-none text-xs uppercase tracking-[0.1em] cursor-pointer disabled:opacity-50 transition-all">
+          class="btn-keycap btn-keycap-sm btn-keycap-blue px-6 py-2.5 text-xs"
+        >
           {{ uploading ? 'Mengunggah & Mengekstrak...' : 'Mulai Transmisi Audio' }}
         </button>
       </div>
-
     </div>
   </div>
 </template>

@@ -34,8 +34,8 @@ function draw() {
   const halfH = height / 2
   const radius = Math.min(halfW, halfH) - 16
 
-  // 1. Semi-transparent clear untuk phosphor trail persistence
-  ctx.fillStyle = 'rgba(10, 15, 29, 0.28)'
+  // 1. Semi-transparent clear untuk phosphor trail persistence di kanvas kertas studio
+  ctx.fillStyle = 'rgba(252, 252, 251, 0.34)'
   ctx.fillRect(0, 0, width, height)
 
   // 2. Gambar Reticle / Graticule Studio (Grid Konsentris & Sumbu 45°)
@@ -93,20 +93,20 @@ function draw() {
       }
       correlationValue.value = rCorr
 
-      // Warna dinamis fosfor:
-      // rCorr >= 0.5: Emerald green neon (#10b981)
-      // 0 <= rCorr < 0.5: Cyan / Sky (#38bdf8)
-      // rCorr < 0: Warning Amber / Rose (#f43f5e)
-      let traceColor = '#10b981'
+      // Warna trace berkonras tinggi pada kanvas kertas terang:
+      // rCorr >= 0.5: Studio Green (#16a34a)
+      // 0 <= rCorr < 0.5: Signal Blue (#0284c7)
+      // rCorr < 0: Critical Red (#e11d48)
+      let traceColor = '#16a34a'
       if (rCorr < 0) {
-        traceColor = '#f43f5e'
+        traceColor = '#e11d48'
       } else if (rCorr < 0.5) {
-        traceColor = '#38bdf8'
+        traceColor = '#0284c7'
       }
 
       ctx.strokeStyle = traceColor
-      ctx.shadowColor = traceColor
-      ctx.shadowBlur = 4
+      ctx.shadowColor = 'rgba(17, 17, 17, 0.12)'
+      ctx.shadowBlur = 2
       ctx.stroke()
       ctx.restore()
     }
@@ -114,8 +114,8 @@ function draw() {
     correlationValue.value = 1.0
     // Gambar titik idle di pusat
     ctx.beginPath()
-    ctx.arc(halfW, halfH, 2, 0, Math.PI * 2)
-    ctx.fillStyle = '#10b981'
+    ctx.arc(halfW, halfH, 2.5, 0, Math.PI * 2)
+    ctx.fillStyle = '#16a34a'
     ctx.fill()
   }
 
@@ -126,7 +126,7 @@ function drawReticle(ctx, cx, cy, r) {
   ctx.save()
 
   // Lingkaran luar & konsentris
-  ctx.strokeStyle = '#1e293b'
+  ctx.strokeStyle = 'rgba(17, 17, 17, 0.16)'
   ctx.lineWidth = 1
 
   ctx.beginPath()
@@ -145,7 +145,7 @@ function drawReticle(ctx, cx, cy, r) {
 
   // Sumbu L (Kiri Atas ke Kanan Bawah) & Sumbu R (Kanan Atas ke Kiri Bawah)
   const diagOffset = r * 0.7071
-  ctx.strokeStyle = '#334155'
+  ctx.strokeStyle = 'rgba(17, 17, 17, 0.22)'
   ctx.lineWidth = 0.8
 
   // Sumbu Mid (Vertikal)
@@ -171,8 +171,8 @@ function drawReticle(ctx, cx, cy, r) {
   ctx.setLineDash([])
 
   // Label sumbu
-  ctx.fillStyle = '#64748b'
-  ctx.font = '9px ui-monospace, monospace'
+  ctx.fillStyle = '#111111'
+  ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
@@ -197,57 +197,67 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col items-center select-none w-full max-w-[200px]">
-    <!-- Visualizer Canvas -->
-    <div class="relative">
+  <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-[#fcfcfb] shadow-[2px_3px_0_#111111] p-4 flex flex-col items-center select-none w-full max-w-[244px]">
+    <div class="w-full flex items-center justify-between mb-2.5">
+      <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#60605e]">
+        Goniometer (Lissajous)
+      </span>
+    </div>
+
+    <!-- Crisp Light Studio Scope Viewport -->
+    <div class="relative rounded-[12px] border-[1.5px] border-[#111111] bg-[#fcfcfb] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
       <canvas 
         ref="canvasRef" 
         :width="size" 
         :height="size" 
-        class="rounded-none bg-[#0F172A] border border-black shadow-2xs"
+        class="rounded-[10px] bg-[#fcfcfb] block"
       />
     </div>
 
-    <!-- Telemetry Correlation Bar (Flat, Seamless) -->
-    <div class="w-full mt-2.5 pt-2 border-t border-stone/60 space-y-1.5">
-      <div class="flex items-center justify-between text-[10px] font-mono-accent">
-        <span class="text-ink-black font-bold uppercase tracking-wider">Fase Korelasi</span>
+    <!-- Telemetry Correlation Bar (Matches Phase 02 Audit Diagnostik Design) -->
+    <div class="w-full mt-3.5 pt-3 border-t border-[#111111]/12 space-y-2">
+      <div class="flex items-center justify-between text-xs">
+        <span class="font-sans text-[11px] font-bold uppercase tracking-wider text-[#60605e]">Korelasi Fasa</span>
         <span 
-          class="font-bold text-[11px] px-1.5 py-0.5 border"
-          :class="correlationValue >= 0.5 
-            ? 'text-emerald-800 bg-emerald-50 border-emerald-300' 
+          class="inline-flex items-center rounded-full border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-0.5 font-telemetry font-bold text-[11px] text-[#111111] leading-none"
+          :class="correlationValue >= 0.4 
+            ? 'bg-[#5ad363]' 
             : correlationValue >= 0 
-              ? 'text-ink-black bg-bone border-stone' 
-              : 'text-rose-800 bg-rose-50 border-rose-300 font-extrabold'">
+              ? 'bg-[#ffda40]' 
+              : 'bg-[#ff82c2]'">
           {{ correlationValue >= 0 ? '+' : '' }}{{ correlationValue.toFixed(2) }}
         </span>
       </div>
 
-      <!-- Meter Visual Bar [-1 to +1] -->
-      <div class="relative h-2 w-full bg-bone overflow-hidden border border-stone flex">
+      <!-- Light Pink-to-Green Meter Visual Bar [-1 to +1] -->
+      <div class="relative h-2.5 w-full bg-[#eaeef4] rounded-full overflow-hidden border-[1.5px] border-[#111111]/20 flex">
         <!-- Negative Zone (-1 to 0) -->
-        <div class="w-1/2 h-full flex justify-end bg-rose-100 border-r border-stone">
+        <div class="w-1/2 h-full flex justify-end bg-[#ff82c2]/35 border-r border-[#111111]/40">
           <div 
             v-if="correlationValue < 0" 
-            class="h-full bg-rose-600 transition-all duration-75"
+            class="h-full bg-[#ff6138] rounded-l-full transition-all duration-75"
             :style="{ width: `${Math.min(100, Math.abs(correlationValue) * 100)}%` }"
           />
         </div>
         <!-- Positive Zone (0 to +1) -->
-        <div class="w-1/2 h-full flex justify-start bg-emerald-100">
+        <div class="w-1/2 h-full flex justify-start bg-[#5ad363]/35">
           <div 
             v-if="correlationValue >= 0" 
-            class="h-full transition-all duration-75"
-            :class="correlationValue >= 0.5 ? 'bg-emerald-600' : 'bg-ink-black'"
+            class="h-full rounded-r-full transition-all duration-75"
+            :class="correlationValue >= 0.4 ? 'bg-[#5ad363]' : 'bg-[#20afff]'"
             :style="{ width: `${Math.min(100, correlationValue * 100)}%` }"
           />
         </div>
       </div>
 
-      <div class="flex justify-between text-[8px] font-mono-accent text-slate px-0.5 leading-none">
-        <span class="text-rose-700 font-bold">-1 (Out Phase)</span>
-        <span>0</span>
-        <span class="text-emerald-800 font-bold">+1 (Mono)</span>
+      <div class="flex justify-between text-[10px] text-[#60605e] px-0.5 leading-none">
+        <span class="text-rose-800 font-bold">
+          <span class="font-telemetry">-1</span> <span class="font-sans">(Batal)</span>
+        </span>
+        <span class="font-telemetry font-bold text-[#111111]">0</span>
+        <span class="text-emerald-800 font-bold">
+          <span class="font-telemetry">+1</span> <span class="font-sans">(Mono)</span>
+        </span>
       </div>
     </div>
   </div>
