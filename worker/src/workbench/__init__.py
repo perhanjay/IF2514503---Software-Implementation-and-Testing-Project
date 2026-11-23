@@ -1,12 +1,10 @@
 from .silence_trimmer import (
     TARGET_SAMPLE_RATE,
-    compute_union_trim_bounds,
     decode_audio_bytes,
+    detect_active_regions,
     encode_wav_bytes,
     extract_waveform_peaks,
-    find_trim_sample_bounds,
-    slice_aligned_batch,
-    trim_audio_silence,
+    split_audio_by_regions,
 )
 from .stem_separator import STEM_ORDER, separate_audio_stems
 
@@ -16,9 +14,7 @@ __all__ = [
     "decode_audio_bytes",
     "encode_wav_bytes",
     "extract_waveform_peaks",
-    "find_trim_sample_bounds",
-    "trim_audio_silence",
-    "compute_union_trim_bounds",
-    "slice_aligned_batch",
+    "detect_active_regions",
+    "split_audio_by_regions",
     "separate_audio_stems",
 ]

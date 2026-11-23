@@ -12,7 +12,10 @@ from scipy.signal import resample_poly
 TARGET_SAMPLE_RATE = 48000
 _CORRUPT_AUDIO_MSG = "Berkas audio rusak atau format tidak didukung"
 _INVALID_BOUNDS_MSG = "Rentang batas pemangkasan tidak valid"
-_SILENT_AUDIO_MSG = "Audio sepenuhnya hening di bawah ambang batas yang dipilih"
+_SILENT_AUDIO_MSG = "Audio sepenuhnya hening atau tidak ada segmen aktif yang memenuhi durasi minimal"
+_INVALID_REGION_COUNT_MSG = "Jumlah region harus antara 1 hingga 100"
+_MIN_REGION_DURATION_SEC = 0.01
+_END_BOUND_TOLERANCE_SEC = 0.05
 
 
 def _ensure_stereo_2d(audio_data: np.ndarray) -> np.ndarray:
@@ -115,11 +118,17 @@ def decode_audio_bytes(raw_bytes: bytes, file_name: str) -> tuple[np.ndarray, in
     return np.ascontiguousarray(stereo, dtype=np.float32), TARGET_SAMPLE_RATE
 
 
-def encode_wav_bytes(audio_data: np.ndarray, sample_rate: int = TARGET_SAMPLE_RATE) -> bytes:
-    """Encode float32 stereo audio array into WAV bytes."""
+def encode_wav_bytes(
+    audio_data: np.ndarray,
+    sample_rate: int = TARGET_SAMPLE_RATE,
+    subtype: str = "PCM_24",
+) -> bytes:
+    """Encode stereo audio array into lossless WAV bytes (24-bit PCM by default)."""
     stereo = _ensure_stereo_2d(audio_data)
+    if subtype != "FLOAT":
+        stereo = np.clip(stereo, -1.0, 1.0)
     buf = io.BytesIO()
-    sf.write(buf, stereo, int(sample_rate), format="WAV", subtype="FLOAT")
+    sf.write(buf, stereo, int(sample_rate), format="WAV", subtype=subtype)
     return buf.getvalue()
 
 
@@ -143,63 +152,6 @@ def extract_waveform_peaks(audio_data: np.ndarray, num_bins: int = 200) -> list[
             val = float(np.max(mono_env[start:end]))
         peaks.append(round(val, 6))
     return peaks
-
-
-def find_trim_sample_bounds(
-    audio_data: np.ndarray,
-    sample_rate: int,
-    threshold_db: float = -45.0,
-    pad_ms: float = 100.0,
-    manual_start_sec: float | None = None,
-    manual_end_sec: float | None = None,
-) -> tuple[int, int]:
-    """Determine sample-accurate [start, end) trim bounds via 10 ms RMS threshold or manual overrides."""
-    arr = np.asarray(audio_data, dtype=np.float32)
-    mono_env = np.max(np.abs(arr), axis=1) if arr.ndim == 2 else np.abs(arr)
-    total_samples = len(mono_env)
-
-    if total_samples == 0 or sample_rate <= 0:
-        raise ValueError(_SILENT_AUDIO_MSG)
-
-    if manual_start_sec is not None and manual_end_sec is not None:
-        start_idx = int(round(float(manual_start_sec) * sample_rate))
-        end_idx = int(round(float(manual_end_sec) * sample_rate))
-        if not (0 <= start_idx < end_idx <= total_samples):
-            raise ValueError(_INVALID_BOUNDS_MSG)
-        return start_idx, end_idx
-
-    win_size = max(1, int(round(0.010 * sample_rate)))
-    threshold_amp = 10.0 ** (float(threshold_db) / 20.0)
-    n_full = total_samples // win_size
-
-    if n_full > 0:
-        frames = mono_env[: n_full * win_size].reshape(n_full, win_size)
-        frame_rms = np.sqrt(np.mean(frames.astype(np.float64) ** 2, axis=1))
-    else:
-        frame_rms = np.empty(0, dtype=np.float64)
-
-    if total_samples % win_size > 0:
-        tail_rms = float(np.sqrt(np.mean(mono_env[n_full * win_size :].astype(np.float64) ** 2)))
-        frame_rms = np.append(frame_rms, tail_rms)
-
-    active_frames = np.where(frame_rms > threshold_amp)[0]
-    if len(active_frames) == 0:
-        raise ValueError(_SILENT_AUDIO_MSG)
-
-    first_active = int(active_frames[0]) * win_size
-    last_active = min(total_samples, (int(active_frames[-1]) + 1) * win_size)
-    pad_samples = max(0, int(round((float(pad_ms) / 1000.0) * sample_rate)))
-
-    auto_start = max(0, first_active - pad_samples)
-    auto_end = min(total_samples, last_active + pad_samples)
-
-    start_idx = int(round(float(manual_start_sec) * sample_rate)) if manual_start_sec is not None else auto_start
-    end_idx = int(round(float(manual_end_sec) * sample_rate)) if manual_end_sec is not None else auto_end
-
-    if not (0 <= start_idx < end_idx <= total_samples):
-        raise ValueError(_INVALID_BOUNDS_MSG)
-
-    return start_idx, end_idx
 
 
 def _slice_and_fade(
@@ -245,70 +197,178 @@ def _slice_and_fade(
     }
 
 
-def trim_audio_silence(
+def detect_active_regions(
     audio_data: np.ndarray,
     sample_rate: int,
     threshold_db: float = -45.0,
-    pad_ms: float = 100.0,
-    fade_ms: float = 15.0,
-    manual_start_sec: float | None = None,
-    manual_end_sec: float | None = None,
-) -> dict:
-    """Trim leading and trailing silence from a single audio array with zero-crossing fade edges."""
+    min_silence_gap_ms: float = 300.0,
+    min_asset_ms: float = 100.0,
+    pad_ms: float = 50.0,
+) -> list[dict]:
+    """Detect non-overlapping active audio regions via 10 ms frame peak envelope, gap bridging, and midpoint-clamped padding."""
+    for param in (threshold_db, min_silence_gap_ms, min_asset_ms, pad_ms):
+        if not math.isfinite(float(param)):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
     stereo = _ensure_stereo_2d(audio_data)
-    start_idx, end_idx = find_trim_sample_bounds(
-        stereo,
-        sample_rate,
-        threshold_db=threshold_db,
-        pad_ms=pad_ms,
-        manual_start_sec=manual_start_sec,
-        manual_end_sec=manual_end_sec,
-    )
-    return _slice_and_fade(stereo, sample_rate, start_idx, end_idx, fade_ms=fade_ms)
+    mono_env = np.max(np.abs(stereo), axis=1)
+    total_samples = len(mono_env)
 
-
-def compute_union_trim_bounds(
-    stems_map: dict[str, np.ndarray],
-    sample_rate: int,
-    threshold_db: float = -45.0,
-    pad_ms: float = 100.0,
-    manual_start_sec: float | None = None,
-    manual_end_sec: float | None = None,
-) -> tuple[int, int]:
-    """Compute shared trim bounds across all stems using the frame-wise max union envelope."""
-    if not stems_map:
+    if total_samples == 0 or sample_rate <= 0:
         raise ValueError(_SILENT_AUDIO_MSG)
 
-    max_len = max(len(arr) for arr in stems_map.values())
-    if max_len == 0:
+    win_size = max(1, int(round(0.010 * sample_rate)))
+    threshold_amp = 10.0 ** (float(threshold_db) / 20.0)
+    n_full = total_samples // win_size
+
+    if n_full > 0:
+        frames = mono_env[: n_full * win_size].reshape(n_full, win_size)
+        frame_peaks = np.max(frames, axis=1)
+    else:
+        frame_peaks = np.empty(0, dtype=np.float32)
+
+    if total_samples % win_size > 0:
+        tail_peak = float(np.max(mono_env[n_full * win_size :]))
+        frame_peaks = np.append(frame_peaks, tail_peak)
+
+    active = frame_peaks >= threshold_amp
+    if not np.any(active):
         raise ValueError(_SILENT_AUDIO_MSG)
 
-    union_env = np.zeros(max_len, dtype=np.float32)
-    for arr in stems_map.values():
-        arr_f = np.asarray(arr, dtype=np.float32)
-        env = np.max(np.abs(arr_f), axis=1) if arr_f.ndim == 2 else np.abs(arr_f)
-        if len(env) > 0:
-            union_env[: len(env)] = np.maximum(union_env[: len(env)], env)
+    padded_mask = np.concatenate(([False], active, [False]))
+    diffs = np.diff(padded_mask.astype(np.int8))
+    starts = np.where(diffs == 1)[0]
+    ends = np.where(diffs == -1)[0]
+    raw_runs = list(zip(starts.tolist(), ends.tolist()))
 
-    return find_trim_sample_bounds(
-        union_env[:, None],
-        sample_rate,
-        threshold_db=threshold_db,
-        pad_ms=pad_ms,
-        manual_start_sec=manual_start_sec,
-        manual_end_sec=manual_end_sec,
-    )
+    min_gap_samples = max(0, int(round((max(0.0, float(min_silence_gap_ms)) / 1000.0) * sample_rate)))
+    bridged_runs: list[tuple[int, int]] = [raw_runs[0]]
+    for start_f, end_f in raw_runs[1:]:
+        prev_start_f, prev_end_f = bridged_runs[-1]
+        gap_samples = (start_f - prev_end_f) * win_size
+        if gap_samples < min_gap_samples:
+            bridged_runs[-1] = (prev_start_f, end_f)
+        else:
+            bridged_runs.append((start_f, end_f))
+
+    min_asset_samples = max(1, int(round((max(0.0, float(min_asset_ms)) / 1000.0) * sample_rate)))
+    filtered_runs: list[tuple[int, int]] = []
+    for start_f, end_f in bridged_runs:
+        start_sample = start_f * win_size
+        end_sample = min(total_samples, end_f * win_size)
+        if (end_sample - start_sample) >= min_asset_samples:
+            filtered_runs.append((start_sample, end_sample))
+
+    if not filtered_runs:
+        raise ValueError(_SILENT_AUDIO_MSG)
+
+    pad_samples = max(0, int(round((max(0.0, float(pad_ms)) / 1000.0) * sample_rate)))
+    padded_bounds = [
+        [max(0, raw_s - pad_samples), min(total_samples, raw_e + pad_samples), raw_s, raw_e]
+        for raw_s, raw_e in filtered_runs
+    ]
+    for idx in range(len(padded_bounds) - 1):
+        if padded_bounds[idx][1] > padded_bounds[idx + 1][0]:
+            gap_mid = (padded_bounds[idx][3] + padded_bounds[idx + 1][2]) // 2
+            padded_bounds[idx][1] = gap_mid
+            padded_bounds[idx + 1][0] = gap_mid
+
+    return [
+        {
+            "start_sec": round(float(s / sample_rate), 6),
+            "end_sec": round(float(e / sample_rate), 6),
+            "duration_sec": round(float((e - s) / sample_rate), 6),
+        }
+        for s, e, _, _ in padded_bounds
+    ]
 
 
-def slice_aligned_batch(
-    stems_map: dict[str, np.ndarray],
+def _sanitize_asset_name(raw_name: object, idx: int) -> str:
+    """Sanitize a region asset name into a safe filename stem without .wav extension."""
+    text = str(raw_name or "").strip().replace("\\", "/")
+    segment = text.split("/")[-1].strip() if text else ""
+    if segment in ("", ".", ".."):
+        return f"asset_{idx + 1}"
+
+    cleaned = re.sub(r"[^a-zA-Z0-9._-]+", "_", segment)
+    while ".." in cleaned:
+        cleaned = cleaned.replace("..", ".")
+    if cleaned.lower().endswith(".wav"):
+        cleaned = cleaned[:-4]
+    cleaned = cleaned.strip("._-")
+
+    if not cleaned or cleaned in (".", ".."):
+        return f"asset_{idx + 1}"
+    return cleaned
+
+
+def split_audio_by_regions(
+    audio_data: np.ndarray,
     sample_rate: int,
-    start_sample: int,
-    end_sample: int,
+    regions: list[dict],
     fade_ms: float = 15.0,
-) -> dict[str, dict]:
-    """Slice all stems in stems_map at identical sample boundaries so timing alignment stays locked."""
-    return {
-        name: _slice_and_fade(audio, sample_rate, start_sample, end_sample, fade_ms=fade_ms)
-        for name, audio in stems_map.items()
-    }
+) -> list[dict]:
+    """Slice audio into 1..100 validated regions with sanitized deduplicated names and 24-bit PCM WAV output."""
+    if not isinstance(regions, list) or not (1 <= len(regions) <= 100):
+        raise ValueError(_INVALID_REGION_COUNT_MSG)
+
+    if not math.isfinite(float(fade_ms)) or float(fade_ms) < 0.0:
+        raise ValueError(_INVALID_BOUNDS_MSG)
+
+    stereo = _ensure_stereo_2d(audio_data)
+    total_samples = len(stereo)
+    if total_samples == 0 or sample_rate <= 0:
+        raise ValueError(_CORRUPT_AUDIO_MSG)
+
+    total_duration = total_samples / sample_rate
+    used_names: set[str] = set()
+    assets: list[dict] = []
+
+    for idx, region in enumerate(regions):
+        if not isinstance(region, dict):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
+        raw_start = region.get("start_sec") if "start_sec" in region else region.get("startSec")
+        raw_end = region.get("end_sec") if "end_sec" in region else region.get("endSec")
+        try:
+            start_sec = float(raw_start)
+            end_sec = float(raw_end)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(_INVALID_BOUNDS_MSG) from exc
+
+        if not (math.isfinite(start_sec) and math.isfinite(end_sec)):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
+        if not (0.0 <= start_sec < end_sec <= total_duration + _END_BOUND_TOLERANCE_SEC):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
+        effective_end_sec = min(end_sec, total_duration)
+        if (effective_end_sec - start_sec) < (_MIN_REGION_DURATION_SEC - 1e-9):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
+        start_sample = max(0, min(total_samples, int(round(start_sec * sample_rate))))
+        end_sample = max(0, min(total_samples, int(round(end_sec * sample_rate))))
+        if not (0 <= start_sample < end_sample <= total_samples):
+            raise ValueError(_INVALID_BOUNDS_MSG)
+
+        base_name = _sanitize_asset_name(region.get("name"), idx)
+        candidate = base_name
+        suffix_num = 1
+        while candidate.lower() in used_names:
+            candidate = f"{base_name}_{suffix_num}"
+            suffix_num += 1
+        used_names.add(candidate.lower())
+
+        sliced_res = _slice_and_fade(stereo, sample_rate, start_sample, end_sample, fade_ms=float(fade_ms))
+        wav_bytes = encode_wav_bytes(sliced_res["trimmed_audio"], int(sample_rate), subtype="PCM_24")
+
+        assets.append({
+            "name": candidate,
+            "file_name": f"{candidate}.wav",
+            "wav_bytes": wav_bytes,
+            "start_sec": round(float(start_sample / sample_rate), 6),
+            "end_sec": round(float(end_sample / sample_rate), 6),
+            "duration_sec": round(float(sliced_res["trimmed_duration_sec"]), 6),
+        })
+
+    return assets

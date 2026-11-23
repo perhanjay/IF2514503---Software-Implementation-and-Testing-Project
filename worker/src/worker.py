@@ -22,14 +22,11 @@ try:
     from .dsp.health_score import calculate_track_health, calculate_session_health
     from .dsp.repair_engine import execute_track_repairs, align_pair_microdelay
     from .workbench.silence_trimmer import (
-        TARGET_SAMPLE_RATE,
         decode_audio_bytes,
-        encode_wav_bytes,
-        trim_audio_silence,
-        compute_union_trim_bounds,
-        slice_aligned_batch,
+        split_audio_by_regions,
     )
     from .workbench.stem_separator import STEM_ORDER, separate_audio_stems
+    from .workbench.audio_exporter import transcode_audio_bytes
 except (ImportError, ValueError):
     from ai.instrument_classifier import classify_track
     from ai.pairing_detector import detect_track_pairs
@@ -43,14 +40,11 @@ except (ImportError, ValueError):
     from dsp.health_score import calculate_track_health, calculate_session_health
     from dsp.repair_engine import execute_track_repairs, align_pair_microdelay
     from workbench.silence_trimmer import (
-        TARGET_SAMPLE_RATE,
         decode_audio_bytes,
-        encode_wav_bytes,
-        trim_audio_silence,
-        compute_union_trim_bounds,
-        slice_aligned_batch,
+        split_audio_by_regions,
     )
     from workbench.stem_separator import STEM_ORDER, separate_audio_stems
+    from workbench.audio_exporter import transcode_audio_bytes
 
 load_dotenv()
 
@@ -535,15 +529,6 @@ def _update_workbench_redis_progress(redis_key, progress, step_message, status="
         sys.stderr.write(f"Warning: Redis progress update failed: {err}\n")
 
 
-def _default_trim_target_key(source_key, file_name):
-    base_name = os.path.splitext(os.path.basename(file_name or source_key or "audio"))[0]
-    safe_base = base_name.replace(" ", "_") or "audio"
-    if source_key and source_key.startswith("workbench/"):
-        stem_dir = os.path.dirname(source_key)
-        return f"{stem_dir}/TRIMMED_{safe_base}_{uuid.uuid4().hex[:8]}.wav"
-    return f"workbench/trimmed/{uuid.uuid4().hex[:12]}/TRIMMED_{safe_base}.wav"
-
-
 def separate_workbench_audio(payload):
     """Download mix audio from S3, separate into 4 zero-aligned stems, and upload stems to S3."""
     s3 = get_s3_client()
@@ -591,111 +576,82 @@ def separate_workbench_audio(payload):
     }
 
 
-def trim_workbench_audio(payload):
-    """Execute single-track or union-envelope synced silence trimming against S3 objects."""
+def split_workbench_audio(payload):
+    """Download source audio from S3 once, slice confirmed regions into PCM_24 WAVs, and upload assets to S3."""
     s3 = get_s3_client()
-    mode = payload.get("mode", "single")
-    threshold_db = float(payload.get("thresholdDb", -45.0))
-    pad_ms = float(payload.get("padMs", 100.0))
+    split_id = payload.get("splitId") or uuid.uuid4().hex
+    user_id = payload.get("userId") or "anonymous"
+    source_key = payload["sourceStorageKey"]
+    file_name = payload.get("fileName") or os.path.basename(source_key) or "audio.wav"
+    regions = payload.get("regions") or []
     fade_ms = float(payload.get("fadeMs", 15.0))
-    manual_start_sec = payload.get("manualStartSec")
-    manual_end_sec = payload.get("manualEndSec")
-    if manual_start_sec is not None:
-        manual_start_sec = float(manual_start_sec)
-    if manual_end_sec is not None:
-        manual_end_sec = float(manual_end_sec)
 
-    if mode == "single":
-        source_key = payload["sourceStorageKey"]
-        file_name = payload.get("fileName") or os.path.basename(source_key) or "audio.wav"
-        target_key = payload.get("targetKey") or _default_trim_target_key(source_key, file_name)
+    raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=source_key)["Body"].read()
+    audio_data, sr = decode_audio_bytes(raw_bytes, file_name)
+    duration_sec = round(float(len(audio_data) / sr), 6)
 
-        raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=source_key)["Body"].read()
-        audio_data, sr = decode_audio_bytes(raw_bytes, file_name)
-        res = trim_audio_silence(
-            audio_data,
-            sr,
-            threshold_db=threshold_db,
-            pad_ms=pad_ms,
-            fade_ms=fade_ms,
-            manual_start_sec=manual_start_sec,
-            manual_end_sec=manual_end_sec,
-        )
-        wav_bytes = encode_wav_bytes(res["trimmed_audio"], res["sample_rate"])
+    split_assets = split_audio_by_regions(audio_data, sr, regions, fade_ms=fade_ms)
+
+    assets_meta = []
+    for idx, asset in enumerate(split_assets, start=1):
+        storage_key = f"workbench/{user_id}/split-{split_id}/{idx:03d}_{asset['file_name']}"
         s3.put_object(
             Bucket=S3_BUCKET,
-            Key=target_key,
-            Body=wav_bytes,
+            Key=storage_key,
+            Body=asset["wav_bytes"],
             ContentType="audio/wav",
         )
-        return {
-            "originalDurationSec": res["original_duration_sec"],
-            "trimmedDurationSec": res["trimmed_duration_sec"],
-            "leadInRemovedSec": res["lead_in_removed_sec"],
-            "tailRemovedSec": res["tail_removed_sec"],
-            "trimmedPeaks": res["peaks"],
-            "targetKey": target_key,
-        }
+        assets_meta.append({
+            "name": asset["name"],
+            "fileName": asset["file_name"],
+            "storageKey": storage_key,
+            "durationSec": asset["duration_sec"],
+        })
 
-    if mode == "synced":
-        stems_input = payload.get("stems") or []
-        if not stems_input:
-            raise ValueError("Daftar stem untuk mode synced tidak boleh kosong")
+    return {
+        "splitId": split_id,
+        "durationSec": duration_sec,
+        "assets": assets_meta,
+    }
 
-        stems_map = {}
-        target_keys = {}
-        for item in stems_input:
-            name = item["name"]
-            src_key = item["sourceStorageKey"]
-            tgt_key = item.get("targetKey") or _default_trim_target_key(src_key, f"{name}.wav")
-            raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=src_key)["Body"].read()
-            audio_data, _ = decode_audio_bytes(raw_bytes, os.path.basename(src_key) or f"{name}.wav")
-            stems_map[name] = audio_data
-            target_keys[name] = tgt_key
 
-        start_idx, end_idx = compute_union_trim_bounds(
-            stems_map,
-            TARGET_SAMPLE_RATE,
-            threshold_db=threshold_db,
-            pad_ms=pad_ms,
-            manual_start_sec=manual_start_sec,
-            manual_end_sec=manual_end_sec,
+def export_workbench_audio(payload):
+    """Fetch S3 audio objects, transcode to targetFormat, and write to outputPath."""
+    s3 = get_s3_client()
+    items = payload.get("items", [])
+    if not items:
+        raise ValueError("Daftar berkas ekspor tidak boleh kosong")
+
+    exported = []
+    for item in items:
+        source_key = item["sourceStorageKey"]
+        output_path = item["outputPath"]
+        target_format = item.get("targetFormat", "wav24")
+        bitrate_kbps = item.get("bitrateKbps")
+        file_name = item.get("fileName") or os.path.basename(source_key) or "audio.wav"
+
+        raw_bytes = s3.get_object(Bucket=S3_BUCKET, Key=source_key)["Body"].read()
+        result = transcode_audio_bytes(
+            raw_bytes,
+            target_format=target_format,
+            bitrate_kbps=bitrate_kbps,
+            file_name=file_name,
         )
-        batch = slice_aligned_batch(stems_map, TARGET_SAMPLE_RATE, start_idx, end_idx, fade_ms=fade_ms)
 
-        updated_stems = []
-        for item in stems_input:
-            name = item["name"]
-            stem_res = batch[name]
-            tgt_key = target_keys[name]
-            wav_bytes = encode_wav_bytes(stem_res["trimmed_audio"], stem_res["sample_rate"])
-            s3.put_object(
-                Bucket=S3_BUCKET,
-                Key=tgt_key,
-                Body=wav_bytes,
-                ContentType="audio/wav",
-            )
-            updated_stems.append({
-                "name": name,
-                "storageKey": tgt_key,
-                "durationSec": stem_res["trimmed_duration_sec"],
-            })
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(result["bytes"])
 
-        primary_name = payload.get("primaryStemName")
-        if primary_name not in batch:
-            primary_name = "vocals" if "vocals" in batch else stems_input[0]["name"]
-        primary_res = batch[primary_name]
+        exported.append({
+            "name": item.get("name"),
+            "outputPath": output_path,
+            "ext": result["ext"],
+            "mime": result["mime"],
+            "format": result["format"],
+            "sizeBytes": len(result["bytes"]),
+        })
 
-        return {
-            "originalDurationSec": primary_res["original_duration_sec"],
-            "trimmedDurationSec": primary_res["trimmed_duration_sec"],
-            "leadInRemovedSec": primary_res["lead_in_removed_sec"],
-            "tailRemovedSec": primary_res["tail_removed_sec"],
-            "trimmedPeaks": primary_res["peaks"],
-            "updatedStems": updated_stems,
-        }
-
-    raise ValueError(f"Mode trim tidak valid: {mode}")
+    return {"items": exported}
 
 
 def sanitize_floats(obj):
@@ -769,11 +725,23 @@ if __name__ == "__main__":
             sys.stderr.write(f"{err}\n")
             sys.exit(1)
 
-    elif "--trim-stdin" in sys.argv:
+    elif "--split-stdin" in sys.argv:
         try:
             input_data = sys.stdin.read()
             payload = json.loads(input_data)
-            output = trim_workbench_audio(payload)
+            output = split_workbench_audio(payload)
+            clean_output = sanitize_floats(output)
+            print(json.dumps(clean_output))
+            sys.exit(0)
+        except Exception as err:
+            sys.stderr.write(f"{err}\n")
+            sys.exit(1)
+
+    elif "--export-stdin" in sys.argv:
+        try:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+            output = export_workbench_audio(payload)
             clean_output = sanitize_floats(output)
             print(json.dumps(clean_output))
             sys.exit(0)
