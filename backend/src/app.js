@@ -10,6 +10,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import adminUserRoutes from './routes/adminUserRoutes.js';
 import adminTransactionRoutes from './routes/adminTransactionRoutes.js';
+import workbenchRoutes from './routes/workbenchRoutes.js';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/sessions', sessionRoutes);
 app.use('/api/v1/admin/users', adminUserRoutes);
 app.use('/api/v1/admin/transactions', adminTransactionRoutes);
+app.use('/api/v1/workbench', workbenchRoutes);
 
 // Health Check API
 app.get('/api/health', async (req, res) => {
