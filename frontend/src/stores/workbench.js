@@ -26,7 +26,7 @@ async function extractBlobError(err, fallbackMsg) {
   return err?.message || fallbackMsg;
 }
 
-async function fetchAndTriggerBlobDownload(url, fallbackName, fallbackErrMsg) {
+async function fetchAndTriggerBlobDownload(url, fallbackName) {
   const res = await axios.get(url, { responseType: 'blob' });
   const filename = extractFilenameFromHeader(res.headers?.['content-disposition'], fallbackName);
   const blobUrl = URL.createObjectURL(res.data);
@@ -45,7 +45,7 @@ let isPollingRequest = false;
 let consecutivePollErrors = 0;
 let activePollToken = 0;
 
-function createEmptyTrimmerSource() {
+function createEmptySplitterSource() {
   return {
     file: null,
     fileName: '',
@@ -53,7 +53,6 @@ function createEmptyTrimmerSource() {
     stemName: null,
     rawUrl: null,
     rawDurationSec: 0,
-    syncAllStems: false,
   };
 }
 
@@ -84,28 +83,28 @@ function extractFilenameFromHeader(disposition, fallbackName) {
 
 export const useWorkbenchStore = defineStore('workbench', {
   state: () => ({
-    activeTab: 'separator', // 'separator' | 'trimmer'
+    activeTab: 'separator', // 'separator' | 'splitter'
     job: null,
     polling: false,
     isUploading: false,
-    isTrimming: false,
+    isSplitting: false,
     isDownloadingZip: false,
     isSendingToStudio: false,
     downloadFormat: 'auto',
     error: null,
-    trimmerSource: createEmptyTrimmerSource(),
-    trimResult: null,
+    splitterSource: createEmptySplitterSource(),
+    splitResult: null,
   }),
 
   getters: {
     hasCompletedJob: (state) => state.job?.status === 'COMPLETED' && Array.isArray(state.job?.stems) && state.job.stems.length > 0,
     isJobRunning: (state) => state.job?.status === 'QUEUED' || state.job?.status === 'PROCESSING',
-    hasTrimmerSource: (state) => Boolean(state.trimmerSource.file || (state.trimmerSource.jobId && state.trimmerSource.stemName)),
+    hasSplitterSource: (state) => Boolean(state.splitterSource.file || (state.splitterSource.jobId && state.splitterSource.stemName)),
   },
 
   actions: {
     setActiveTab(tab) {
-      if (tab === 'separator' || tab === 'trimmer') {
+      if (tab === 'separator' || tab === 'splitter') {
         this.activeTab = tab;
       }
     },
@@ -227,128 +226,104 @@ export const useWorkbenchStore = defineStore('workbench', {
       }, POLL_INTERVAL_MS);
     },
 
-    openStemInTrimmer(stem) {
+    openStemInSplitter(stem) {
       if (!stem) return;
-      revokeBlobUrl(this.trimmerSource.rawUrl);
+      revokeBlobUrl(this.splitterSource.rawUrl);
       this.error = null;
-      this.trimResult = null;
-      this.trimmerSource = {
+      this.splitResult = null;
+      this.splitterSource = {
         file: null,
         fileName: stem.label ? `${stem.label} (${stem.name}.wav)` : `${stem.name}.wav`,
         jobId: this.job?.jobId || null,
         stemName: stem.name,
-        rawUrl: stem.originalAudioUrl || stem.audioUrl || null,
-        rawDurationSec: Number(stem.originalDurationSec ?? stem.durationSec ?? 0),
-        syncAllStems: false,
+        rawUrl: stem.audioUrl || null,
+        rawDurationSec: Number(stem.durationSec ?? 0),
       };
-      this.activeTab = 'trimmer';
+      this.activeTab = 'splitter';
     },
 
-    loadLocalFileInTrimmer(file, durationSec = 0) {
+    loadLocalFileInSplitter(file, durationSec = 0) {
       if (!file) return;
-      revokeBlobUrl(this.trimmerSource.rawUrl);
+      revokeBlobUrl(this.splitterSource.rawUrl);
       const rawUrl = URL.createObjectURL(file);
 
       this.error = null;
-      this.trimResult = null;
-      this.trimmerSource = {
+      this.splitResult = null;
+      this.splitterSource = {
         file,
         fileName: file.name,
         jobId: null,
         stemName: null,
         rawUrl,
         rawDurationSec: Number(durationSec || 0),
-        syncAllStems: false,
       };
-      this.activeTab = 'trimmer';
+      this.activeTab = 'splitter';
     },
 
-    setTrimmerDuration(durationSec) {
+    setSplitterDuration(durationSec) {
       const parsed = Number(durationSec);
       if (Number.isFinite(parsed) && parsed > 0) {
-        this.trimmerSource.rawDurationSec = parsed;
+        this.splitterSource.rawDurationSec = parsed;
       }
     },
 
-    async executeTrim(params = {}) {
-      const {
-        thresholdDb = -45,
-        padMs = 100,
-        fadeMs = 15,
-        manualStartSec = null,
-        manualEndSec = null,
-        syncAllStems = this.trimmerSource.syncAllStems,
-      } = params;
-
-      if (!this.trimmerSource.file && !this.trimmerSource.jobId) {
+    async executeSplit({ regions = [], fadeMs = 15 } = {}) {
+      if (!this.splitterSource.file && !(this.splitterSource.jobId && this.splitterSource.stemName)) {
         const msg = 'Pilih stem atau unggah berkas audio terlebih dahulu';
         this.error = msg;
         throw new Error(msg);
       }
 
-      this.isTrimming = true;
+      if (!Array.isArray(regions) || regions.length === 0) {
+        const msg = 'Tambahkan minimal 1 segmen region sebelum mengekspor aset';
+        this.error = msg;
+        throw new Error(msg);
+      }
+
+      const normalizedRegions = regions.map((region) => ({
+        name: typeof region.name === 'string' ? region.name : '',
+        startSec: Number(region.startSec),
+        endSec: Number(region.endSec),
+      }));
+
+      this.isSplitting = true;
       this.error = null;
 
       try {
         let res;
-        if (this.trimmerSource.file) {
+        if (this.splitterSource.file) {
           const formData = new FormData();
-          formData.append('audio', this.trimmerSource.file);
-          formData.append('thresholdDb', String(thresholdDb));
-          formData.append('padMs', String(padMs));
+          formData.append('audio', this.splitterSource.file);
+          formData.append('regions', JSON.stringify(normalizedRegions));
           formData.append('fadeMs', String(fadeMs));
-          if (manualStartSec !== null && manualStartSec !== undefined && manualStartSec !== '') {
-            formData.append('manualStartSec', String(manualStartSec));
-          }
-          if (manualEndSec !== null && manualEndSec !== undefined && manualEndSec !== '') {
-            formData.append('manualEndSec', String(manualEndSec));
-          }
 
-          res = await axios.post('/api/v1/workbench/trim', formData);
+          res = await axios.post('/api/v1/workbench/split', formData);
         } else {
-          res = await axios.post('/api/v1/workbench/trim', {
-            jobId: this.trimmerSource.jobId,
-            stemName: this.trimmerSource.stemName,
-            thresholdDb,
-            padMs,
+          res = await axios.post('/api/v1/workbench/split', {
+            jobId: this.splitterSource.jobId,
+            stemName: this.splitterSource.stemName,
+            regions: normalizedRegions,
             fadeMs,
-            manualStartSec: manualStartSec ?? null,
-            manualEndSec: manualEndSec ?? null,
-            syncAllStems: Boolean(syncAllStems),
           });
         }
 
         const data = res.data;
-        this.trimResult = {
-          storageKey: data.storageKey,
-          audioUrl: data.audioUrl,
+        this.splitResult = {
+          splitId: data.splitId,
+          sourceFileName: data.sourceFileName || this.splitterSource.fileName || '',
           sourceFormat: data.sourceFormat || this.job?.sourceFormat || null,
-          originalDurationSec: data.originalDurationSec,
-          trimmedDurationSec: data.trimmedDurationSec,
-          leadInRemovedSec: data.leadInRemovedSec,
-          tailRemovedSec: data.tailRemovedSec,
-          trimmedPeaks: Array.isArray(data.trimmedPeaks) ? data.trimmedPeaks : [],
-          updatedJobStems: data.updatedJobStems || null,
+          fadeMs: data.fadeMs ?? fadeMs,
+          totalAssets: data.totalAssets ?? (Array.isArray(data.assets) ? data.assets.length : 0),
+          assets: Array.isArray(data.assets) ? data.assets : [],
         };
 
-        if (Array.isArray(data.updatedJobStems) && this.job && this.job.jobId === this.trimmerSource.jobId) {
-          const updatedByName = new Map(data.updatedJobStems.map((stem) => [stem.name, stem]));
-          this.job = {
-            ...this.job,
-            stems: (this.job.stems || []).map((existing) => {
-              const updated = updatedByName.get(existing.name);
-              return updated ? { ...existing, ...updated } : existing;
-            }),
-          };
-        }
-
-        return this.trimResult;
+        return this.splitResult;
       } catch (err) {
-        const msg = err.response?.data?.error || err.message || 'Gagal memangkas hening audio';
+        const msg = err.response?.data?.error || err.message || 'Gagal memecah segmen audio';
         this.error = msg;
         throw err;
       } finally {
-        this.isTrimming = false;
+        this.isSplitting = false;
       }
     },
 
@@ -368,8 +343,7 @@ export const useWorkbenchStore = defineStore('workbench', {
           : 'Polaris_Workbench_Stems.zip';
         return await fetchAndTriggerBlobDownload(
           `/api/v1/workbench/jobs/${jobId}/download-zip?format=${encodeURIComponent(format || 'auto')}`,
-          fallbackName,
-          'Gagal mengunduh arsip ZIP stem'
+          fallbackName
         );
       } catch (err) {
         this.error = await extractBlobError(err, 'Gagal mengunduh arsip ZIP stem');
@@ -391,8 +365,7 @@ export const useWorkbenchStore = defineStore('workbench', {
       try {
         return await fetchAndTriggerBlobDownload(
           `/api/v1/workbench/jobs/${jobId}/stems/${encodeURIComponent(stemName)}/download?format=${encodeURIComponent(format || 'auto')}`,
-          `${stemName}.wav`,
-          'Gagal mengunduh berkas stem audio'
+          `${stemName}.wav`
         );
       } catch (err) {
         this.error = await extractBlobError(err, 'Gagal mengunduh berkas stem audio');
@@ -400,22 +373,51 @@ export const useWorkbenchStore = defineStore('workbench', {
       }
     },
 
-    async downloadTrimmedExport(format = this.downloadFormat) {
-      const storageKey = this.trimResult?.storageKey;
+    async downloadSplitZip(format = this.downloadFormat) {
+      const splitId = this.splitResult?.splitId;
+      if (!splitId) {
+        const msg = 'Hasil pemecahan aset belum tersedia untuk diunduh';
+        this.error = msg;
+        throw new Error(msg);
+      }
+
+      this.isDownloadingZip = true;
+      this.error = null;
+
+      try {
+        const baseSource = this.splitResult?.sourceFileName || this.splitterSource.fileName;
+        const fallbackName = baseSource
+          ? `Polaris_Workbench_${baseSource.replace(/\.[^.]+$/, '')}_Assets.zip`
+          : 'Polaris_Workbench_Assets.zip';
+        return await fetchAndTriggerBlobDownload(
+          `/api/v1/workbench/splits/${splitId}/download-zip?format=${encodeURIComponent(format || 'auto')}`,
+          fallbackName
+        );
+      } catch (err) {
+        this.error = await extractBlobError(err, 'Gagal mengunduh arsip ZIP aset audio');
+        throw err;
+      } finally {
+        this.isDownloadingZip = false;
+      }
+    },
+
+    async downloadSplitAsset(asset, format = this.downloadFormat) {
+      const storageKey = asset?.storageKey;
       if (!storageKey) {
-        const msg = 'Berkas hasil pemangkasan belum tersedia';
+        const msg = 'Berkas aset audio belum tersedia';
         this.error = msg;
         throw new Error(msg);
       }
 
       this.error = null;
       try {
+        const targetFileName = asset.fileName || (asset.name ? `${asset.name}.wav` : 'asset.wav');
         const params = new URLSearchParams({
           storageKey,
           format: format || 'auto',
-          fileName: this.trimmerSource.fileName || 'trimmed_audio.wav',
+          fileName: targetFileName,
         });
-        const srcFmt = this.trimResult?.sourceFormat;
+        const srcFmt = this.splitResult?.sourceFormat;
         if (srcFmt?.targetFormat) {
           params.set('sourceTargetFormat', srcFmt.targetFormat);
         }
@@ -424,11 +426,10 @@ export const useWorkbenchStore = defineStore('workbench', {
         }
         return await fetchAndTriggerBlobDownload(
           `/api/v1/workbench/export?${params.toString()}`,
-          'trimmed_audio.wav',
-          'Gagal mengunduh berkas hasil pemangkasan'
+          targetFileName
         );
       } catch (err) {
-        this.error = await extractBlobError(err, 'Gagal mengunduh berkas hasil pemangkasan');
+        this.error = await extractBlobError(err, 'Gagal mengunduh berkas aset audio');
         throw err;
       }
     },
@@ -466,16 +467,16 @@ export const useWorkbenchStore = defineStore('workbench', {
 
     reset() {
       this.stopPolling();
-      revokeBlobUrl(this.trimmerSource.rawUrl);
+      revokeBlobUrl(this.splitterSource.rawUrl);
       this.activeTab = 'separator';
       this.job = null;
       this.isUploading = false;
-      this.isTrimming = false;
+      this.isSplitting = false;
       this.isDownloadingZip = false;
       this.isSendingToStudio = false;
       this.error = null;
-      this.trimmerSource = createEmptyTrimmerSource();
-      this.trimResult = null;
+      this.splitterSource = createEmptySplitterSource();
+      this.splitResult = null;
     },
   },
 });
