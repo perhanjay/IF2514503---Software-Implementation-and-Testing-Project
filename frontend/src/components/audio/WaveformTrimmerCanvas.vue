@@ -226,8 +226,8 @@ function renderCanvas() {
   ctx.save()
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-  // 1. Dark monitor surface
-  ctx.fillStyle = '#18181b'
+  // 1. Light studio paper surface
+  ctx.fillStyle = '#fcfcfb'
   ctx.fillRect(0, 0, width, height)
 
   const topPad = 24
@@ -237,8 +237,8 @@ function renderCanvas() {
   const centerY = waveTop + waveHeight / 2
   const maxHalfH = waveHeight / 2
 
-  // 2. Grid lines (rgba(255,255,255,0.06))
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)'
+  // 2. Crisp light-paper grid lines
+  ctx.strokeStyle = 'rgba(17, 17, 17, 0.08)'
   ctx.lineWidth = 1
 
   // Horizontal amplitude lines
@@ -264,8 +264,8 @@ function renderCanvas() {
   const peaks = Array.isArray(props.peaks) ? props.peaks : []
 
   if (peaks.length === 0 || dur <= 0) {
-    ctx.fillStyle = '#a1a1aa'
-    ctx.font = '500 11px "JetBrains Mono", ui-monospace, monospace'
+    ctx.fillStyle = '#60605e'
+    ctx.font = '600 11px "JetBrains Mono", ui-monospace, monospace'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText('MEMUAT SINYAL GELOMBANG...', width / 2, centerY - 12)
@@ -280,7 +280,7 @@ function renderCanvas() {
     const threshOffset = clamp(thresholdAmp.value, 0, 1) * maxHalfH
     if (threshOffset >= 1.5) {
       ctx.save()
-      ctx.strokeStyle = 'rgba(255, 130, 194, 0.28)'
+      ctx.strokeStyle = 'rgba(219, 39, 119, 0.35)'
       ctx.lineWidth = 1
       ctx.setLineDash([3, 4])
       ctx.beginPath()
@@ -315,11 +315,11 @@ function renderCanvas() {
     const inDeadZone = !props.isTrimmedPreview && (barCenterX < startX || barCenterX > endX)
 
     if (props.isTrimmedPreview) {
-      ctx.fillStyle = '#5ad363'
+      ctx.fillStyle = '#16a34a'
     } else if (inDeadZone) {
-      ctx.fillStyle = 'rgba(32, 175, 255, 0.32)'
+      ctx.fillStyle = 'rgba(2, 132, 199, 0.25)'
     } else {
-      ctx.fillStyle = '#20afff'
+      ctx.fillStyle = '#0284c7'
     }
 
     const barH = Math.max(2, peakVal * waveHeight * 0.94)
@@ -331,19 +331,19 @@ function renderCanvas() {
   if (!props.isTrimmedPreview) {
     // Lead-in shaded dead zone
     if (startX > 0.5) {
-      ctx.fillStyle = 'rgba(255, 130, 194, 0.22)'
+      ctx.fillStyle = 'rgba(255, 130, 194, 0.28)'
       ctx.fillRect(0, 0, startX, height)
     }
 
     // Tail shaded dead zone
     if (endX < width - 0.5) {
-      ctx.fillStyle = 'rgba(255, 130, 194, 0.22)'
+      ctx.fillStyle = 'rgba(255, 130, 194, 0.28)'
       ctx.fillRect(endX, 0, width - endX, height)
     }
 
     // Dashed cut boundary lines
     ctx.save()
-    ctx.strokeStyle = '#ff82c2'
+    ctx.strokeStyle = '#db2777'
     ctx.lineWidth = 1.5
     ctx.setLineDash([5, 4])
 
@@ -364,16 +364,16 @@ function renderCanvas() {
     drawHandleTag(ctx, endX, width, 'OUT', true)
   }
 
-  // 6. Sun Yellow Playhead Cursor (#ffda40)
+  // 6. Ember Orange Playhead Cursor (#ff5a2c)
   const playRatio = clamp((Number(props.currentTimeSec) || 0) / dur, 0, 1)
   const playheadX = clamp(playRatio * width, 1, width - 1)
 
   ctx.save()
   if (props.isPlaying) {
-    ctx.shadowColor = 'rgba(255, 218, 64, 0.65)'
-    ctx.shadowBlur = 6
+    ctx.shadowColor = 'rgba(255, 90, 44, 0.4)'
+    ctx.shadowBlur = 5
   }
-  ctx.strokeStyle = '#ffda40'
+  ctx.strokeStyle = '#ff5a2c'
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(playheadX, 0)
@@ -381,7 +381,7 @@ function renderCanvas() {
   ctx.stroke()
 
   // Playhead cap triangle
-  ctx.fillStyle = '#ffda40'
+  ctx.fillStyle = '#ff5a2c'
   ctx.beginPath()
   ctx.moveTo(playheadX - 5, 0)
   ctx.lineTo(playheadX + 5, 0)
@@ -568,16 +568,16 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="retro-monitor p-3 sm:p-4 select-none"
+    class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-3.5 sm:p-4 select-none"
     role="region"
     aria-label="Monitor Bentuk Gelombang Pemangkas Hening"
   >
     <!-- Top JetBrains Mono Time Ruler Overlay -->
-    <div class="relative h-5 border-b border-white/10 mb-1.5 flex items-end">
+    <div class="relative h-5 border-b border-[#111111]/15 mb-2 flex items-end">
       <div
         v-for="(tick, idx) in rulerTicks"
         :key="idx"
-        class="absolute bottom-1 font-telemetry text-[10px] leading-none text-[#a1a1aa] tabular-nums pointer-events-none"
+        class="absolute bottom-1 font-telemetry text-[10px] font-bold leading-none text-[#60605e] tabular-nums pointer-events-none"
         :style="{
           left: `${tick.percent}%`,
           transform: idx === 0 ? 'translateX(0%)' : idx === rulerTicks.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)'
@@ -588,7 +588,7 @@ onUnmounted(() => {
     </div>
 
     <!-- HiDPI Interactive Waveform Canvas -->
-    <div ref="containerRef" class="relative w-full h-44 sm:h-52 overflow-hidden rounded-[8px]">
+    <div ref="containerRef" class="relative w-full h-44 sm:h-52 overflow-hidden rounded-[10px] border-[1.5px] border-[#111111] bg-[#fcfcfb]">
       <canvas
         ref="canvasRef"
         class="block w-full h-full touch-none"
@@ -600,31 +600,31 @@ onUnmounted(() => {
     </div>
 
     <!-- Bottom Telemetry Readout Strip -->
-    <div class="mt-2.5 pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+    <div class="mt-3 pt-2.5 border-t border-[#111111]/12 flex flex-wrap items-center justify-between gap-2 text-[11px]">
       <div class="flex flex-wrap items-center gap-3">
-        <span v-if="!isTrimmedPreview" class="inline-flex items-center gap-1.5 text-[#a1a1aa]">
-          <span class="w-2 h-2 rounded-full bg-[#20afff]"></span>
+        <span v-if="!isTrimmedPreview" class="inline-flex items-center gap-1.5 text-[#60605e] font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#0284c7] border border-[#111111]/40"></span>
           <span>Sinyal Aktif</span>
         </span>
-        <span v-else class="inline-flex items-center gap-1.5 text-[#5ad363] font-semibold">
-          <span class="w-2 h-2 rounded-full bg-[#5ad363]"></span>
+        <span v-else class="inline-flex items-center gap-1.5 text-emerald-800 font-bold">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#16a34a] border border-[#111111]/40"></span>
           <span>Pratinjau Hasil Pangkas</span>
         </span>
-        <span v-if="!isTrimmedPreview" class="inline-flex items-center gap-1.5 text-[#a1a1aa]">
-          <span class="w-2 h-2 rounded-full bg-[#ff82c2]"></span>
+        <span v-if="!isTrimmedPreview" class="inline-flex items-center gap-1.5 text-[#60605e] font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#db2777] border border-[#111111]/40"></span>
           <span>Zona Hening (Dibuang)</span>
         </span>
-        <span class="inline-flex items-center gap-1.5 text-[#a1a1aa]">
-          <span class="w-2 h-2 rounded-full bg-[#ffda40]"></span>
+        <span class="inline-flex items-center gap-1.5 text-[#60605e] font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-[#ff5a2c] border border-[#111111]/40"></span>
           <span>Playhead</span>
         </span>
       </div>
 
-      <div class="flex items-center gap-3 font-telemetry tabular-nums text-[11px]">
-        <span v-if="!isTrimmedPreview && durationSec > 0" class="text-[#ff82c2]">
+      <div class="flex items-center gap-3 font-telemetry font-bold tabular-nums text-[11px]">
+        <span v-if="!isTrimmedPreview && durationSec > 0" class="text-[#be185d]">
           IN {{ formatTimecode(computedBounds.startSec) }} – OUT {{ formatTimecode(computedBounds.endSec) }}
         </span>
-        <span class="text-[#ffda40]">
+        <span class="text-[#111111]">
           {{ formatTimecode(currentTimeSec) }} / {{ formatTimecode(durationSec) }}
         </span>
       </div>

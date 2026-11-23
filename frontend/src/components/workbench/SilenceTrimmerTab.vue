@@ -13,7 +13,8 @@ import {
   Check
 } from 'lucide-vue-next'
 import WaveformTrimmerCanvas from '../audio/WaveformTrimmerCanvas.vue'
-import { useWorkbenchStore } from '../../stores/workbench'
+import RetroSelect from '../ui/RetroSelect.vue'
+import { useWorkbenchStore, WORKBENCH_EXPORT_FORMATS } from '../../stores/workbench'
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const ALLOWED_EXT_REGEX = /\.(wav|flac|mp3)$/i
@@ -536,34 +537,12 @@ async function handleExecuteTrim() {
 }
 
 async function handleDownloadTrimmedWav() {
-  const url = workbenchStore.trimResult?.audioUrl
-  if (!url) return
+  if (!workbenchStore.trimResult?.storageKey) return
   isDownloadingWav.value = true
-  const rawName = workbenchStore.trimmerSource.fileName || 'audio'
-  const base = rawName.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_')
-  const filename = `TRIMMED_${base}.wav`
-
   try {
-    const res = await fetch(url, { cache: 'no-store' })
-    if (!res.ok) throw new Error('HTTP error')
-    const blob = await res.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+    await workbenchStore.downloadTrimmedExport(workbenchStore.downloadFormat)
   } catch {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.target = '_blank'
-    link.rel = 'noopener'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    // Store error banner displays error
   } finally {
     isDownloadingWav.value = false
   }
@@ -581,16 +560,11 @@ defineExpose({
 <template>
   <div class="space-y-5">
     <!-- Source Selector Bar + Local Dropzone -->
-    <section class="retro-glass-card p-5 sm:p-6 space-y-4">
+    <section class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-5 sm:p-6 space-y-4">
       <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div>
-          <h2 class="font-editorial font-bold text-lg sm:text-xl text-[#111111] tracking-tight">
-            Pemangkas Hening Pintar &amp; De-Clicker
-          </h2>
-          <p class="text-xs sm:text-sm text-[#60605e] mt-0.5">
-            Pangkas hening di awal dan akhir trek dengan ambang batas real-time, margin aman, dan micro-fade anti-klik.
-          </p>
-        </div>
+        <h2 class="font-editorial font-bold text-lg sm:text-xl text-[#111111] tracking-tight">
+          Pemangkas Hening Pintar &amp; De-Clicker
+        </h2>
 
         <!-- Quick Stem Switcher when Tab 1 stems are available -->
         <div v-if="availableJobStems.length > 0" class="flex flex-wrap items-center gap-1.5 shrink-0">
@@ -618,7 +592,7 @@ defineExpose({
       >
         <div v-if="hasSource" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
-            <div class="w-10 h-10 rounded-[12px] bg-[#18181b] text-[#ffda40] border-2 border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-[12px] bg-[#fff099] text-[#111111] border-[1.5px] border-[#111111] shadow-[1.5px_2px_0_#111111] flex items-center justify-center shrink-0">
               <FileAudio class="w-5 h-5" :stroke-width="2" />
             </div>
             <div class="min-w-0">
@@ -655,7 +629,7 @@ defineExpose({
             @change="handleFileInputChange"
             class="sr-only"
           />
-          <div class="w-11 h-11 rounded-[12px] bg-[#18181b] text-[#ffda40] border-2 border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center mb-2.5">
+          <div class="w-11 h-11 rounded-[12px] bg-[#ffda40] text-[#111111] border-[1.5px] border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center mb-2.5">
             <Upload class="w-5 h-5" :stroke-width="2" />
           </div>
           <p class="text-sm font-bold text-[#111111]">
@@ -678,7 +652,7 @@ defineExpose({
 
     <!-- Waveform Monitor + Controls + A/B Auditioning -->
     <template v-if="hasSource">
-      <!-- Embedded HiDPI Waveform Canvas inside .retro-monitor -->
+      <!-- Embedded HiDPI Waveform Canvas inside light v2 monitor card -->
       <WaveformTrimmerCanvas
         :peaks="activePeaks"
         :duration-sec="activeDurationSec"
@@ -695,7 +669,7 @@ defineExpose({
       />
 
       <!-- Transport & A/B Auditioning Bar -->
-      <section class="retro-glass-card p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <section class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div class="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
@@ -751,7 +725,7 @@ defineExpose({
       </section>
 
       <!-- Trimmer Parameter Controls -->
-      <section class="retro-glass-card p-5 sm:p-6 space-y-5">
+      <section class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-5 sm:p-6 space-y-5">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
           <!-- Silence Threshold Slider -->
           <div class="space-y-2">
@@ -885,7 +859,7 @@ defineExpose({
       </section>
 
       <!-- Trim Telemetry Cards & WAV Download -->
-      <section v-if="hasTrimResult" class="retro-glass-card p-5 sm:p-6 space-y-4 animate-fade-in">
+      <section v-if="hasTrimResult" class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-5 sm:p-6 space-y-4 animate-fade-in">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="retro-telemetry-plate p-3.5 space-y-1">
             <span class="block text-[11px] font-bold text-[#60605e]">Durasi Asli</span>
@@ -916,19 +890,29 @@ defineExpose({
           <p class="text-xs text-[#60605e]">
             {{ hasJobSource && syncAllStems
               ? 'Keempat stem telah disinkronkan dengan titik potong identik dan siap dikirim ke Studio Workspace.'
-              : 'Audio hasil pemangkasan siap diaudisi A/B atau diunduh sebagai berkas WAV 24-bit.' }}
+              : 'Audio hasil pemangkasan siap diaudisi A/B atau diunduh sesuai format pilihan.' }}
           </p>
 
-          <button
-            type="button"
-            @click="handleDownloadTrimmedWav"
-            :disabled="isDownloadingWav"
-            class="btn-keycap btn-keycap-yellow px-4 py-2.5 text-xs shrink-0"
-          >
-            <Loader2 v-if="isDownloadingWav" class="w-4 h-4 animate-spin" :stroke-width="2" />
-            <Download v-else class="w-4 h-4" :stroke-width="2" />
-            <span>{{ isDownloadingWav ? 'Mengunduh WAV...' : 'Unduh WAV Hasil Trim' }}</span>
-          </button>
+          <div class="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
+            <RetroSelect
+              v-model="workbenchStore.downloadFormat"
+              :options="WORKBENCH_EXPORT_FORMATS"
+              :compact="true"
+              :drop-up="true"
+              aria-label="Pilih format unduhan hasil trim"
+            />
+
+            <button
+              type="button"
+              @click="handleDownloadTrimmedWav"
+              :disabled="isDownloadingWav"
+              class="btn-keycap btn-keycap-yellow px-4 py-2.5 text-xs shrink-0"
+            >
+              <Loader2 v-if="isDownloadingWav" class="w-4 h-4 animate-spin" :stroke-width="2" />
+              <Download v-else class="w-4 h-4" :stroke-width="2" />
+              <span>{{ isDownloadingWav ? 'Mengunduh...' : 'Unduh Hasil Trim' }}</span>
+            </button>
+          </div>
         </div>
       </section>
     </template>

@@ -4,6 +4,42 @@ import axios from 'axios';
 const POLL_INTERVAL_MS = 1500;
 const MAX_CONSECUTIVE_POLL_ERRORS = 5;
 
+export const WORKBENCH_EXPORT_FORMATS = [
+  { value: 'auto', label: 'Sesuai File Asli' },
+  { value: 'flac24', label: 'FLAC 24-bit' },
+  { value: 'wav24', label: 'WAV 24-bit PCM' },
+  { value: 'mp3_320', label: 'MP3 320 kbps' },
+];
+
+async function extractBlobError(err, fallbackMsg) {
+  if (err?.response?.data instanceof Blob) {
+    try {
+      const text = await err.response.data.text();
+      const parsed = JSON.parse(text);
+      if (parsed?.error) return parsed.error;
+    } catch {
+      // keep fallback message
+    }
+  } else if (err?.response?.data?.error) {
+    return err.response.data.error;
+  }
+  return err?.message || fallbackMsg;
+}
+
+async function fetchAndTriggerBlobDownload(url, fallbackName, fallbackErrMsg) {
+  const res = await axios.get(url, { responseType: 'blob' });
+  const filename = extractFilenameFromHeader(res.headers?.['content-disposition'], fallbackName);
+  const blobUrl = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  return filename;
+}
+
 let pollTimer = null;
 let isPollingRequest = false;
 let consecutivePollErrors = 0;
@@ -55,6 +91,7 @@ export const useWorkbenchStore = defineStore('workbench', {
     isTrimming: false,
     isDownloadingZip: false,
     isSendingToStudio: false,
+    downloadFormat: 'auto',
     error: null,
     trimmerSource: createEmptyTrimmerSource(),
     trimResult: null,
@@ -143,6 +180,7 @@ export const useWorkbenchStore = defineStore('workbench', {
         this.job = {
           jobId: data.jobId,
           fileName: data.fileName || this.job?.fileName || '',
+          sourceFormat: data.sourceFormat || this.job?.sourceFormat || null,
           status: data.status,
           progress: data.progress ?? 0,
           stepMessage: data.stepMessage || '',
@@ -284,6 +322,7 @@ export const useWorkbenchStore = defineStore('workbench', {
         this.trimResult = {
           storageKey: data.storageKey,
           audioUrl: data.audioUrl,
+          sourceFormat: data.sourceFormat || this.job?.sourceFormat || null,
           originalDurationSec: data.originalDurationSec,
           trimmedDurationSec: data.trimmedDurationSec,
           leadInRemovedSec: data.leadInRemovedSec,
@@ -313,7 +352,7 @@ export const useWorkbenchStore = defineStore('workbench', {
       }
     },
 
-    async downloadZip(jobId = this.job?.jobId) {
+    async downloadZip(jobId = this.job?.jobId, format = this.downloadFormat) {
       if (!jobId) {
         const msg = 'Tidak ada pekerjaan workbench yang tersedia untuk diunduh';
         this.error = msg;
@@ -324,42 +363,73 @@ export const useWorkbenchStore = defineStore('workbench', {
       this.error = null;
 
       try {
-        const res = await axios.get(`/api/v1/workbench/jobs/${jobId}/download-zip`, {
-          responseType: 'blob',
-        });
-
         const fallbackName = this.job?.fileName
           ? `Polaris_Workbench_${this.job.fileName.replace(/\.[^.]+$/, '')}_Stems.zip`
           : 'Polaris_Workbench_Stems.zip';
-        const filename = extractFilenameFromHeader(res.headers?.['content-disposition'], fallbackName);
-
-        const blobUrl = URL.createObjectURL(res.data);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-
-        return filename;
+        return await fetchAndTriggerBlobDownload(
+          `/api/v1/workbench/jobs/${jobId}/download-zip?format=${encodeURIComponent(format || 'auto')}`,
+          fallbackName,
+          'Gagal mengunduh arsip ZIP stem'
+        );
       } catch (err) {
-        let msg = 'Gagal mengunduh arsip ZIP stem';
-        if (err.response?.data instanceof Blob) {
-          try {
-            const text = await err.response.data.text();
-            const parsed = JSON.parse(text);
-            if (parsed?.error) msg = parsed.error;
-          } catch {
-            // keep fallback message
-          }
-        } else if (err.response?.data?.error) {
-          msg = err.response.data.error;
-        }
-        this.error = msg;
+        this.error = await extractBlobError(err, 'Gagal mengunduh arsip ZIP stem');
         throw err;
       } finally {
         this.isDownloadingZip = false;
+      }
+    },
+
+    async downloadStem(stemName, format = this.downloadFormat) {
+      const jobId = this.job?.jobId;
+      if (!jobId || !stemName) {
+        const msg = 'Stem tidak tersedia untuk diunduh';
+        this.error = msg;
+        throw new Error(msg);
+      }
+
+      this.error = null;
+      try {
+        return await fetchAndTriggerBlobDownload(
+          `/api/v1/workbench/jobs/${jobId}/stems/${encodeURIComponent(stemName)}/download?format=${encodeURIComponent(format || 'auto')}`,
+          `${stemName}.wav`,
+          'Gagal mengunduh berkas stem audio'
+        );
+      } catch (err) {
+        this.error = await extractBlobError(err, 'Gagal mengunduh berkas stem audio');
+        throw err;
+      }
+    },
+
+    async downloadTrimmedExport(format = this.downloadFormat) {
+      const storageKey = this.trimResult?.storageKey;
+      if (!storageKey) {
+        const msg = 'Berkas hasil pemangkasan belum tersedia';
+        this.error = msg;
+        throw new Error(msg);
+      }
+
+      this.error = null;
+      try {
+        const params = new URLSearchParams({
+          storageKey,
+          format: format || 'auto',
+          fileName: this.trimmerSource.fileName || 'trimmed_audio.wav',
+        });
+        const srcFmt = this.trimResult?.sourceFormat;
+        if (srcFmt?.targetFormat) {
+          params.set('sourceTargetFormat', srcFmt.targetFormat);
+        }
+        if (srcFmt?.bitrateKbps) {
+          params.set('sourceBitrateKbps', String(srcFmt.bitrateKbps));
+        }
+        return await fetchAndTriggerBlobDownload(
+          `/api/v1/workbench/export?${params.toString()}`,
+          'trimmed_audio.wav',
+          'Gagal mengunduh berkas hasil pemangkasan'
+        );
+      } catch (err) {
+        this.error = await extractBlobError(err, 'Gagal mengunduh berkas hasil pemangkasan');
+        throw err;
       }
     },
 

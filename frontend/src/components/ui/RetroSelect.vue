@@ -22,6 +22,10 @@ const props = defineProps({
   compact: {
     type: Boolean,
     default: false
+  },
+  dropUp: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -97,7 +101,8 @@ onUnmounted(() => {
       v-if="isOpen"
       role="listbox"
       :aria-label="ariaLabel"
-      class="absolute left-0 right-0 z-50 mt-1.5 min-w-[200px] bg-white/98 backdrop-blur-xl border-2 border-[#111111] rounded-[14px] shadow-[3px_4px_0_#111111] p-1.5 max-h-56 overflow-y-auto animate-fade-in"
+      :class="dropUp ? 'bottom-full mb-1.5' : 'mt-1.5'"
+      class="absolute left-0 right-0 z-50 min-w-[200px] bg-white/98 backdrop-blur-xl border-2 border-[#111111] rounded-[14px] shadow-[3px_4px_0_#111111] p-1.5 max-h-56 overflow-y-auto animate-fade-in"
     >
       <button
         v-for="opt in options"

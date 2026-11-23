@@ -16,7 +16,8 @@ import {
   FileAudio,
   X
 } from 'lucide-vue-next'
-import { useWorkbenchStore } from '../../stores/workbench'
+import RetroSelect from '../ui/RetroSelect.vue'
+import { useWorkbenchStore, WORKBENCH_EXPORT_FORMATS } from '../../stores/workbench'
 
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024
 const ALLOWED_EXT_REGEX = /\.(wav|flac|mp3)$/i
@@ -427,30 +428,12 @@ function handleOpenInTrimmer(stem) {
 }
 
 async function handleDownloadSingleStem(stem) {
-  if (!stem?.audioUrl) return
+  if (!stem?.name) return
   downloadingStemName.value = stem.name
-  const filename = `${stem.isTrimmed ? 'TRIMMED_' : ''}${stem.name}.wav`
   try {
-    const res = await fetch(stem.audioUrl, { cache: 'no-store' })
-    if (!res.ok) throw new Error('HTTP error')
-    const blob = await res.blob()
-    const blobUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+    await workbenchStore.downloadStem(stem.name, workbenchStore.downloadFormat)
   } catch {
-    const link = document.createElement('a')
-    link.href = stem.audioUrl
-    link.download = filename
-    link.target = '_blank'
-    link.rel = 'noopener'
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
+    // Store displays error
   } finally {
     downloadingStemName.value = null
   }
@@ -487,16 +470,11 @@ defineExpose({
 <template>
   <div class="space-y-5">
     <!-- Upload Dropzone Card -->
-    <section class="retro-glass-card p-5 sm:p-6 space-y-4">
+    <section class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-5 sm:p-6 space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <div>
-          <h2 class="font-editorial font-bold text-lg sm:text-xl text-[#111111] tracking-tight">
-            Pemisah Stem Audio AI
-          </h2>
-          <p class="text-xs sm:text-sm text-[#60605e] mt-0.5">
-            Unggah lagu campuran (stereo mixdown) untuk dipisahkan otomatis menjadi 4 stem terpisah: Vocals, Drums, Bass, dan Other.
-          </p>
-        </div>
+        <h2 class="font-editorial font-bold text-lg sm:text-xl text-[#111111] tracking-tight">
+          Pemisah Stem Audio AI
+        </h2>
         <span class="self-start sm:self-center px-3 py-1 rounded-full bg-white border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] text-[11px] font-bold text-[#111111] font-telemetry tabular-nums shrink-0">
           WAV &middot; FLAC &middot; MP3 &le; 100 MB
         </span>
@@ -520,7 +498,7 @@ defineExpose({
           aria-label="Pilih berkas audio untuk pemisahan stem"
         />
 
-        <div class="w-12 h-12 rounded-[14px] bg-[#18181b] text-[#20afff] border-2 border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center mx-auto mb-3">
+        <div class="w-12 h-12 rounded-[14px] bg-[#87d7ff] text-[#111111] border-[1.5px] border-[#111111] shadow-[2px_3px_0_#111111] flex items-center justify-center mx-auto mb-3">
           <Upload class="w-5 h-5" :stroke-width="2" />
         </div>
 
@@ -581,61 +559,63 @@ defineExpose({
       </div>
     </section>
 
-    <!-- Active Queue / Processing Hardware Monitor -->
+    <!-- Active Queue / Processing Card (Unified Light v2 Card) -->
     <section
       v-if="workbenchStore.isJobRunning"
-      class="retro-monitor p-5 sm:p-6 space-y-4 animate-fade-in"
+      class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-5 sm:p-6 space-y-4 animate-fade-in"
       aria-live="polite"
     >
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-9 h-9 rounded-[10px] bg-[#20afff]/15 border border-[#20afff]/40 text-[#20afff] flex items-center justify-center shrink-0">
+          <div class="w-10 h-10 rounded-[12px] border-[1.5px] border-[#111111] bg-[#ffda40] shadow-[1.5px_2px_0_#111111] text-[#111111] flex items-center justify-center shrink-0">
             <Loader2 class="w-5 h-5 animate-spin" :stroke-width="2.2" />
           </div>
           <div class="min-w-0">
-            <p class="text-xs font-bold text-white truncate">
+            <p class="text-xs sm:text-sm font-bold text-[#111111] truncate">
               {{ workbenchStore.job?.fileName || 'Berkas Audio' }}
             </p>
-            <p class="text-[11px] text-[#a1a1aa] mt-0.5">
+            <p class="text-xs text-[#60605e] mt-0.5">
               {{ workbenchStore.job?.stepMessage || 'Memproses pemisahan stem...' }}
             </p>
           </div>
         </div>
 
-        <div class="flex items-center gap-2.5 shrink-0">
-          <span class="px-2.5 py-1 rounded-full bg-[#27272a] border border-white/15 text-[11px] font-bold text-[#ffda40]">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="px-2.5 py-1 rounded-full bg-[#fff099] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] text-[11px] font-bold text-[#111111] leading-none">
             {{ workbenchStore.job?.status === 'QUEUED' ? 'Dalam Antrean' : 'Sedang Diproses' }}
           </span>
-          <span class="font-telemetry text-sm font-bold text-[#20afff] tabular-nums">
+          <span class="inline-flex items-center rounded-full bg-[#87d7ff] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-2.5 py-1 font-telemetry text-xs font-bold text-[#111111] tabular-nums leading-none">
             {{ progressPercent }}%
           </span>
         </div>
       </div>
 
-      <div class="w-full h-2.5 bg-[#27272a] rounded-full overflow-hidden border border-white/10">
+      <div class="w-full h-3 bg-[#eaeef4] rounded-full overflow-hidden border-[1.5px] border-[#111111]">
         <div
           class="h-full bg-[#20afff] transition-all duration-300 rounded-full"
-          :style="{ width: `${progressPercent}%` }"
+          :style="{ width: `${Math.max(4, progressPercent)}%` }"
         ></div>
       </div>
     </section>
 
     <!-- Completed Stems Results & Multi-Stem Preview -->
     <section v-if="hasCompleted" class="space-y-4 animate-fade-in">
-      <!-- Synchronized Multi-Stem Preview Transport Monitor -->
-      <div class="retro-monitor p-4 sm:p-5 space-y-3">
+      <!-- Synchronized Multi-Stem Preview Transport Card (Light v2 Studio Card) -->
+      <div class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-4 sm:p-5 space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-center gap-2.5 min-w-0">
-            <CheckCircle2 class="w-4 h-4 text-[#5ad363] shrink-0" :stroke-width="2.2" />
-            <span class="text-xs sm:text-sm font-bold text-white truncate">
+            <span class="w-7 h-7 rounded-[8px] border-[1.5px] border-[#111111] bg-[#d8f3dc] text-[#111111] flex items-center justify-center shrink-0">
+              <CheckCircle2 class="w-4 h-4" :stroke-width="2.2" />
+            </span>
+            <span class="text-xs sm:text-sm font-bold text-[#111111] truncate">
               Pratinjau Sinkron 4 Stem &mdash; {{ workbenchStore.job?.fileName }}
             </span>
           </div>
 
-          <div class="flex items-center gap-2 font-telemetry text-xs text-[#ffda40] tabular-nums shrink-0">
+          <div class="inline-flex items-center gap-1.5 rounded-full bg-[#f5f3eb] border-[1.5px] border-[#111111] shadow-[1px_1.5px_0_#111111] px-3 py-1 font-telemetry text-xs font-bold text-[#111111] tabular-nums shrink-0 self-start sm:self-center">
             <span>{{ formatTimecode(currentTimeSec) }}</span>
-            <span class="text-[#a1a1aa]">/</span>
-            <span class="text-[#a1a1aa]">{{ formatTimecode(durationSec) }}</span>
+            <span class="text-[#60605e]">/</span>
+            <span class="text-[#60605e]">{{ formatTimecode(durationSec) }}</span>
           </div>
         </div>
 
@@ -673,16 +653,20 @@ defineExpose({
             :disabled="isLoadingBuffers || durationSec <= 0"
             @input="handleSeekInput"
             aria-label="Scrubber waktu pratinjau multitrack"
-            class="flex-1"
+            class="flex-1 accent-[#111111]"
           />
         </div>
 
-        <div v-if="bufferError" class="text-xs text-rose-300 flex items-center justify-between gap-2 pt-1">
+        <div
+          v-if="bufferError"
+          role="alert"
+          class="rounded-[10px] border-[1.5px] border-[#111111] bg-[#ffcae6]/50 px-3 py-2 text-xs font-medium text-[#111111] flex items-center justify-between gap-2"
+        >
           <span>{{ bufferError }}</span>
           <button
             type="button"
             @click="loadAllStemBuffers(stems)"
-            class="underline text-[#20afff] cursor-pointer shrink-0"
+            class="btn-keycap btn-keycap-mini btn-keycap-white px-2.5 py-1 text-[11px] shrink-0"
           >
             Muat Ulang
           </button>
@@ -694,7 +678,7 @@ defineExpose({
         <article
           v-for="stem in stems"
           :key="stem.name"
-          class="retro-glass-card p-4 sm:p-5 flex flex-col justify-between gap-4"
+          class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-4 sm:p-5 flex flex-col justify-between gap-4"
         >
           <div class="flex items-start justify-between gap-3">
             <div class="space-y-1 min-w-0">
@@ -761,7 +745,7 @@ defineExpose({
                 class="btn-keycap btn-keycap-mini btn-keycap-white px-3 py-1.5 text-xs"
               >
                 <Download class="w-3.5 h-3.5" :stroke-width="2" />
-                <span>{{ downloadingStemName === stem.name ? 'Mengunduh...' : 'Unduh WAV' }}</span>
+                <span>{{ downloadingStemName === stem.name ? 'Mengunduh...' : 'Unduh' }}</span>
               </button>
             </div>
           </div>
@@ -769,12 +753,20 @@ defineExpose({
       </div>
 
       <!-- Footer Action Bar -->
-      <footer class="retro-glass-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <footer class="rounded-[14px] border-[1.5px] border-[#111111] bg-white/96 shadow-[2px_3px_0_#111111] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p class="text-xs text-[#60605e] leading-relaxed">
           Kirim keempat stem langsung ke <strong class="font-bold text-[#111111]">Studio Workspace</strong> untuk audit fasa &amp; perbaikan DSP otomatis, atau unduh seluruh stem dalam satu arsip ZIP.
         </p>
 
         <div class="flex flex-wrap items-center justify-end gap-2.5 shrink-0">
+          <RetroSelect
+            v-model="workbenchStore.downloadFormat"
+            :options="WORKBENCH_EXPORT_FORMATS"
+            :compact="true"
+            :drop-up="true"
+            aria-label="Pilih format unduhan"
+          />
+
           <button
             type="button"
             @click="handleDownloadZip"

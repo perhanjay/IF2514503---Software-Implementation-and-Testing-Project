@@ -110,14 +110,9 @@ onUnmounted(() => {
     <main class="relative z-10 flex-1 w-full max-w-[1800px] 2xl:max-w-[1920px] mx-auto px-4 sm:px-6 md:px-10 lg:px-12 py-7 md:py-9 space-y-6">
       <!-- Workbench Header -->
       <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-1">
-        <div class="space-y-1.5">
-          <h1 class="font-editorial font-bold text-3xl sm:text-4xl text-[#111111] tracking-[-0.03em] leading-none">
-            Audio Workbench
-          </h1>
-          <p class="text-xs sm:text-sm text-[#60605e] max-w-2xl leading-relaxed">
-            Pisahkan trek campuran menjadi 4 stem terisolasi dengan AI, pangkas hening secara presisi dengan de-clicker, lalu kirim ke Studio Workspace.
-          </p>
-        </div>
+        <h1 class="font-editorial font-bold text-3xl sm:text-4xl text-[#111111] tracking-[-0.03em] leading-none">
+          Audio Workbench
+        </h1>
 
         <router-link
           to="/dashboard"
