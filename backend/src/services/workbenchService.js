@@ -373,6 +373,10 @@ function runPythonWorker(payload, mode, timeoutMs = 180000) {
   });
 }
 
+function isNumericInput(val) {
+  return typeof val === 'number' || (typeof val === 'string' && val.trim() !== '');
+}
+
 function parseSplitRegions(regionsInput) {
   let parsed = regionsInput;
   if (typeof parsed === 'string') {
@@ -392,10 +396,7 @@ function parseSplitRegions(regionsInput) {
     }
     const rawStart = region.startSec;
     const rawEnd = region.endSec;
-    if (
-      rawStart === undefined || rawStart === null || rawStart === '' || typeof rawStart === 'boolean' ||
-      rawEnd === undefined || rawEnd === null || rawEnd === '' || typeof rawEnd === 'boolean'
-    ) {
+    if (!isNumericInput(rawStart) || !isNumericInput(rawEnd)) {
       throw createHttpError(400, `Batas waktu region ke-${idx + 1} wajib berupa angka`);
     }
     const startSec = Number(rawStart);
@@ -418,7 +419,7 @@ function parseSplitFadeMs(fadeMsInput) {
   if (fadeMsInput === undefined || fadeMsInput === null || fadeMsInput === '') {
     return 15;
   }
-  if (typeof fadeMsInput === 'boolean') {
+  if (!isNumericInput(fadeMsInput)) {
     throw createHttpError(400, 'Parameter fadeMs harus berupa angka antara 0 hingga 100');
   }
   const num = Number(fadeMsInput);
@@ -752,8 +753,8 @@ export class WorkbenchService {
       : null;
     const spec = resolveExportSpec(format, parsedSourceFormat);
 
-    const rawBase = path.basename(fileName || storageKey, path.extname(fileName || storageKey)) || 'trimmed_audio';
-    const safeBase = sanitizeFileName(rawBase) || 'trimmed_audio';
+    const rawBase = path.basename(fileName || storageKey, path.extname(fileName || storageKey)) || 'audio';
+    const safeBase = sanitizeFileName(rawBase) || 'audio';
 
     const [exported] = await transcodeStorageItems(
       [
@@ -766,7 +767,7 @@ export class WorkbenchService {
       spec
     );
 
-    const downloadName = safeBase.startsWith('TRIMMED_') ? `${safeBase}${exported.ext}` : `TRIMMED_${safeBase}${exported.ext}`;
+    const downloadName = `${safeBase}${exported.ext}`;
     return {
       filename: downloadName,
       mimeType: exported.mime,
@@ -809,7 +810,7 @@ export class WorkbenchService {
     if (maxDur - minDur > MAX_SYNC_DURATION_DRIFT_SEC) {
       throw createHttpError(
         400,
-        'Durasi antar stem tidak sinkron (selisih melebihi 0.1 detik). Silakan sinkronkan di Trimmer terlebih dahulu.'
+        'Durasi antar stem tidak sinkron (selisih melebihi 0.1 detik).'
       );
     }
 

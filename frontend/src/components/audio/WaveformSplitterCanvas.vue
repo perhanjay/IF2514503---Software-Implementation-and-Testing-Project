@@ -564,6 +564,7 @@ function stopDragging() {
 }
 
 function handlePointerDown(e) {
+  if (typeof e.button === 'number' && e.button !== 0) return
   const dur = Number(props.durationSec) || 0
   if (dur <= 0) return
   const { x, y, width } = getLocalPoint(e)

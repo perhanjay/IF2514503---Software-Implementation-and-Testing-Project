@@ -651,6 +651,7 @@ async function loadRawSourceBuffer() {
   rawPeaks.value = []
   regions.value = []
   selectedRegionId.value = null
+  batchPrefix.value = ''
   hasManualOverrides.value = false
   rawDurationSec.value = Number(workbenchStore.splitterSource.rawDurationSec || 0)
   decodeError.value = ''

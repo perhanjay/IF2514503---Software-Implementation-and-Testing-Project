@@ -366,6 +366,50 @@ describe('Audio Workbench API (Stem Separator, Asset Splitter, & Session Bridge)
         .field('regions', JSON.stringify([{ name: 'ok', startSec: 0.1, endSec: 0.6 }]))
         .attach('audio', wav, 'neg_fade.wav');
       assert.equal(resNegativeFade.status, 400);
+
+      const resWhitespaceFade = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('fadeMs', '   ')
+        .field('regions', JSON.stringify([{ name: 'ok', startSec: 0.1, endSec: 0.6 }]))
+        .attach('audio', wav, 'whitespace_fade.wav');
+      assert.equal(resWhitespaceFade.status, 400);
+
+      const resArrayFade = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          fadeMs: [],
+          regions: [{ name: 'ok', startSec: 0.1, endSec: 0.6 }]
+        });
+      assert.equal(resArrayFade.status, 400);
+
+      const resArrayBound = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          fadeMs: 15,
+          regions: [{ name: 'bad_array', startSec: [], endSec: 0.6 }]
+        });
+      assert.equal(resArrayBound.status, 400);
+
+      const resWhitespaceBound = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          fadeMs: 15,
+          regions: [{ name: 'bad_ws', startSec: 0.1, endSec: '   ' }]
+        });
+      assert.equal(resWhitespaceBound.status, 400);
+
+      const resObjectBound = await request(app)
+        .post('/api/v1/workbench/split')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({
+          fadeMs: 15,
+          regions: [{ name: 'bad_obj', startSec: {}, endSec: 0.6 }]
+        });
+      assert.equal(resObjectBound.status, 400);
     });
 
     it('splits standalone WAV into named S3 assets with presigned audioUrls', async () => {
@@ -622,7 +666,7 @@ describe('Audio Workbench API (Stem Separator, Asset Splitter, & Session Bridge)
         .buffer(true);
       assert.equal(resExportFlac.status, 200);
       assert.match(resExportFlac.headers['content-type'], /audio\/flac/);
-      assert.match(resExportFlac.headers['content-disposition'], /vox_hook\.flac/);
+      assert.match(resExportFlac.headers['content-disposition'], /filename="vox_hook\.flac"/);
 
       const resExportIdor = await request(app)
         .get(`/api/v1/workbench/export?storageKey=${encodeURIComponent(firstAsset.storageKey)}&format=flac24`)
@@ -725,7 +769,7 @@ describe('Audio Workbench API (Stem Separator, Asset Splitter, & Session Bridge)
         .buffer(true);
       assert.equal(resExportFlac.status, 200);
       assert.match(resExportFlac.headers['content-type'], /audio\/flac/);
-      assert.match(resExportFlac.headers['content-disposition'], /TRIMMED_vocals\.flac/);
+      assert.match(resExportFlac.headers['content-disposition'], /filename="vocals\.flac"/);
 
       // Verify 'auto' respects MP3 sourceFormat recorded in Redis
       const rawJob1 = await redis.get(`workbench:job:${job1Id}`);
